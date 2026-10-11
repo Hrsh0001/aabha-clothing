@@ -3,6 +3,7 @@ import './globals.css';
 import { ClientProviders } from '../components/ClientProviders';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_URL || 'https://aabhaclothing.in'),
   title: "AABHA CLOTHING — Premium Indian Women's Ethnic Wear",
   description:
     "A contemporary Indian women's ethnic-wear house crafting minimal silhouettes, handwoven Chanderi silks, and timeless everyday elegance.",
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
     description:
       "A contemporary Indian women's ethnic-wear house crafting minimal silhouettes, handwoven Chanderi silks, and timeless everyday elegance.",
     type: 'website',
+    url: 'https://aabhaclothing.in',
   },
 };
 
