@@ -7,9 +7,10 @@ import { useAuth } from '../context/AuthContext';
 import { AdminSidebar } from './AdminSidebar';
 
 interface AdminLayoutProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   extraAction?: React.ReactNode;
+  noPadding?: boolean;
   children: React.ReactNode;
 }
 
@@ -17,6 +18,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   title,
   subtitle,
   extraAction,
+  noPadding = false,
   children,
 }) => {
   const { isAdmin, isInitialized } = useAuth();
@@ -66,26 +68,34 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       {/* Main Content Workspace */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Workspace Top Bar */}
-        <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="font-serif text-2xl sm:text-3xl text-[#1E1B18] font-normal tracking-tight">
-              {title}
-            </h1>
-            {subtitle && (
-              <p className="text-xs text-[#7C736A] font-light mt-0.5">
-                {subtitle}
-              </p>
-            )}
-          </div>
-          {extraAction && (
-            <div className="flex items-center gap-3">
-              {extraAction}
+        {title && (
+          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="font-serif text-2xl sm:text-3xl text-[#1E1B18] font-normal tracking-tight">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="text-xs text-[#7C736A] font-light mt-0.5">
+                  {subtitle}
+                </p>
+              )}
             </div>
-          )}
-        </header>
+            {extraAction && (
+              <div className="flex items-center gap-3">
+                {extraAction}
+              </div>
+            )}
+          </header>
+        )}
 
         {/* Workspace Children */}
-        <main className="flex-1 p-4 sm:p-8 lg:p-10 max-w-[1700px] w-full mx-auto">
+        <main
+          className={
+            noPadding
+              ? 'flex-1 w-full flex flex-col min-h-0'
+              : 'flex-1 p-4 sm:p-8 lg:p-10 max-w-[1700px] w-full mx-auto'
+          }
+        >
           {children}
         </main>
       </div>

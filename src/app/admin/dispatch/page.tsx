@@ -282,7 +282,7 @@ export default function AdminDispatchMapPage() {
   );
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Live Dispatch & Courier GPS Tracing" noPadding>
       <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden bg-[#FAF8F5]">
         {/* Header Bar */}
         <div className="p-4 sm:p-5 bg-[#F3EFEA] border-b border-[#ECE6DD] flex flex-wrap items-center justify-between gap-3 shrink-0">
