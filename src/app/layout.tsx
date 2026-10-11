@@ -1,6 +1,13 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ClientProviders } from '../components/ClientProviders';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#FAF8F5',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || 'https://aabhaclothing.in'),
@@ -25,8 +32,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -34,9 +42,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-[#FAF8F5] text-[#1E1B18] antialiased selection:bg-[#231F1D] selection:text-[#FAF8F5] min-h-screen w-full overflow-x-hidden">
+      <body className="bg-[#FAF8F5] text-[#1E1B18] antialiased selection:bg-[#231F1D] selection:text-[#FAF8F5] min-h-screen w-full max-w-full overflow-x-hidden">
         <ClientProviders>
-          <div className="max-w-[1920px] mx-auto w-full min-h-screen flex flex-col">
+          <div className="max-w-[1920px] mx-auto w-full min-h-screen flex flex-col overflow-x-hidden">
             {children}
           </div>
         </ClientProviders>

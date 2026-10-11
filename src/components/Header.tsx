@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
-            className="p-2 -ml-2 text-[#1E1B18] hover:text-[#6E5043] transition-colors cursor-pointer"
+            className="p-2 text-[#1E1B18] hover:text-[#6E5043] transition-colors cursor-pointer"
           >
             {mobileMenuOpen ? (
               <X className="w-5 h-5 stroke-[1.35]" />
@@ -114,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 1: Brand Logo (Perfectly Centered Horizontally & Vertically on Mobile, Vertically Centered on Desktop) */}
-        <div className="max-md:absolute max-md:left-1/2 max-md:top-1/2 max-md:-translate-x-1/2 max-md:-translate-y-1/2 shrink-0 flex items-center justify-center md:justify-start h-full">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0 shrink-0 flex items-center justify-center md:justify-start h-full pointer-events-auto">
           <a
             href="#top"
             aria-label="AABHA CLOTHING Home"

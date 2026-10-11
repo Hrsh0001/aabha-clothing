@@ -46,10 +46,17 @@ export async function GET(request: Request) {
 
     // 2. Fallback to local data/orders.json
     const ordersFilePath = path.join(process.cwd(), 'data', 'orders.json');
-    if (fs.existsSync(ordersFilePath)) {
-      const data = fs.readFileSync(ordersFilePath, 'utf-8');
-      const allOrders = JSON.parse(data);
+    let allOrders: any[] = [];
+    try {
+      if (fs.existsSync(ordersFilePath)) {
+        const data = fs.readFileSync(ordersFilePath, 'utf-8');
+        allOrders = JSON.parse(data);
+      }
+    } catch (parseErr) {
+      allOrders = [];
+    }
 
+    if (Array.isArray(allOrders) && allOrders.length > 0) {
       const matched = allOrders.filter((o: any) => {
         if (cleanOrderNum) {
           const matchNum =

@@ -213,7 +213,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        className="relative w-full h-[84vh] min-h-[560px] sm:h-[88vh] max-h-[880px] overflow-hidden bg-[#181512] select-none"
+        className="relative w-full h-[84vh] min-h-[560px] sm:h-[88vh] max-h-[880px] overflow-hidden bg-[#181512] select-none touch-pan-y"
       >
         {heroSlides.map((slide, index) => {
           const isActive = index === activeSlide;
@@ -252,7 +252,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     <p className="text-[11px] sm:text-xs tracking-[0.24em] uppercase text-[#E5DDD3] mb-4 sm:mb-5">
                       {slide.eyebrow}
                     </p>
-                    <h1 className="font-serif text-[36px] sm:text-6xl lg:text-[70px] font-light sm:font-normal tracking-[0.05em] leading-[1.08] text-[#FAF8F5] mb-4 sm:mb-6">
+                    <h1 className="font-serif text-[28px] xs:text-[34px] sm:text-6xl lg:text-[70px] font-light sm:font-normal tracking-[0.05em] leading-[1.08] text-[#FAF8F5] mb-4 sm:mb-6 break-words">
                       {slide.heading}
                     </h1>
                     <p className="text-base sm:text-xl text-[#EDE7DF] font-light tracking-[0.02em] leading-relaxed mb-9 sm:mb-11 max-w-lg">

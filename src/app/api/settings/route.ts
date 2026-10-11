@@ -30,29 +30,48 @@ const DEFAULT_SETTINGS: SiteSettings = {
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemorySettingsCache: SiteSettings | null = null;
+
 function ensureSettingsFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(SETTINGS_FILE_PATH)) {
-    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(SETTINGS_FILE_PATH)) {
+      fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
 function readSettings(): SiteSettings {
+  if (inMemorySettingsCache) {
+    return inMemorySettingsCache;
+  }
   try {
     ensureSettingsFile();
-    const data = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
-  } catch (err) {
+    if (fs.existsSync(SETTINGS_FILE_PATH)) {
+      const data = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
+      inMemorySettingsCache = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+      return inMemorySettingsCache;
+    }
     return DEFAULT_SETTINGS;
+  } catch (err) {
+    return inMemorySettingsCache || DEFAULT_SETTINGS;
   }
 }
 
 function saveSettings(settings: SiteSettings): void {
-  ensureSettingsFile();
-  fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  inMemorySettingsCache = settings;
+  try {
+    ensureSettingsFile();
+    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (settings kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/settings — Fetch active branding & section images

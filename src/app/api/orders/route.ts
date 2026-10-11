@@ -36,30 +36,48 @@ export interface CODOrder {
 
 const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'orders.json');
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryOrdersCache: CODOrder[] | null = null;
+
 function ensureDataDirectory(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(ORDERS_FILE_PATH)) {
-    fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(ORDERS_FILE_PATH)) {
+      fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
 function readOrders(): CODOrder[] {
+  if (inMemoryOrdersCache && inMemoryOrdersCache.length > 0) {
+    return inMemoryOrdersCache;
+  }
   try {
     ensureDataDirectory();
-    const data = fs.readFileSync(ORDERS_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    if (fs.existsSync(ORDERS_FILE_PATH)) {
+      const data = fs.readFileSync(ORDERS_FILE_PATH, 'utf-8');
+      inMemoryOrdersCache = JSON.parse(data);
+      return inMemoryOrdersCache || [];
+    }
+    return inMemoryOrdersCache || [];
   } catch (err) {
-    console.error('Error reading orders file:', err);
-    return [];
+    return inMemoryOrdersCache || [];
   }
 }
 
 function saveOrders(orders: CODOrder[]): void {
-  ensureDataDirectory();
-  fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), 'utf-8');
+  inMemoryOrdersCache = orders;
+  try {
+    ensureDataDirectory();
+    fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (orders kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/orders — Fetch all COD orders (Used by Admin Dashboard)

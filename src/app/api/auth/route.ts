@@ -6,26 +6,21 @@ import { signJwt, verifyJwt } from '../../../lib/jwt';
 
 const USERS_FILE_PATH = path.join(process.cwd(), 'data', 'users.json');
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryUsersCache: any[] | null = null;
+
 function ensureUsersFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(USERS_FILE_PATH)) {
-    // Seed with initial customer demo account
-    const initialUsers = [
-      {
-        id: 'user_seed_01',
-        name: 'Ananya Sharma',
-        email: 'ananya@example.com',
-        phone: '9876543210',
-        passwordHash: hashPassword('password123'),
-        resetToken: null,
-        resetTokenExpiry: null,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(initialUsers, null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(USERS_FILE_PATH)) {
+      // Empty array for clean production state (no static dummy patrons)
+      fs.writeFileSync(USERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
@@ -34,18 +29,30 @@ function hashPassword(password: string): string {
 }
 
 function readUsers(): any[] {
+  if (inMemoryUsersCache && inMemoryUsersCache.length > 0) {
+    return inMemoryUsersCache;
+  }
   try {
     ensureUsersFile();
-    const data = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    if (fs.existsSync(USERS_FILE_PATH)) {
+      const data = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
+      inMemoryUsersCache = JSON.parse(data);
+      return inMemoryUsersCache || [];
+    }
+    return inMemoryUsersCache || [];
   } catch (err) {
-    return [];
+    return inMemoryUsersCache || [];
   }
 }
 
 function saveUsers(users: any[]): void {
-  ensureUsersFile();
-  fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
+  inMemoryUsersCache = users;
+  try {
+    ensureUsersFile();
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (users kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/auth — Verify customer token & return profile

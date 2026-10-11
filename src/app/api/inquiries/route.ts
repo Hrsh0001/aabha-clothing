@@ -16,29 +16,48 @@ export interface CustomerInquiry {
 
 const INQUIRIES_FILE_PATH = path.join(process.cwd(), 'data', 'inquiries.json');
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryInquiriesCache: CustomerInquiry[] | null = null;
+
 function ensureInquiriesFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(INQUIRIES_FILE_PATH)) {
-    fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(INQUIRIES_FILE_PATH)) {
+      fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
 function readInquiries(): CustomerInquiry[] {
+  if (inMemoryInquiriesCache && inMemoryInquiriesCache.length > 0) {
+    return inMemoryInquiriesCache;
+  }
   try {
     ensureInquiriesFile();
-    const data = fs.readFileSync(INQUIRIES_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    if (fs.existsSync(INQUIRIES_FILE_PATH)) {
+      const data = fs.readFileSync(INQUIRIES_FILE_PATH, 'utf-8');
+      inMemoryInquiriesCache = JSON.parse(data);
+      return inMemoryInquiriesCache || [];
+    }
+    return inMemoryInquiriesCache || [];
   } catch (err) {
-    return [];
+    return inMemoryInquiriesCache || [];
   }
 }
 
 function saveInquiries(inquiries: CustomerInquiry[]): void {
-  ensureInquiriesFile();
-  fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify(inquiries, null, 2), 'utf-8');
+  inMemoryInquiriesCache = inquiries;
+  try {
+    ensureInquiriesFile();
+    fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify(inquiries, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (inquiries kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/inquiries — List all customer inquiries

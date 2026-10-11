@@ -21,41 +21,49 @@ function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password.trim()).digest('hex');
 }
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryCustomersCache: any[] | null = null;
+
 function ensureUsersFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(USERS_FILE_PATH)) {
-    const initialUsers = [
-      {
-        id: 'user_seed_01',
-        name: 'Ananya Sharma',
-        email: 'ananya@example.com',
-        phone: '9876543210',
-        passwordHash: hashPassword('password123'),
-        resetToken: null,
-        resetTokenExpiry: null,
-        createdAt: new Date('2026-10-09T10:00:00.000Z').toISOString(),
-      },
-    ];
-    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(initialUsers, null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(USERS_FILE_PATH)) {
+      // Empty array for clean production state (no static dummy patrons)
+      fs.writeFileSync(USERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
 function readUsers(): any[] {
+  if (inMemoryCustomersCache && inMemoryCustomersCache.length > 0) {
+    return inMemoryCustomersCache;
+  }
   try {
     ensureUsersFile();
-    const data = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    if (fs.existsSync(USERS_FILE_PATH)) {
+      const data = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
+      inMemoryCustomersCache = JSON.parse(data);
+      return inMemoryCustomersCache || [];
+    }
+    return inMemoryCustomersCache || [];
   } catch (err) {
-    return [];
+    return inMemoryCustomersCache || [];
   }
 }
 
 function saveUsers(users: any[]): void {
-  ensureUsersFile();
-  fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
+  inMemoryCustomersCache = users;
+  try {
+    ensureUsersFile();
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (customers kept in memory cache):', fsErr);
+  }
 }
 
 function readOrders(): any[] {

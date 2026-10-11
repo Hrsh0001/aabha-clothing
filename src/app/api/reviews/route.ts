@@ -19,29 +19,48 @@ export interface StoredReview {
 const REVIEWS_FILE_PATH = path.join(process.cwd(), 'data', 'reviews.json');
 const PRODUCTS_FILE_PATH = path.join(process.cwd(), 'data', 'products.json');
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryReviewsCache: StoredReview[] | null = null;
+
 function ensureReviewsFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(REVIEWS_FILE_PATH)) {
-    fs.writeFileSync(REVIEWS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(REVIEWS_FILE_PATH)) {
+      fs.writeFileSync(REVIEWS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    }
+  } catch (fsErr) {
+    // Read-only filesystem in cloud deployment
   }
 }
 
 function readReviews(): StoredReview[] {
+  if (inMemoryReviewsCache && inMemoryReviewsCache.length > 0) {
+    return inMemoryReviewsCache;
+  }
   try {
     ensureReviewsFile();
-    const data = fs.readFileSync(REVIEWS_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    if (fs.existsSync(REVIEWS_FILE_PATH)) {
+      const data = fs.readFileSync(REVIEWS_FILE_PATH, 'utf-8');
+      inMemoryReviewsCache = JSON.parse(data);
+      return inMemoryReviewsCache || [];
+    }
+    return inMemoryReviewsCache || [];
   } catch (err) {
-    return [];
+    return inMemoryReviewsCache || [];
   }
 }
 
 function saveReviews(reviews: StoredReview[]): void {
-  ensureReviewsFile();
-  fs.writeFileSync(REVIEWS_FILE_PATH, JSON.stringify(reviews, null, 2), 'utf-8');
+  inMemoryReviewsCache = reviews;
+  try {
+    ensureReviewsFile();
+    fs.writeFileSync(REVIEWS_FILE_PATH, JSON.stringify(reviews, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (reviews kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/reviews — List reviews (Storefront by productId or All for Admin)

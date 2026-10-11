@@ -458,23 +458,41 @@ function ProductEditorContent() {
     setCustomSizeInput('');
   };
 
-  // Submit Form
+  // Submit Form with comprehensive pre-flight validation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validate Garment Name
     if (!name.trim()) {
-      alert('Please enter a garment name.');
+      showToast('Validation Error: Please enter a garment name.');
       return;
     }
-    if (!price || Number(price) <= 0) {
-      alert('Please enter a valid price.');
+
+    // 2. Validate Price
+    const parsedPrice = Number(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      showToast('Validation Error: Price must be a valid positive amount in ₹ INR.');
       return;
     }
-    if (selectedSizes.length === 0) {
-      alert('Please select at least one available size.');
+
+    // 3. Validate Original Price if entered
+    if (originalPrice && Number(originalPrice) < parsedPrice) {
+      showToast('Validation Warning: Original price is lower than selling price.');
+    }
+
+    // 4. Validate Sizes
+    const validSizes = selectedSizes
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => Boolean(s));
+
+    if (validSizes.length === 0) {
+      showToast('Validation Error: Please select at least one available size (e.g., S, M, L).');
       return;
     }
-    if (gallery.length === 0) {
-      alert('Please add at least one garment photo.');
+
+    // 5. Validate Photos
+    if (!gallery || gallery.length === 0 || !gallery[0]?.url) {
+      showToast('Validation Error: Please upload at least one garment photo.');
       return;
     }
 
@@ -483,18 +501,25 @@ function ProductEditorContent() {
       const leadImage = gallery[0]?.url || primaryImage;
       const drapeImage = secondaryImage || leadImage;
 
+      // Ensure gallery items are clean structured objects
+      const sanitizedGallery = gallery.map((item, idx) => ({
+        url: item.url.trim(),
+        label: item.label?.trim() || (idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`),
+        focalClass: item.focalClass || 'object-center',
+      }));
+
       const payload = {
         name: name.trim(),
         category,
-        price: Number(price),
+        price: parsedPrice,
         originalPrice: originalPrice ? Number(originalPrice) : undefined,
-        fabric: fabric.trim(),
-        inStock,
+        fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
+        inStock: Boolean(inStock),
         description: description.trim(),
-        sizes: selectedSizes,
+        sizes: validSizes,
         primaryImage: leadImage,
         secondaryImage: drapeImage,
-        gallery: gallery,
+        gallery: sanitizedGallery,
       };
 
       if (!isNew && productId) {
@@ -511,7 +536,7 @@ function ProductEditorContent() {
             router.push('/admin/products');
           }, 1200);
         } else {
-          showToast(data.error || 'Failed to update garment');
+          showToast(`Save Error: ${data.error || 'Failed to update garment'}`);
         }
       } else {
         // Create new

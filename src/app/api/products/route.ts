@@ -18,19 +18,31 @@ function ensureProductsFile(): void {
   }
 }
 
+// In-memory fallback cache for serverless environments where local filesystem is read-only
+let inMemoryProductsCache: any[] | null = null;
+
 function readLocalProducts(): any[] {
+  if (inMemoryProductsCache && inMemoryProductsCache.length > 0) {
+    return inMemoryProductsCache;
+  }
   try {
     ensureProductsFile();
     const data = fs.readFileSync(PRODUCTS_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
+    inMemoryProductsCache = JSON.parse(data);
+    return inMemoryProductsCache;
   } catch (err) {
-    return PRODUCTS;
+    return inMemoryProductsCache || PRODUCTS;
   }
 }
 
 function saveLocalProducts(products: any[]): void {
-  ensureProductsFile();
-  fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(products, null, 2), 'utf-8');
+  inMemoryProductsCache = products;
+  try {
+    ensureProductsFile();
+    fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(products, null, 2), 'utf-8');
+  } catch (fsErr) {
+    console.warn('Serverless filesystem notice (kept in memory cache):', fsErr);
+  }
 }
 
 // GET /api/products — List all products or query single product by ?id= (Storefront & Admin)
@@ -206,13 +218,38 @@ export async function PUT(request: Request) {
 
     if (process.env.DATABASE_URL && prisma) {
       try {
-        const updated = await prisma.product.update({
+        const galleryUrls: string[] = Array.isArray(updates.gallery)
+          ? updates.gallery
+              .map((g: any) => (typeof g === 'string' ? g : g?.url || ''))
+              .filter(Boolean)
+          : [];
+
+        const prismaData: any = {
+          name: updates.name,
+          category: updates.category,
+          price: Number(updates.price),
+          originalPrice: updates.originalPrice ? Number(updates.originalPrice) : null,
+          inStock: updates.inStock !== undefined ? Boolean(updates.inStock) : true,
+          primaryImage: updates.primaryImage || '',
+          secondaryImage: updates.secondaryImage || null,
+          gallery: galleryUrls,
+          sizes: Array.isArray(updates.sizes) ? updates.sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+          description: updates.description || '',
+          fabric: updates.fabric || '',
+        };
+
+        const updated = await prisma.product.upsert({
           where: { id },
-          data: updates,
+          update: prismaData,
+          create: {
+            id,
+            sku: updates.sku || `AB-${id.toUpperCase().slice(0, 8)}`,
+            ...prismaData,
+          },
         });
         return NextResponse.json({ success: true, product: updated });
       } catch (dbErr) {
-        console.warn('Prisma update fallback notice:', dbErr);
+        console.warn('Prisma upsert fallback notice:', dbErr);
       }
     }
 
