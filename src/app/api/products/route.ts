@@ -165,8 +165,15 @@ export async function POST(request: Request) {
 
     if (process.env.DATABASE_URL && prisma) {
       try {
+        const galleryUrls: string[] = Array.isArray(newProduct.gallery)
+          ? newProduct.gallery
+              .map((g: any) => (typeof g === 'string' ? g : g?.url || ''))
+              .filter(Boolean)
+          : [];
+
         const created = await prisma.product.create({
           data: {
+            id: newProduct.id,
             sku: newProduct.sku,
             name: newProduct.name,
             category: newProduct.category,
@@ -174,6 +181,8 @@ export async function POST(request: Request) {
             originalPrice: newProduct.originalPrice,
             inStock: true,
             primaryImage: newProduct.primaryImage,
+            secondaryImage: newProduct.secondaryImage,
+            gallery: galleryUrls,
             description: newProduct.description,
             fabric: newProduct.fabric,
             sizes: newProduct.sizes,
@@ -190,10 +199,10 @@ export async function POST(request: Request) {
     saveLocalProducts(localProducts);
 
     return NextResponse.json({ success: true, product: newProduct });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding product:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create product' },
+      { success: false, error: error?.message || 'Failed to create product', details: String(error) },
       { status: 500 }
     );
   }
@@ -286,8 +295,16 @@ export async function PUT(request: Request) {
     saveLocalProducts(localProducts);
 
     return NextResponse.json({ success: true, product: localProducts[index] });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Failed to update product' }, { status: 500 });
+  } catch (error: any) {
+    console.error('PUT /api/products error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error?.message || 'Failed to update product',
+        details: String(error),
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -322,7 +339,15 @@ export async function DELETE(request: Request) {
     saveLocalProducts(filtered);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Failed to delete product' }, { status: 500 });
+  } catch (error: any) {
+    console.error('DELETE /api/products error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error?.message || 'Failed to delete product',
+        details: String(error),
+      },
+      { status: 500 }
+    );
   }
 }

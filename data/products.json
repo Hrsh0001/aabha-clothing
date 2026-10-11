@@ -21,27 +21,17 @@
       "XL",
       "XXL"
     ],
-    "primaryImage": "/images/garment_Screenshot_2026-09-09_155031_1791716146114.png",
+    "primaryImage": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
     "secondaryImage": "/images/brand_story_editorial_1791119191742.jpg",
     "gallery": [
       {
-        "url": "/images/garment_Screenshot_2026-09-09_155031_1791716146114.png",
+        "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
         "label": "Full Studio Silhouette",
         "focalClass": "object-center"
       },
       {
         "url": "/images/product_dress_ochre_1791119165890.jpg",
         "label": "Pleated Bodice & Yoke Detail",
-        "focalClass": "object-top scale-125"
-      },
-      {
-        "url": "/images/product_dress_ochre_1791119165890.jpg",
-        "label": "Kalidar Flare & Zari Selvedge",
-        "focalClass": "object-bottom scale-120"
-      },
-      {
-        "url": "/images/brand_story_editorial_1791119191742.jpg",
-        "label": "Editorial Daylight Drape",
         "focalClass": "object-center"
       }
     ],

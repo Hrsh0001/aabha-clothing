@@ -112,14 +112,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const fullName = (body.fullName || body.customerName || '').trim();
+    const phone = (body.phone || '').trim();
+    const email = (body.email || '').trim();
+    const address = (body.address || '').trim();
+    const city = (body.city || '').trim();
+    const stateName = (body.stateName || body.state || 'Maharashtra').trim();
+    const postalCode = (body.postalCode || body.pincode || '').trim();
     const {
-      fullName,
-      phone,
-      email,
-      address,
-      city,
-      stateName,
-      postalCode,
       latitude,
       longitude,
       mapUrl,
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
     // Basic Validation
     if (!fullName || !phone || !address || !city || !postalCode || !items || items.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Missing required order fields' },
+        { success: false, error: 'Missing required order fields (name, phone, address, city, pincode, items)' },
         { status: 400 }
       );
     }
