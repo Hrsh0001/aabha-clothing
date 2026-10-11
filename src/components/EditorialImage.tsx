@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect } from 'react';
 
 interface EditorialImageProps {
@@ -20,11 +21,13 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
   const [currentSrc, setCurrentSrc] = useState(src);
   const [hasError, setHasError] = useState(false);
   const [attemptedFallback, setAttemptedFallback] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     setCurrentSrc(src);
     setHasError(false);
     setAttemptedFallback(false);
+    setIsLoaded(false);
   }, [src]);
 
   const handleError = () => {
@@ -44,13 +47,23 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
   return (
     <div className={containerClassName}>
       {!hasError ? (
-        <img
-          src={currentSrc}
-          alt={alt}
-          loading={priority ? 'eager' : 'lazy'}
-          onError={handleError}
-          className={className}
-        />
+        <>
+          {/* Subtle loading shimmer placeholder while downloading */}
+          {!isLoaded && !priority && (
+            <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse" />
+          )}
+          <img
+            src={currentSrc}
+            alt={alt}
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
+            onLoad={() => setIsLoaded(true)}
+            onError={handleError}
+            className={`${className} transition-opacity duration-500 ease-out ${
+              isLoaded || priority ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        </>
       ) : (
         <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#F3EFEA] via-[#EAE3DA] to-[#DFD5C8] text-[#5C5349] text-center">
           <svg
@@ -73,4 +86,3 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
     </div>
   );
 };
-

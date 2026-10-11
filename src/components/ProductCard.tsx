@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { Heart, Plus } from 'lucide-react';
 import { Product, GarmentSize, formatINR } from '../data/products';
@@ -38,6 +39,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const showSizeOverlay = isHovered || mobileSizesOpen;
+  const availableSizes =
+    product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0
+      ? product.sizes
+      : (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as GarmentSize[]);
 
   return (
     <article
@@ -61,6 +66,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           }`}
         />
 
+        {/* Sold Out Badge */}
+        {!product.inStock && (
+          <span className="absolute top-3 left-3 sm:top-4 sm:left-4 px-2.5 py-1 bg-[#231F1D]/90 backdrop-blur-xs text-[#FAF8F5] text-[10px] tracking-wider uppercase font-medium z-10">
+            Sold Out
+          </span>
+        )}
+
         {/* Refined Minimal Wishlist Toggle Button */}
         <button
           type="button"
@@ -79,8 +91,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           />
         </button>
 
-        {/* Mobile Quick Add Trigger Button */}
-        {!mobileSizesOpen && (
+        {/* Mobile Quick Add Trigger Button (Only if in stock) */}
+        {product.inStock && !mobileSizesOpen && (
           <button
             type="button"
             onClick={(e) => {
@@ -95,35 +107,37 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         )}
 
-        {/* Quick-Add Size Bar (Desktop Hover or Mobile Toggle) */}
-        <div
-          className={`absolute inset-x-0 bottom-0 bg-[#FAF8F5]/95 backdrop-blur-xs px-3 sm:px-4 py-2.5 sm:py-3 transition-opacity duration-200 z-20 ${
-            showSizeOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-            <span className="text-[10px] sm:text-[11px] tracking-wider uppercase text-[#7C736A]">
-              {addedSize ? `Added Size ${addedSize}` : 'Quick Add Size'}
-            </span>
+        {/* Quick-Add Size Bar (Only if in stock) */}
+        {product.inStock && (
+          <div
+            className={`absolute inset-x-0 bottom-0 bg-[#FAF8F5]/95 backdrop-blur-xs px-3 sm:px-4 py-2.5 sm:py-3 transition-opacity duration-200 z-20 ${
+              showSizeOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+              <span className="text-[10px] sm:text-[11px] tracking-wider uppercase text-[#7C736A]">
+                {addedSize ? `Added Size ${addedSize}` : 'Quick Add Size'}
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1">
+              {availableSizes.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={(e) => handleQuickSizeClick(size, e)}
+                  className={`py-1.5 text-[11px] font-normal transition-colors whitespace-nowrap cursor-pointer ${
+                    addedSize === size
+                      ? 'bg-[#231F1D] text-[#FAF8F5]'
+                      : 'bg-[#F3EFEA] text-[#1E1B18] hover:bg-[#231F1D] hover:text-[#FAF8F5]'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-6 gap-1">
-            {product.sizes.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={(e) => handleQuickSizeClick(size, e)}
-                className={`py-1.5 text-[11px] font-normal transition-colors whitespace-nowrap cursor-pointer ${
-                  addedSize === size
-                    ? 'bg-[#231F1D] text-[#FAF8F5]'
-                    : 'bg-[#F3EFEA] text-[#1E1B18] hover:bg-[#231F1D] hover:text-[#FAF8F5]'
-                }`}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Spacious Editorial Product Details */}

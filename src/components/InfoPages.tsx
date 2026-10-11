@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { ArrowRight, Mail, Clock, CheckCircle2 } from 'lucide-react';
 import { EDITORIAL_ASSETS } from '../data/products';
@@ -9,11 +10,11 @@ interface AboutPageProps {
 
 export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => {
   return (
-    <div className="max-w-[1360px] mx-auto px-4 sm:px-8 py-12 sm:py-20 space-y-20">
+    <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-10 sm:py-16 lg:py-20 space-y-16 sm:space-y-20">
       {/* Hero Header */}
       <div className="max-w-3xl space-y-4">
         <p className="text-xs tracking-[0.18em] uppercase text-[#7C736A]">
-          AABHA CLOTHING · Premium Indian Women's Ethnic Wear
+          AABHA CLOTHING · Premium Indian Women&apos;s Ethnic Wear
         </p>
         <h1 className="font-serif text-4xl sm:text-6xl text-[#1E1B18] font-normal leading-[1.08]">
           Quiet Indian Luxury, Woven for the Everyday Hour.
@@ -84,18 +85,46 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => 
 export const ContactPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [topic, setTopic] = useState('Sizing & Styling Inquiry');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !message.trim()) return;
-    setSubmitted(true);
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          topic,
+          message: message.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSubmitted(true);
+      } else {
+        setError(data.error || 'Failed to send message. Please try again.');
+      }
+    } catch (err) {
+      setError('Network connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-[1360px] mx-auto px-4 sm:px-8 py-12 sm:py-20">
+    <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-10 sm:py-16 lg:py-20">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         <div className="lg:col-span-5 space-y-8">
           <div>
@@ -148,6 +177,7 @@ export const ContactPage: React.FC = () => {
                 onClick={() => {
                   setSubmitted(false);
                   setMessage('');
+                  setPhone('');
                 }}
                 className="px-7 py-3 bg-[#231F1D] text-[#FAF8F5] text-xs tracking-[0.16em] uppercase cursor-pointer"
               >
@@ -159,6 +189,12 @@ export const ContactPage: React.FC = () => {
               <h2 className="font-serif text-2xl sm:text-3xl text-[#1E1B18] font-normal">
                 Write to AABHA
               </h2>
+
+              {error && (
+                <div className="p-3 bg-[#FFEBEE] text-[#C62828] text-xs border border-[#FFCDD2]">
+                  {error}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -189,20 +225,36 @@ export const ContactPage: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-[#7C736A] mb-1.5">
-                  Subject
-                </label>
-                <select
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#1E1B18]"
-                >
-                  <option>Sizing & Styling Inquiry</option>
-                  <option>Order Dispatch & Tracking Status</option>
-                  <option>Size Exchange or Return Request</option>
-                  <option>General Inquiry</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-[#7C736A] mb-1.5">
+                    Mobile Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="9876543210"
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:border-[#1E1B18]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[#7C736A] mb-1.5">
+                    Subject
+                  </label>
+                  <select
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#1E1B18] cursor-pointer"
+                  >
+                    <option>Sizing & Styling Inquiry</option>
+                    <option>Order Dispatch & Tracking Status</option>
+                    <option>Size Exchange or Return Request</option>
+                    <option>Custom Handloom Request</option>
+                    <option>General Inquiry</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -214,16 +266,17 @@ export const ContactPage: React.FC = () => {
                   required
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="How can we help you today?"
+                  placeholder="How can our styling team help you today?"
                   className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#1E1B18]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="px-8 py-3.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors cursor-pointer"
+                disabled={loading}
+                className="w-full sm:w-auto px-8 py-3.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors cursor-pointer disabled:opacity-50"
               >
-                SEND MESSAGE
+                {loading ? 'Sending to Atelier...' : 'Submit Message'}
               </button>
             </form>
           )}

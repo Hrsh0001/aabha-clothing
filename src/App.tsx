@@ -1,3 +1,4 @@
+'use client';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -20,6 +21,8 @@ import { CartDrawer, WishlistDrawer, SearchModal, CartItem } from './components/
 import { CheckoutPage } from './components/CheckoutPage';
 import { AboutPage, ContactPage, PolicyPage, PolicyTopic } from './components/InfoPages';
 import { Footer } from './components/Footer';
+import { useAuth } from './context/AuthContext';
+import type { SiteSettings } from './app/api/settings/route';
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -28,25 +31,13 @@ export default function App() {
   const [selectedProductId, setSelectedProductId] = useState<string>(PRODUCTS[0].id);
   const [policyTopic, setPolicyTopic] = useState<PolicyTopic>('shipping');
 
-  // Persistent Wishlist & Cart for AABHA CLOTHING 17-piece collection
-  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('aabha_wishlist_v1');
-      return saved ? JSON.parse(saved) : ['anarkali-01', 'chikankari-01'];
-    } catch {
-      return ['anarkali-01', 'chikankari-01'];
-    }
-  });
+  // Hydration-safe Persistent Wishlist & Cart
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
 
-  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('aabha_cart_v1');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return [{ product: PRODUCTS[0], size: 'S', quantity: 1 }];
-  });
+  const { setAuthModalOpen } = useAuth();
 
   // Drawers & Modals
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
@@ -56,19 +47,57 @@ export default function App() {
 
   useEffect(() => {
     try {
+      const savedWishlist = localStorage.getItem('aabha_wishlist_v1');
+      if (savedWishlist) {
+        setWishlistIds(JSON.parse(savedWishlist));
+      }
+      const savedCart = localStorage.getItem('aabha_cart_v1');
+      if (savedCart) {
+        setCartItems(JSON.parse(savedCart));
+      }
+    } catch {
+      // ignore
+    }
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    try {
       localStorage.setItem('aabha_wishlist_v1', JSON.stringify(wishlistIds));
     } catch {
       // ignore
     }
-  }, [wishlistIds]);
+  }, [wishlistIds, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try {
       localStorage.setItem('aabha_cart_v1', JSON.stringify(cartItems));
     } catch {
       // ignore
     }
-  }, [cartItems]);
+  }, [cartItems, isHydrated]);
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.products && data.products.length > 0) {
+          setProducts(data.products);
+        }
+      })
+      .catch((err) => console.warn('Live products sync notice:', err));
+
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setSiteSettings(data.settings);
+        }
+      })
+      .catch((err) => console.warn('Live settings sync notice:', err));
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -132,6 +161,11 @@ export default function App() {
     quantity: number = 1,
     openDrawer: boolean = true
   ) => {
+    if (!product.inStock) {
+      showToast(`${product.name} is currently out of stock`);
+      return;
+    }
+
     setCartItems((prev) => {
       const existingIndex = prev.findIndex(
         (item) => item.product.id === product.id && item.size === size
@@ -192,19 +226,47 @@ export default function App() {
     setCartDrawerOpen(true);
   };
 
-  const handleAddReview = (
+  const handleAddReview = async (
     productId: string,
     newReview: Omit<ProductReview, 'id' | 'date'>
   ) => {
-    const reviewObj: ProductReview = {
-      ...newReview,
-      id: `rev-${Date.now()}`,
-      date: 'October 2026',
-    };
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, reviews: [reviewObj, ...p.reviews] } : p))
-    );
-    showToast('Thank you. Your verified patron review has been published.');
+    const targetProduct = products.find((p) => p.id === productId);
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          productName: targetProduct?.name || 'Handloom Silhouette',
+          author: newReview.author,
+          sizePurchased: newReview.sizePurchased,
+          rating: newReview.rating,
+          title: newReview.title,
+          comment: newReview.comment,
+        }),
+      });
+      const data = await res.json();
+      const reviewObj: ProductReview = {
+        ...newReview,
+        id: data?.review?.id || `rev-${Date.now()}`,
+        date: data?.review?.date || 'October 2026',
+      };
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, reviews: [reviewObj, ...p.reviews] } : p))
+      );
+      showToast('Thank you. Your verified patron review has been recorded.');
+    } catch (err) {
+      // Offline / network fallback
+      const reviewObj: ProductReview = {
+        ...newReview,
+        id: `rev-${Date.now()}`,
+        date: 'October 2026',
+      };
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, reviews: [reviewObj, ...p.reviews] } : p))
+      );
+      showToast('Thank you. Your verified patron review has been recorded.');
+    }
   };
 
   const selectedProduct =
@@ -227,6 +289,7 @@ export default function App() {
         selectedCategory={selectedCategory}
         wishlistCount={wishlistIds.length}
         cartCount={totalCartCount}
+        products={products}
         onNavigateHome={handleNavigateHome}
         onNavigateNewArrivals={handleNavigateNewArrivals}
         onNavigateShopCategory={handleNavigateShopCategory}
@@ -241,6 +304,8 @@ export default function App() {
         onOpenSearch={() => setSearchModalOpen(true)}
         onOpenWishlist={() => setWishlistDrawerOpen(true)}
         onOpenCart={() => setCartDrawerOpen(true)}
+        onOpenAccount={() => setAuthModalOpen(true)}
+        logoUrl={siteSettings?.logoUrl}
       />
 
       {/* Main Content View Router with Subtle Editorial Fade-In Transition */}
@@ -256,6 +321,7 @@ export default function App() {
             <HomePage
               products={products}
               wishlistIds={wishlistIds}
+              siteSettings={siteSettings}
               onShopCollection={handleNavigateShopCategory}
               onSelectProduct={handleSelectProduct}
               onToggleWishlist={handleToggleWishlist}
@@ -338,6 +404,7 @@ export default function App() {
           setActivePage('policy');
           scrollToTop();
         }}
+        logoUrl={siteSettings?.logoUrl}
       />
 
       {/* Interactive Drawers & Search Overlay */}

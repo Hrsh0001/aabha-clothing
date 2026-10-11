@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
 import { CollectionFilter } from '../data/products';
@@ -10,6 +11,7 @@ interface FooterProps {
   onNavigateAbout: () => void;
   onNavigateContact: () => void;
   onNavigatePolicy: (topic: PolicyTopic) => void;
+  logoUrl?: string;
 }
 
 const FOOTER_CATEGORIES: CollectionFilter[] = [
@@ -26,20 +28,45 @@ export const Footer: React.FC<FooterProps> = ({
   onNavigateAbout,
   onNavigateContact,
   onNavigatePolicy,
+  logoUrl,
 }) => {
   const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSubscribed(true);
-    setEmail('');
+    const cleanEmail = email.trim();
+    if (!cleanEmail) return;
+
+    setErrorMsg('');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSubscribed(true);
+        setFeedbackMsg(data.message || 'Thank you for subscribing to AABHA CLOTHING.');
+        setEmail('');
+      } else {
+        setErrorMsg(data.error || 'Failed to subscribe. Please try again.');
+      }
+    } catch (err) {
+      setErrorMsg('Network error. Please try again later.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <footer className="bg-[#1B1815] text-[#EDE7DF]">
-      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-12 py-20 sm:py-28">
+      <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-16 sm:py-24 lg:py-28">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-10 pb-16 sm:pb-20 border-b border-[#2E2925]">
           {/* Brand Logo & Newsletter Column */}
           <div className="lg:col-span-5 space-y-6">
@@ -49,7 +76,7 @@ export const Footer: React.FC<FooterProps> = ({
               aria-label="AABHA CLOTHING Home"
               className="inline-flex items-center cursor-pointer"
             >
-              <BrandLogo variant="footer" />
+              <BrandLogo variant="footer" customLogoUrl={logoUrl} />
             </button>
             <p className="text-sm text-[#B5ABA0] font-light max-w-sm leading-relaxed">
               Premium Indian women’s ethnic wear crafted in small handloom batches with modern silhouettes and timeless elegance.
@@ -63,33 +90,40 @@ export const Footer: React.FC<FooterProps> = ({
               {subscribed ? (
                 <div className="flex items-center gap-2 text-xs text-[#D6C4AE] py-2 font-light">
                   <Check className="w-4 h-4 stroke-[1.4]" />
-                  <span>Thank you for subscribing to AABHA CLOTHING.</span>
+                  <span>{feedbackMsg || 'Thank you for subscribing to AABHA CLOTHING.'}</span>
                 </div>
               ) : (
-                <form
-                  onSubmit={handleSubscribe}
-                  className="flex items-center border-b border-[#4A433D] focus-within:border-[#FAF8F5] transition-colors pb-2"
-                >
-                  <label htmlFor="footer-newsletter" className="sr-only">
-                    Email address for newsletter
-                  </label>
-                  <input
-                    id="footer-newsletter"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email address"
-                    className="flex-1 bg-transparent py-1.5 text-sm text-[#FAF8F5] placeholder:text-[#7C736A] font-light focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="pl-4 py-1.5 text-[#FAF8F5] text-xs tracking-[0.18em] uppercase hover:text-[#D6C4AE] transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                <div>
+                  <form
+                    onSubmit={handleSubscribe}
+                    className="flex items-center border-b border-[#4A433D] focus-within:border-[#FAF8F5] transition-colors pb-2"
                   >
-                    <span>Subscribe</span>
-                    <ArrowRight className="w-3.5 h-3.5 stroke-[1.4]" />
-                  </button>
-                </form>
+                    <label htmlFor="footer-newsletter" className="sr-only">
+                      Email address for newsletter
+                    </label>
+                    <input
+                      id="footer-newsletter"
+                      type="email"
+                      required
+                      disabled={submitting}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email address"
+                      className="flex-1 bg-transparent py-1.5 text-sm text-[#FAF8F5] placeholder:text-[#7C736A] font-light focus:outline-none disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="pl-4 py-1.5 text-[#FAF8F5] text-xs tracking-[0.18em] uppercase hover:text-[#D6C4AE] transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer disabled:opacity-50"
+                    >
+                      <span>{submitting ? 'Subscribing...' : 'Subscribe'}</span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[1.4]" />
+                    </button>
+                  </form>
+                  {errorMsg && (
+                    <p className="text-[11px] text-[#FF8A80] mt-1.5 font-light">{errorMsg}</p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -139,13 +173,14 @@ export const Footer: React.FC<FooterProps> = ({
                 </button>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => onNavigateCategory('All Collection')}
-                  className="hover:text-[#FAF8F5] transition-colors cursor-pointer"
+                <a
+                  href="https://instagram.com/aabhaclothing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#FAF8F5] transition-colors inline-block"
                 >
                   Instagram
-                </button>
+                </a>
               </li>
             </ul>
           </div>
@@ -156,6 +191,14 @@ export const Footer: React.FC<FooterProps> = ({
               CLIENT CARE
             </h3>
             <ul className="space-y-3 text-sm font-light text-[#B5ABA0]">
+              <li>
+                <a
+                  href="/my-orders"
+                  className="hover:text-[#FAF8F5] transition-colors inline-block text-[#D8CEC2] font-normal"
+                >
+                  Track Orders & GST Bills
+                </a>
+              </li>
               <li>
                 <button
                   type="button"

@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# AABHA CLOTHING — Next.js Full-Stack COD Store
 
-# Run and deploy your AI Studio app
+A luxury Indian women's ethnic-wear e-commerce storefront with a **pure Cash on Delivery (COD)** checkout flow, unified backend API, and a Store Owner Admin Dashboard — all inside a single **Next.js (App Router)** codebase.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/52e189f6-8b18-4f3b-add3-6cebcc629149
+## Tech Stack
+* **Framework:** Next.js 15 (App Router)
+* **Styling:** Tailwind CSS v4
+* **Backend:** Next.js Route Handlers (`/api/orders`)
+* **Icons & Animation:** Lucide React + Motion
+* **Order Persistence:** Unified backend order storage in `data/orders.json`
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## Getting Started
 
+### 1. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 2. Routes Available
+* **Storefront:** [http://localhost:3000](http://localhost:3000) — Full catalog, 17 artisanal garments, editorial hero slider, cart, wishlist, and pure COD checkout.
+* **Store Owner Admin Panel:** [http://localhost:3000/admin/orders](http://localhost:3000/admin/orders) — View all received COD orders, customer details, one-click WhatsApp confirmation, call customer, and update order dispatch status.
+* **Backend Orders API:**
+  * `GET /api/orders` — Retrieve all orders
+  * `POST /api/orders` — Record new COD order
+  * `PATCH /api/orders` — Update order status (Pending / Confirmed / Dispatched / Delivered)
+
+---
+
+## Building for Production
+```bash
+npm run build
+npm run start
+```

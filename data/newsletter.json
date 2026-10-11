@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sub_17911001",
+    "email": "ananya.sharma@example.com",
+    "subscribedAt": "2026-10-09T10:14:22.000Z",
+    "source": "Storefront Footer"
+  },
+  {
+    "id": "sub_17911002",
+    "email": "priya.mehta@example.com",
+    "subscribedAt": "2026-10-10T14:22:18.000Z",
+    "source": "Storefront Footer"
+  },
+  {
+    "id": "sub_17911003",
+    "email": "kavita.verma@example.com",
+    "subscribedAt": "2026-10-11T08:05:40.000Z",
+    "source": "Storefront Footer"
+  }
+]

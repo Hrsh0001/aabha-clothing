@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import {
   ArrowLeft,
@@ -71,7 +72,21 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setActiveImageIndex(0);
     setQuantity(1);
     setPinStatus(null);
-  }, [product.id]);
+    if (product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0) {
+      if (!product.sizes.includes(selectedSize)) {
+        setSelectedSize(product.sizes[0] as GarmentSize);
+      }
+    }
+  }, [product.id, product.sizes]);
+
+  React.useEffect(() => {
+    if (!sizeGuideOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSizeGuideOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sizeGuideOpen]);
 
   const isWishlisted = wishlistIds.includes(product.id);
   const discountPercent =
@@ -79,17 +94,57 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
       : null;
 
-  const currentGalleryItem = product.gallery[activeImageIndex] || {
-    url: product.primaryImage,
-    label: 'Full Studio View',
-    focalClass: 'object-center',
-  };
+  const normalizedGallery = React.useMemo(() => {
+    if (!product.gallery || !Array.isArray(product.gallery) || product.gallery.length === 0) {
+      return [
+        {
+          url: product.primaryImage || '/images/hero_editorial_banner_1791119088652.jpg',
+          label: 'Full Studio View',
+          focalClass: 'object-center',
+        },
+      ];
+    }
+    return product.gallery.map((item: any, idx: number) => {
+      if (typeof item === 'string') {
+        return {
+          url: item,
+          label: `Studio View ${idx + 1}`,
+          focalClass: 'object-center',
+        };
+      }
+      return {
+        url: item.url || product.primaryImage,
+        label: item.label || `Studio View ${idx + 1}`,
+        focalClass: item.focalClass || 'object-center',
+      };
+    });
+  }, [product.gallery, product.primaryImage]);
+
+  const currentGalleryItem = normalizedGallery[activeImageIndex] || normalizedGallery[0];
+  const availableSizes =
+    product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0
+      ? product.sizes
+      : (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as GarmentSize[]);
+  const reviews = Array.isArray(product.reviews) ? product.reviews : [];
+  const highlights =
+    Array.isArray(product.highlights) && product.highlights.length > 0
+      ? product.highlights
+      : ['16-panel hand-joined kalidar construction', 'Concealed side-seam pockets'];
+  const fabricAndCare =
+    Array.isArray(product.fabricAndCare) && product.fabricAndCare.length > 0
+      ? product.fabricAndCare
+      : ['Dry clean only', 'Store in breathable cotton muslin bag'];
+  const sizeAndFit =
+    Array.isArray(product.sizeAndFit) && product.sizeAndFit.length > 0
+      ? product.sizeAndFit
+      : ['Relaxed tailored silhouette', 'True to size standard Indian fit'];
 
   const relatedProducts = allProducts
     .filter((p) => p.id !== product.id && (p.category === product.category || p.isCurated))
     .slice(0, 4);
 
   const handleAddClick = () => {
+    if (!product.inStock) return;
     onAddToCart(product, selectedSize, quantity);
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1600);
@@ -128,7 +183,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-16">
+    <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 sm:py-12 lg:py-16">
       {/* Minimal Breadcrumb & Back Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-8 sm:pb-10">
         <div className="flex items-center gap-2.5 text-xs text-[#7C736A]">
@@ -166,7 +221,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 sm:gap-4">
             {/* Thumbnails Strip */}
             <div className="order-2 sm:order-1 sm:col-span-2 flex sm:flex-col gap-3 overflow-x-auto no-scrollbar sm:overflow-visible">
-              {product.gallery.map((item, idx) => {
+              {normalizedGallery.map((item, idx) => {
                 const isSelected = idx === activeImageIndex;
                 return (
                   <button
@@ -223,7 +278,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <span aria-hidden="true">·</span>
               <span>{product.colorName}</span>
               <span aria-hidden="true">·</span>
-              <span className="text-[#6E5043]">Ready to Ship</span>
+              {product.inStock ? (
+                <span className="text-[#6E5043]">Ready to Ship</span>
+              ) : (
+                <span className="text-[#C62828] font-medium">Out of Stock</span>
+              )}
             </div>
 
             {/* Product Name */}
@@ -287,15 +346,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-6 gap-2">
-              {product.sizes.map((size) => {
+            <div className="flex flex-wrap gap-2">
+              {availableSizes.map((size) => {
                 const active = selectedSize === size;
                 return (
                   <button
                     key={size}
                     type="button"
                     onClick={() => setSelectedSize(size)}
-                    className={`py-3 text-xs font-normal border transition-colors whitespace-nowrap cursor-pointer ${
+                    className={`min-w-[52px] px-3.5 py-2.5 text-xs font-normal border transition-colors whitespace-nowrap cursor-pointer text-center ${
                       active
                         ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
                         : 'bg-transparent text-[#1E1B18] border-[#E0D8CE] hover:border-[#1E1B18]'
@@ -337,10 +396,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               {/* Add to Cart Button */}
               <button
                 type="button"
+                disabled={!product.inStock}
                 onClick={handleAddClick}
-                className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors whitespace-nowrap cursor-pointer"
+                className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {addedFeedback ? (
+                {!product.inStock ? (
+                  <span>Sold Out</span>
+                ) : addedFeedback ? (
                   <>
                     <Check className="w-4 h-4 stroke-[1.5]" />
                     <span>Added to Bag</span>
@@ -372,10 +434,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             {/* Buy Now Direct Checkout CTA */}
             <button
               type="button"
-              onClick={() => onBuyNow(product, selectedSize, quantity)}
-              className="w-full py-4 px-6 border border-[#231F1D] bg-transparent text-[#1E1B18] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors whitespace-nowrap cursor-pointer"
+              disabled={!product.inStock}
+              onClick={() => {
+                if (!product.inStock) return;
+                onBuyNow(product, selectedSize, quantity);
+              }}
+              className="w-full py-4 px-6 border border-[#231F1D] bg-transparent text-[#1E1B18] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Buy Now
+              {product.inStock ? 'Buy Now' : 'Currently Unavailable'}
             </button>
           </div>
 
@@ -421,7 +487,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="pb-6 space-y-3 text-sm text-[#4A433D] font-light leading-[1.75]">
                   <p>{product.description}</p>
                   <ul className="space-y-1.5 pt-1">
-                    {product.highlights.map((item, i) => (
+                    {highlights.map((item, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm">
                         <span className="text-[#6E5043]">·</span>
                         <span>{item}</span>
@@ -448,7 +514,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
               {openAccordion === 'fabric' && (
                 <ul className="pb-6 space-y-2 text-xs sm:text-sm text-[#4A433D] font-light leading-relaxed">
-                  {product.fabricAndCare.map((line, i) => (
+                  {fabricAndCare.map((line, i) => (
                     <li key={i} className="flex items-start gap-2.5">
                       <span className="text-[#6E5043]">·</span>
                       <span>{line}</span>
@@ -474,7 +540,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
               {openAccordion === 'fit' && (
                 <ul className="pb-6 space-y-2 text-xs sm:text-sm text-[#4A433D] font-light leading-relaxed">
-                  {product.sizeAndFit.map((line, i) => (
+                  {sizeAndFit.map((line, i) => (
                     <li key={i} className="flex items-start gap-2.5">
                       <span className="text-[#6E5043]">·</span>
                       <span>{line}</span>
@@ -500,7 +566,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
               {openAccordion === 'delivery' && (
                 <p className="pb-6 text-xs sm:text-sm text-[#4A433D] font-light leading-relaxed">
-                  {product.deliveryInfo}
+                  {product.deliveryInfo || 'Complimentary insured express shipping across India. Dispatched within 24–48 hours.'}
                 </p>
               )}
             </div>
@@ -521,7 +587,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
               {openAccordion === 'returns' && (
                 <p className="pb-6 text-xs sm:text-sm text-[#4A433D] font-light leading-relaxed">
-                  {product.returnsInfo}
+                  {product.returnsInfo || '14-day doorstep size exchange and complimentary returns.'}
                 </p>
               )}
             </div>
@@ -537,7 +603,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               Client Impressions
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl text-[#1E1B18] font-normal">
-              Reviews ({product.reviews.length})
+              Reviews ({reviews.length})
             </h2>
           </div>
 
@@ -639,9 +705,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </form>
         )}
 
-        {product.reviews.length > 0 ? (
+        {reviews.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {product.reviews.map((rev) => (
+            {reviews.map((rev) => (
               <div
                 key={rev.id}
                 className="p-7 sm:p-8 bg-[#F3EFEA] flex flex-col justify-between space-y-5"
@@ -695,7 +761,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-14">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 sm:gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-14">
           {relatedProducts.map((rel) => (
             <ProductCard
               key={rel.id}
@@ -711,8 +777,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
       {/* Interactive Size Guide Modal */}
       {sizeGuideOpen && (
-        <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#FAF8F5] max-w-2xl w-full p-6 sm:p-10 space-y-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-black/55 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={() => setSizeGuideOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative bg-[#FAF8F5] max-w-2xl w-full p-6 sm:p-10 space-y-6 max-h-[90vh] overflow-y-auto z-10 shadow-2xl">
             <div className="flex items-start justify-between pb-5 border-b border-[#ECE6DD]">
               <div>
                 <p className="text-[11px] tracking-[0.18em] uppercase text-[#7C736A] mb-1">

@@ -1,0 +1,51 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  sku            String   @unique
+  name           String
+  category       String   // 'Anarkali' | '3-Piece Dresses' | 'Co-ord Sets' | 'Chikankari Suit'
+  price          Float
+  originalPrice  Float?
+  inStock        Boolean  @default(true)
+  isNewArrival   Boolean  @default(false)
+  isCurated      Boolean  @default(false)
+  primaryImage   String
+  secondaryImage String?
+  gallery        String[] @default([])
+  sizes          String[] @default(["XS", "S", "M", "L", "XL", "XXL"])
+  description    String   @default("")
+  fabric         String   @default("")
+  colorName      String   @default("")
+  highlights     String[] @default([])
+  fabricAndCare  String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique // e.g. "AB-24810"
+  customerName  String
+  phone         String
+  email         String?
+  address       String
+  city          String
+  state         String
+  pincode       String
+  total         Float
+  status        String   @default("PENDING_VERIFICATION") // PENDING_VERIFICATION | CONFIRMED | DISPATCHED | DELIVERED | CANCELLED
+  paymentMethod String   @default("CASH_ON_DELIVERY")
+  items         Json     // Array of ordered items [{ productId, name, size, quantity, price }]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([phone])
+}

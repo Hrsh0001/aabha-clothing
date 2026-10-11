@@ -1,8 +1,22 @@
-import React, { useState } from 'react';
-import { ArrowLeft, ShieldCheck, CheckCircle2, Truck, Lock } from 'lucide-react';
+'use client';
+import React, { useState, useEffect } from 'react';
+import {
+  ArrowLeft,
+  ShieldCheck,
+  CheckCircle2,
+  Truck,
+  Lock,
+  MessageCircle,
+  FileText,
+  User,
+  MapPin,
+  ExternalLink,
+} from 'lucide-react';
 import { CartItem } from './Drawers';
 import { formatINR } from '../data/products';
 import { EditorialImage } from './EditorialImage';
+import { useAuth } from '../context/AuthContext';
+import { LocationPickerModal, LocationData } from './LocationPickerModal';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -17,14 +31,55 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   onBackToShopping,
   onClearCart,
 }) => {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const { user, setAuthModalOpen } = useAuth();
+  const [fullName, setFullName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('Maharashtra');
   const [postalCode, setPostalCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
+
+  // Exact Doorstep GPS & Map Selection states (100% Free OpenStreetMap)
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
+
+  const handleLocationSelected = (loc: LocationData) => {
+    setLatitude(loc.latitude);
+    setLongitude(loc.longitude);
+    setMapUrl(loc.mapUrl);
+    if (loc.address) setAddress(loc.address);
+    if (loc.city) setCity(loc.city);
+    if (loc.state) setStateName(loc.state);
+    if (loc.pincode) setPostalCode(loc.pincode);
+  };
+
+  useEffect(() => {
+    try {
+      const savedLoc = localStorage.getItem('aabha_delivery_location');
+      if (savedLoc) {
+        const parsed = JSON.parse(savedLoc);
+        if (parsed.latitude && parsed.longitude) {
+          setLatitude(parsed.latitude);
+          setLongitude(parsed.longitude);
+          if (parsed.mapUrl) setMapUrl(parsed.mapUrl);
+          if (parsed.address && !address) setAddress(parsed.address);
+          if (parsed.city && !city) setCity(parsed.city);
+          if (parsed.state && !stateName) setStateName(parsed.state);
+          if (parsed.pincode && !postalCode) setPostalCode(parsed.pincode);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (user?.name && !fullName) setFullName(user.name);
+    if (user?.phone && !phone) setPhone(user.phone);
+    if (user?.email && !email) setEmail(user.email);
+  }, [user]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [upiId, setUpiId] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
@@ -36,6 +91,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     customerName: string;
     shippingCity: string;
     paymentLabel: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    mapUrl?: string | null;
   } | null>(null);
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -49,26 +107,67 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     }
   };
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
 
-    const paymentLabel =
-      paymentMethod === 'upi'
-        ? 'Instant UPI Verified'
-        : paymentMethod === 'card'
-        ? 'Credit / Debit Card'
-        : 'Cash on Delivery (COD)';
+    setIsSubmitting(true);
+    const fallbackOrderNumber = `AB-${Math.floor(24000 + Math.random() * 5999)}`;
 
-    setOrderCompleted({
-      orderNumber: `AB-${Math.floor(24000 + Math.random() * 5999)}`,
-      items: [...items],
-      total: finalTotal,
-      customerName: fullName.trim() || 'Guest',
-      shippingCity: `${city.trim() || 'India'}, ${stateName} — ${postalCode.trim()}`,
-      paymentLabel,
-    });
-    onClearCart();
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          phone,
+          email,
+          address,
+          city,
+          stateName,
+          postalCode,
+          latitude: latitude || undefined,
+          longitude: longitude || undefined,
+          mapUrl: mapUrl || undefined,
+          items,
+          total: finalTotal,
+        }),
+      });
+      const data = await res.json();
+      const actualOrderNumber =
+        data.success && data.order?.orderNumber ? data.order.orderNumber : fallbackOrderNumber;
+
+      setOrderCompleted({
+        orderNumber: actualOrderNumber,
+        items: [...items],
+        total: finalTotal,
+        customerName: fullName.trim() || 'Guest',
+        shippingCity: `${city.trim() || 'India'}, ${stateName} — ${postalCode.trim()}`,
+        paymentLabel: 'Cash on Delivery (Doorstep Cash/UPI)',
+        latitude,
+        longitude,
+        mapUrl: data.order?.mapUrl || mapUrl,
+      });
+      onClearCart();
+    } catch (err) {
+      console.warn('Backend order recording notice:', err);
+      setOrderCompleted({
+        orderNumber: fallbackOrderNumber,
+        items: [...items],
+        total: finalTotal,
+        customerName: fullName.trim() || 'Guest',
+        shippingCity: `${city.trim() || 'India'}, ${stateName} — ${postalCode.trim()}`,
+        paymentLabel: 'Cash on Delivery (Doorstep Cash/UPI)',
+        latitude,
+        longitude,
+        mapUrl,
+      });
+      onClearCart();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (orderCompleted) {
@@ -93,7 +192,24 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs sm:text-sm pb-6 border-b border-[#E0D8CE]">
             <div>
               <span className="text-[#7C736A] block mb-1">Delivery Destination</span>
-              <span className="font-medium text-[#1E1B18]">{orderCompleted.shippingCity}</span>
+              <span className="font-medium text-[#1E1B18] block">{orderCompleted.shippingCity}</span>
+              {orderCompleted.latitude && orderCompleted.longitude && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[11px] font-mono text-[#2E7D32]">
+                    <MapPin className="w-3 h-3 text-[#2E7D32]" />
+                    {orderCompleted.latitude.toFixed(4)}° N, {orderCompleted.longitude.toFixed(4)}° E
+                  </span>
+                  <a
+                    href={orderCompleted.mapUrl || `https://www.google.com/maps?q=${orderCompleted.latitude},${orderCompleted.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-[#6E5043] underline inline-flex items-center gap-0.5"
+                  >
+                    <span>Google Maps</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+              )}
             </div>
             <div>
               <span className="text-[#7C736A] block mb-1">Payment Method</span>
@@ -127,14 +243,36 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={onBackToShopping}
-              className="px-8 py-4 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors cursor-pointer"
+              className="px-6 py-3.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors cursor-pointer"
             >
-              RETURN TO STOREFRONT
+              Return to Storefront
             </button>
+
+            <a
+              href={`/my-orders?phone=${encodeURIComponent(
+                phone.trim().replace(/[^0-9]/g, '')
+              )}&order=${encodeURIComponent(orderCompleted.orderNumber)}&invoice=1`}
+              className="px-6 py-3.5 border border-[#E0D8CE] bg-[#FAF8F5] text-[#1E1B18] text-xs font-medium tracking-[0.16em] uppercase hover:bg-[#ECE6DD] transition-colors inline-flex items-center gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              View & Print Invoice Bill
+            </a>
+
+            <a
+              href={`https://wa.me/919876543210?text=${encodeURIComponent(
+                `Namaste AABHA, I have just placed Cash on Delivery Order #${orderCompleted.orderNumber} for ${formatINR(orderCompleted.total)}. Please confirm dispatch!`
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-6 py-3.5 bg-[#25D366] text-white text-xs font-medium tracking-[0.16em] uppercase hover:opacity-90 transition-opacity inline-flex items-center gap-1.5"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              WhatsApp Confirmation
+            </a>
           </div>
         </div>
       </div>
@@ -142,7 +280,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   }
 
   return (
-    <div className="max-w-[1360px] mx-auto px-4 sm:px-8 py-10 sm:py-14">
+    <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 sm:py-12 lg:py-16">
       <div className="pb-6 mb-8 border-b border-[#ECE6DD] flex items-center justify-between">
         <button
           type="button"
@@ -162,6 +300,22 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         {/* Left Form: Shipping & Payment */}
         <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-8">
+          {!user && (
+            <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-[#5C544D]">
+                <User className="w-4 h-4 text-[#6E5043] shrink-0" />
+                <span>Already have an AABHA client account?</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="text-[#1E1B18] font-medium underline underline-offset-4 hover:text-[#6E5043] whitespace-nowrap cursor-pointer text-left sm:text-right"
+              >
+                Sign In for Express Checkout →
+              </button>
+            </div>
+          )}
+
           <div>
             <p className="text-xs text-[#7C736A] mb-1">Step 01 of 02</p>
             <h1 className="font-serif text-3xl text-[#1E1B18] font-normal">
@@ -210,6 +364,52 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 placeholder="+91 98200 00000"
                 className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
               />
+            </div>
+
+            {/* 100% Free Interactive OpenStreetMap & GPS Doorstep Location Selector */}
+            <div className="sm:col-span-2 p-4 bg-[#F3EFEA] border border-[#E0D8CE] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#231F1D] text-[#FAF8F5] flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 stroke-[1.4]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-semibold text-[#1E1B18]">
+                      {latitude && longitude
+                        ? 'Exact Doorstep Location Pinned'
+                        : 'Interactive Delivery Map & GPS'}
+                    </p>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#FAF8F5] border border-[#E0D8CE] text-[#2E7D32] font-semibold">
+                      100% FREE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#7C736A] font-light mt-0.5">
+                    {latitude && longitude
+                      ? `📍 ${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E · Attached for Courier GPS Navigation`
+                      : 'Pinpoint your exact gate/doorstep or auto-detect via GPS for seamless COD delivery'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setLocationModalOpen(true)}
+                  className="px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs uppercase tracking-wider font-medium hover:bg-[#14110E] transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>{latitude && longitude ? 'Edit Pin (Modal)' : 'Select on Map (Modal)'}</span>
+                </button>
+
+                <a
+                  href="/select-location"
+                  className="px-3.5 py-2 bg-[#FAF8F5] border border-[#D5CCC0] text-xs uppercase tracking-wider font-medium text-[#1E1B18] hover:bg-[#EAE4DC] transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                  title="Open Dedicated Fullscreen Map Page"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-[#6E5043]" />
+                  <span>Full Map Page</span>
+                </a>
+              </div>
             </div>
 
             <div className="sm:col-span-2">
@@ -283,79 +483,34 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('upi')}
-                className={`p-4 border text-left transition-colors cursor-pointer ${
-                  paymentMethod === 'upi'
-                    ? 'border-[#231F1D] bg-[#F3EFEA]'
-                    : 'border-[#E0D8CE] bg-[#FAF8F5]'
-                }`}
-              >
-                <p className="text-sm font-medium text-[#1E1B18]">UPI Instant Pay</p>
-                <p className="text-xs text-[#7C736A] mt-1">GPay, PhonePe, CRED, BHIM</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('card')}
-                className={`p-4 border text-left transition-colors cursor-pointer ${
-                  paymentMethod === 'card'
-                    ? 'border-[#231F1D] bg-[#F3EFEA]'
-                    : 'border-[#E0D8CE] bg-[#FAF8F5]'
-                }`}
-              >
-                <p className="text-sm font-medium text-[#1E1B18]">Credit / Debit Card</p>
-                <p className="text-xs text-[#7C736A] mt-1">Visa, Mastercard, Amex, RuPay</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('cod')}
-                className={`p-4 border text-left transition-colors cursor-pointer ${
-                  paymentMethod === 'cod'
-                    ? 'border-[#231F1D] bg-[#F3EFEA]'
-                    : 'border-[#E0D8CE] bg-[#FAF8F5]'
-                }`}
-              >
-                <p className="text-sm font-medium text-[#1E1B18]">Cash on Delivery</p>
-                <p className="text-xs text-[#7C736A] mt-1">Pay via cash or UPI at doorstep</p>
-              </button>
-            </div>
-
-            {paymentMethod === 'upi' && (
-              <div className="p-4 bg-[#F3EFEA]">
-                <label className="block text-xs text-[#1E1B18] mb-1.5">
-                  Enter UPI ID (Optional for instant verification)
-                </label>
-                <input
-                  type="text"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="yourname@upi"
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2 text-sm"
-                />
+            <div className="p-5 border border-[#231F1D] bg-[#F3EFEA] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[#1E1B18] flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#6E5043]"></span>
+                  Cash on Delivery (Doorstep Cash or UPI)
+                </span>
+                <span className="text-xs uppercase tracking-wider font-mono px-2 py-0.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[#6E5043]">
+                  Complimentary COD
+                </span>
               </div>
-            )}
-
-            {paymentMethod === 'cod' && (
-              <div className="p-4 bg-[#F3EFEA] text-xs text-[#4A433D]">
-                Cash on Delivery is complimentary on all orders. Total payable at doorstep:{' '}
-                <strong className="font-mono tabular-nums text-[#1E1B18]">
+              <p className="text-xs text-[#5C544D] leading-relaxed">
+                No advance online payment required. Pay via cash or instant doorstep UPI when your AABHA garment package arrives.
+              </p>
+              <div className="pt-2 border-t border-[#E0D8CE] flex items-center justify-between text-xs text-[#1E1B18]">
+                <span>Payable upon delivery:</span>
+                <strong className="font-mono tabular-nums text-sm">
                   {formatINR(finalTotal)}
                 </strong>
-                .
               </div>
-            )}
+            </div>
           </div>
 
           <button
             type="submit"
-            disabled={items.length === 0}
+            disabled={items.length === 0 || isSubmitting}
             className="w-full py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors disabled:opacity-50 cursor-pointer"
           >
-            COMPLETE ORDER · {formatINR(finalTotal)}
+            {isSubmitting ? 'RECORDING ORDER...' : `CONFIRM CASH ON DELIVERY ORDER · ${formatINR(finalTotal)}`}
           </button>
         </form>
 
@@ -451,6 +606,15 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 100% Free Interactive Location Picker Modal (OpenStreetMap & HTML5 GPS) */}
+      <LocationPickerModal
+        isOpen={locationModalOpen}
+        onClose={() => setLocationModalOpen(false)}
+        onSelectLocation={handleLocationSelected}
+        initialLat={latitude || undefined}
+        initialLng={longitude || undefined}
+      />
     </div>
   );
 };

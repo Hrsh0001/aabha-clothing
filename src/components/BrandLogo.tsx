@@ -1,22 +1,31 @@
+'use client';
 import React from 'react';
 
 interface BrandLogoProps {
   variant?: 'header' | 'footer';
   className?: string;
+  customLogoUrl?: string;
 }
 
-/**
- * Official AABHA CLOTHING Brand Logo Component (आBHA CLOTHING with 3-Petal Lotus Emblem).
- * Preserves the exact proportions and appearance of the uploaded AABHA CLOTHING logo.
- * - Header variant: Original warm henna-espresso brown (#6D2E12) on warm ivory header.
- * - Footer variant: Warm ivory/champagne version (#F3EDE4) for crisp visibility on dark footer.
- */
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   variant = 'header',
   className = '',
+  customLogoUrl,
 }) => {
   const isFooter = variant === 'footer';
   const inkColor = isFooter ? '#F3EDE4' : '#6D2E12';
+
+  if (customLogoUrl && customLogoUrl !== '/logo.svg') {
+    return (
+      <span className={`inline-flex items-center justify-center select-none ${className}`}>
+        <img
+          src={customLogoUrl}
+          alt="AABHA CLOTHING"
+          className={`${isFooter ? 'h-12 sm:h-14' : 'h-8 sm:h-10'} w-auto object-contain block`}
+        />
+      </span>
+    );
+  }
 
   return (
     <span

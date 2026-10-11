@@ -1,0 +1,1521 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Package,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  X,
+  Upload,
+  Image as ImageIcon,
+  Search,
+  Filter,
+  Layers,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  ArrowUp,
+  ArrowDown,
+  ExternalLink,
+  Camera,
+  Eye,
+} from 'lucide-react';
+import { AdminLayout } from '@/src/components/AdminLayout';
+import { useAuth } from '@/src/context/AuthContext';
+
+export interface GalleryItem {
+  url: string;
+  label?: string;
+  focalClass?: string;
+}
+
+interface ProductItem {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  originalPrice?: number;
+  inStock: boolean;
+  primaryImage: string;
+  secondaryImage?: string;
+  gallery?: GalleryItem[];
+  fabric?: string;
+  description?: string;
+  sizes: string[];
+}
+
+const PRESET_IMAGES = [
+  { label: 'Ivory Kurta', url: '/images/product_kurta_ivory_1791119105107.jpg' },
+  { label: 'Sand Kurta Set', url: '/images/product_kurtaset_sand_1791119136277.jpg' },
+  { label: 'Ochre Dress', url: '/images/product_dress_ochre_1791119165890.jpg' },
+  { label: 'Charcoal Co-ords', url: '/images/product_coords_charcoal_1791119178003.jpg' },
+  { label: 'Olive Kurta', url: '/images/product_kurta_olive_1791119121380.jpg' },
+  { label: 'Rosewood Set', url: '/images/product_kurtaset_rosewood_1791119152298.jpg' },
+];
+
+const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
+const PRODUCTS_PER_PAGE = 8;
+
+export default function AdminProductsPage() {
+  const { adminToken } = useAuth();
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+
+  const getAuthHeaders = () => {
+    const token =
+      adminToken ||
+      (typeof window !== 'undefined' ? localStorage.getItem('aabha_admin_jwt') : null);
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'x-admin-pin': 'aabha2026',
+    };
+  };
+
+  const getUploadHeaders = () => {
+    const token =
+      adminToken ||
+      (typeof window !== 'undefined' ? localStorage.getItem('aabha_admin_jwt') : null);
+    return {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'x-admin-pin': 'aabha2026',
+    };
+  };
+
+  // Search, Filter & Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [stockFilter, setStockFilter] = useState<'ALL' | 'IN_STOCK' | 'OUT_OF_STOCK'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Form states
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Anarkali');
+  const [price, setPrice] = useState('');
+  const [originalPrice, setOriginalPrice] = useState('');
+  const [primaryImage, setPrimaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
+  const [secondaryImage, setSecondaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [newGalleryUrl, setNewGalleryUrl] = useState('');
+  const [newGalleryLabel, setNewGalleryLabel] = useState('');
+  const [showAddUrlForm, setShowAddUrlForm] = useState(false);
+  const [fabric, setFabric] = useState('Pure Handloom Chanderi Silk');
+  const [description, setDescription] = useState('');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+  const [customSizeInput, setCustomSizeInput] = useState('');
+
+  const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingSecondary, setUploadingSecondary] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const secondaryFileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.products || []);
+      }
+    } catch (err) {
+      console.error('Failed to load products:', err);
+      showToast('Error loading garments catalog');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, stockFilter, searchQuery]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Photo exceeds 5MB limit. Please upload an image under 5MB.');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: getUploadHeaders(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success && data.imageUrl) {
+        setPrimaryImage(data.imageUrl);
+        // Also sync first gallery photo with uploaded cover
+        setGallery((prev) => {
+          if (prev.length === 0) {
+            return [{ url: data.imageUrl, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+          }
+          return prev.map((item, idx) => (idx === 0 ? { ...item, url: data.imageUrl } : item));
+        });
+        showToast('Primary cover image uploaded successfully!');
+      } else {
+        showToast(data.error || 'Failed to upload photo');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast('Error during photo upload');
+    } finally {
+      setUploadingImage(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleSecondaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Photo exceeds 5MB limit. Please upload an image under 5MB.');
+      return;
+    }
+
+    setUploadingSecondary(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: getUploadHeaders(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success && data.imageUrl) {
+        setSecondaryImage(data.imageUrl);
+        setGallery((prev) => {
+          const exists = prev.some((g) => g.url === data.imageUrl);
+          if (!exists) {
+            return [...prev, { url: data.imageUrl, label: 'Editorial Daylight Drape', focalClass: 'object-center' }];
+          }
+          return prev;
+        });
+        showToast('Secondary drape image uploaded and added to gallery!');
+      } else {
+        showToast(data.error || 'Failed to upload secondary photo');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast('Error during secondary photo upload');
+    } finally {
+      setUploadingSecondary(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingGallery(true);
+    try {
+      let added = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 5 * 1024 * 1024) {
+          showToast(`Photo "${file.name}" exceeds 5MB limit.`);
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: getUploadHeaders(),
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.success && data.imageUrl) {
+          const defaultLabel =
+            gallery.length + added === 0
+              ? 'Full Studio Silhouette'
+              : gallery.length + added === 1
+              ? 'Bodice & Neckline Detail'
+              : gallery.length + added === 2
+              ? 'Kalidar Flare & Zari Hem'
+              : `Studio Angle ${gallery.length + added + 1}`;
+          setGallery((prev) => [
+            ...prev,
+            { url: data.imageUrl, label: defaultLabel, focalClass: 'object-center' },
+          ]);
+          added++;
+        }
+      }
+      if (added > 0) {
+        showToast(`Added ${added} photo(s) to garment gallery!`);
+      }
+    } catch (err) {
+      console.error('Gallery upload error:', err);
+      showToast('Error uploading gallery photos');
+    } finally {
+      setUploadingGallery(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleAddGalleryUrl = () => {
+    if (!newGalleryUrl.trim()) return;
+    const cleanUrl = newGalleryUrl.trim();
+    const cleanLabel =
+      newGalleryLabel.trim() ||
+      (gallery.length === 0
+        ? 'Full Studio Silhouette'
+        : gallery.length === 1
+        ? 'Bodice & Neckline Detail'
+        : `Studio Angle ${gallery.length + 1}`);
+
+    setGallery((prev) => [
+      ...prev,
+      { url: cleanUrl, label: cleanLabel, focalClass: 'object-center' },
+    ]);
+    setNewGalleryUrl('');
+    setNewGalleryLabel('');
+    setShowAddUrlForm(false);
+    showToast('Photo added to gallery!');
+  };
+
+  const handleUpdateGalleryItem = (index: number, updates: Partial<GalleryItem>) => {
+    setGallery((prev) =>
+      prev.map((item, idx) => {
+        if (idx === index) {
+          const updated = { ...item, ...updates };
+          if (idx === 0 && updates.url) {
+            setPrimaryImage(updates.url);
+          }
+          return updated;
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleRemoveGalleryItem = (index: number) => {
+    if (gallery.length <= 1) {
+      showToast('A garment must retain at least one photo.');
+      return;
+    }
+    setGallery((prev) => {
+      const updated = prev.filter((_, idx) => idx !== index);
+      if (index === 0 && updated[0]) {
+        setPrimaryImage(updated[0].url);
+      }
+      return updated;
+    });
+    showToast('Photo removed from gallery.');
+  };
+
+  const handleSetPrimary = (index: number) => {
+    if (index === 0) return;
+    const item = gallery[index];
+    setPrimaryImage(item.url);
+    setGallery((prev) => {
+      const rest = prev.filter((_, idx) => idx !== index);
+      return [item, ...rest];
+    });
+    showToast(`Set "${item.label || 'Photo'}" as Primary Cover!`);
+  };
+
+  const handleSetSecondary = (index: number) => {
+    const item = gallery[index];
+    setSecondaryImage(item.url);
+    showToast(`Set "${item.label || 'Photo'}" as Hover Drape!`);
+  };
+
+  const handleMoveGalleryItem = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= gallery.length) return;
+    setGallery((prev) => {
+      const clone = [...prev];
+      const temp = clone[index];
+      clone[index] = clone[targetIdx];
+      clone[targetIdx] = temp;
+      if (index === 0 || targetIdx === 0) {
+        setPrimaryImage(clone[0].url);
+      }
+      return clone;
+    });
+  };
+
+  const handleOpenAdd = () => {
+    setEditingProduct(null);
+    setName('');
+    setCategory('Anarkali');
+    setPrice('');
+    setOriginalPrice('');
+    const defaultLead = '/images/product_kurta_ivory_1791119105107.jpg';
+    setPrimaryImage(defaultLead);
+    setSecondaryImage(defaultLead);
+    setGallery([
+      { url: defaultLead, label: 'Full Studio Silhouette', focalClass: 'object-center' },
+    ]);
+    setFabric('Pure Handloom Chanderi Silk');
+    setDescription('');
+    setSelectedSizes(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+    setNewGalleryUrl('');
+    setNewGalleryLabel('');
+    setShowAddUrlForm(false);
+    setModalOpen(true);
+  };
+
+  const handleOpenEdit = (p: ProductItem) => {
+    setEditingProduct(p);
+    setName(p.name);
+    setCategory(p.category);
+    setPrice(p.price.toString());
+    setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
+    setPrimaryImage(p.primaryImage);
+    setSecondaryImage(p.secondaryImage || p.primaryImage);
+
+    let existingGallery: GalleryItem[] = [];
+    if (p.gallery && Array.isArray(p.gallery) && p.gallery.length > 0) {
+      existingGallery = p.gallery.map((g: any, idx: number) => {
+        if (typeof g === 'string') {
+          return {
+            url: g,
+            label: idx === 0 ? 'Full Studio Silhouette' : `Studio View ${idx + 1}`,
+            focalClass: 'object-center',
+          };
+        }
+        return {
+          url: g.url || p.primaryImage,
+          label: g.label || (idx === 0 ? 'Full Studio Silhouette' : `Studio View ${idx + 1}`),
+          focalClass: g.focalClass || 'object-center',
+        };
+      });
+    } else {
+      existingGallery = [
+        { url: p.primaryImage, label: 'Full Studio Silhouette', focalClass: 'object-center' },
+      ];
+      if (p.secondaryImage && p.secondaryImage !== p.primaryImage) {
+        existingGallery.push({
+          url: p.secondaryImage,
+          label: 'Editorial Daylight Drape',
+          focalClass: 'object-center',
+        });
+      }
+    }
+
+    setGallery(existingGallery);
+    setFabric(p.fabric || 'Pure Handloom Chanderi Silk');
+    setDescription(p.description || '');
+    setSelectedSizes(p.sizes && p.sizes.length > 0 ? p.sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+    setNewGalleryUrl('');
+    setNewGalleryLabel('');
+    setShowAddUrlForm(false);
+    setModalOpen(true);
+  };
+
+  const toggleSize = (size: string) => {
+    setSelectedSizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
+    );
+  };
+
+  const addCustomSize = () => {
+    const cleaned = customSizeInput.trim().toUpperCase();
+    if (!cleaned) return;
+    if (!selectedSizes.includes(cleaned)) {
+      setSelectedSizes((prev) => [...prev, cleaned]);
+    }
+    setCustomSizeInput('');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedSizes.length === 0) {
+      alert('Please select at least one available size for this garment.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const leadImage = gallery[0]?.url || primaryImage;
+      const drapeImage = secondaryImage || leadImage;
+      const galleryToSubmit =
+        gallery.length > 0
+          ? gallery
+          : [{ url: leadImage, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+
+      if (editingProduct) {
+        // Edit mode
+        const res = await fetch('/api/products', {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            id: editingProduct.id,
+            name,
+            category,
+            price: Number(price),
+            originalPrice: originalPrice ? Number(originalPrice) : undefined,
+            primaryImage: leadImage,
+            secondaryImage: drapeImage,
+            gallery: galleryToSubmit,
+            fabric,
+            description,
+            sizes: selectedSizes,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.id === editingProduct.id
+                ? {
+                    ...p,
+                    ...data.product,
+                    primaryImage: leadImage,
+                    secondaryImage: drapeImage,
+                    gallery: galleryToSubmit,
+                  }
+                : p
+            )
+          );
+          setModalOpen(false);
+          showToast(`Updated ${name} & its multi-image gallery successfully!`);
+        } else {
+          showToast(data.error || 'Failed to update garment');
+        }
+      } else {
+        // Add mode
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name,
+            category,
+            price: Number(price),
+            originalPrice: originalPrice ? Number(originalPrice) : undefined,
+            primaryImage: leadImage,
+            secondaryImage: drapeImage,
+            gallery: galleryToSubmit,
+            fabric,
+            description,
+            sizes: selectedSizes,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.product) {
+          setProducts((prev) => [data.product, ...prev]);
+          setModalOpen(false);
+          showToast(`Added ${name} with full gallery to collection!`);
+        } else {
+          showToast(data.error || 'Failed to add garment');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save product:', err);
+      showToast('Error saving garment');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleStock = async (p: ProductItem) => {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: p.id,
+          inStock: !p.inStock,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === p.id ? { ...item, inStock: !p.inStock } : item))
+        );
+        showToast(
+          `${p.name} marked as ${!p.inStock ? 'In Stock (Available)' : 'Out of Stock (Sold Out)'}`
+        );
+      }
+    } catch (err) {
+      showToast('Failed to toggle stock status');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const item = products.find((p) => p.id === id);
+    if (!confirm(`Are you sure you want to remove "${item?.name || 'this garment'}" from the catalog?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/products?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        showToast('Silhouette removed from catalog');
+      } else {
+        showToast(data.error || 'Failed to delete');
+      }
+    } catch (err) {
+      showToast('Error deleting garment');
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      // Category filter
+      if (categoryFilter !== 'ALL' && p.category !== categoryFilter) return false;
+
+      // Stock filter
+      if (stockFilter === 'IN_STOCK' && !p.inStock) return false;
+      if (stockFilter === 'OUT_OF_STOCK' && p.inStock) return false;
+
+      // Search query
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        const matchName = p.name.toLowerCase().includes(q);
+        const matchSku = p.sku.toLowerCase().includes(q);
+        const matchCategory = p.category.toLowerCase().includes(q);
+        const matchFabric = (p.fabric || '').toLowerCase().includes(q);
+        if (!matchName && !matchSku && !matchCategory && !matchFabric) return false;
+      }
+
+      return true;
+    });
+  }, [products, searchQuery, categoryFilter, stockFilter]);
+
+  // Paginated Slices
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
+
+  const formatINR = (amt: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amt);
+  };
+
+  return (
+    <AdminLayout
+      title="Garments & Stock Inventory"
+      subtitle="Catalog of handcrafted Anarkalis, Co-ord sets, and suits. Manage sizes, pricing, and stock status."
+      extraAction={
+        <Link
+          href="/admin/products/edit?id=new"
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer shadow-xs"
+        >
+          <Plus className="w-4 h-4" />
+          <span>+ Add Silhouette (Full Page)</span>
+        </Link>
+      }
+    >
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="fixed top-20 right-6 z-50 bg-[#1E1B18] text-[#FAF8F5] px-4 py-2.5 text-xs shadow-xl border border-[#3D3732] flex items-center gap-2 animate-fadeIn">
+          <CheckCircle className="w-4 h-4 text-[#A8E6CF]" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* Hidden File Input for Product Photos */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+      />
+
+      <div className="space-y-6">
+        {/* Metric Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4">
+            <span className="text-xs uppercase tracking-wider text-[#7C736A] block">
+              Total Silhouettes
+            </span>
+            <span className="font-mono text-2xl font-medium text-[#1E1B18] mt-1 block">
+              {products.length}
+            </span>
+          </div>
+
+          <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4">
+            <span className="text-xs uppercase tracking-wider text-[#7C736A] block">In Stock</span>
+            <span className="font-mono text-2xl font-medium text-[#2E7D32] mt-1 block">
+              {products.filter((p) => p.inStock).length}
+            </span>
+          </div>
+
+          <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4">
+            <span className="text-xs uppercase tracking-wider text-[#7C736A] block">
+              Sold Out / Inactive
+            </span>
+            <span className="font-mono text-2xl font-medium text-[#C62828] mt-1 block">
+              {products.filter((p) => !p.inStock).length}
+            </span>
+          </div>
+
+          <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4">
+            <span className="text-xs uppercase tracking-wider text-[#7C736A] block">
+              Categories
+            </span>
+            <span className="font-mono text-2xl font-medium text-[#6E5043] mt-1 block">
+              {new Set(products.map((p) => p.category)).size}
+            </span>
+          </div>
+        </div>
+
+        {/* Search & Dynamic Filter Controls Bar */}
+        <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-[#7C736A] absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by silhouette name, SKU (e.g. AB-ANA-01), or fabric..."
+              className="w-full bg-[#FAF8F5] border border-[#E0D8CE] pl-9 pr-3 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+            />
+          </div>
+
+          {/* Filter Chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Category Filter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-2 text-xs text-[#1E1B18] focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="Anarkali">Anarkali</option>
+              <option value="3-Piece Dresses">3-Piece Dresses</option>
+              <option value="Co-ord Sets">Co-ord Sets</option>
+              <option value="Chikankari Suit">Chikankari Suit</option>
+            </select>
+
+            {/* Stock Filter */}
+            <div className="flex border border-[#E0D8CE] bg-[#FAF8F5]">
+              <button
+                type="button"
+                onClick={() => setStockFilter('ALL')}
+                className={`px-3 py-1.5 cursor-pointer ${
+                  stockFilter === 'ALL' ? 'bg-[#231F1D] text-[#FAF8F5]' : 'text-[#7C736A]'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setStockFilter('IN_STOCK')}
+                className={`px-3 py-1.5 cursor-pointer ${
+                  stockFilter === 'IN_STOCK' ? 'bg-[#231F1D] text-[#FAF8F5]' : 'text-[#7C736A]'
+                }`}
+              >
+                In Stock
+              </button>
+              <button
+                type="button"
+                onClick={() => setStockFilter('OUT_OF_STOCK')}
+                className={`px-3 py-1.5 cursor-pointer ${
+                  stockFilter === 'OUT_OF_STOCK' ? 'bg-[#231F1D] text-[#FAF8F5]' : 'text-[#7C736A]'
+                }`}
+              >
+                Sold Out
+              </button>
+            </div>
+
+            <button
+              onClick={fetchProducts}
+              className="p-2 border border-[#E0D8CE] bg-[#FAF8F5] text-[#7C736A] hover:text-[#1E1B18] cursor-pointer"
+              title="Refresh Inventory"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Products List / Table */}
+        {loading ? (
+          <div className="py-20 text-center text-sm text-[#7C736A] flex flex-col items-center justify-center gap-2">
+            <RefreshCw className="w-5 h-5 text-[#6E5043] animate-spin" />
+            <span>Loading garments collection...</span>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-16 text-center border border-dashed border-[#ECE6DD] bg-[#FAF8F5] space-y-2">
+            <Package className="w-8 h-8 text-[#9E948A] mx-auto stroke-[1.3]" />
+            <p className="font-serif text-lg text-[#1E1B18]">No silhouettes match your filter.</p>
+            <p className="text-xs text-[#7C736A]">Try clearing search or switching filter categories.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-[#F3EFEA] border border-[#ECE6DD] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left min-w-[760px]">
+                  <thead className="bg-[#FAF8F5] border-b border-[#ECE6DD] text-[#7C736A] uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Garment & SKU</th>
+                      <th className="py-3 px-4">Category</th>
+                      <th className="py-3 px-4">Available Sizes</th>
+                      <th className="py-3 px-4">Price / MRP</th>
+                      <th className="py-3 px-4">Stock Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#ECE6DD]">
+                    {paginatedProducts.map((p) => (
+                      <tr key={p.id} className="hover:bg-[#FAF8F5]/60 transition-colors">
+                        <td className="py-3 px-4 flex items-center gap-3">
+                          <div className="relative w-12 h-16 shrink-0 bg-[#ECE6DD] border border-[#E0D8CE] overflow-hidden group">
+                            <img
+                              src={p.primaryImage}
+                              alt={p.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <span className="absolute bottom-0 inset-x-0 bg-[#1E1B18]/80 text-[#FAF8F5] text-[8px] font-mono text-center py-0.2">
+                              {(p.gallery && p.gallery.length) || 1}P
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={`/admin/products/edit?id=${p.id}`}
+                                className="font-medium text-sm text-[#1E1B18] hover:text-[#6E5043] transition-colors line-clamp-1"
+                                title="Open dedicated full-page editor"
+                              >
+                                {p.name}
+                              </Link>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] font-mono text-[#7C736A]">{p.sku}</span>
+                              <span className="text-[#D5CCC0]">·</span>
+                              <a
+                                href={`/product/${p.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] text-[#6E5043] hover:underline font-mono"
+                              >
+                                <span>Live Page</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </div>
+                            {/* Gallery Mini Thumbnail Strip */}
+                            <div className="flex items-center gap-1 mt-1.5">
+                              {(p.gallery && p.gallery.length > 0
+                                ? p.gallery
+                                : [{ url: p.primaryImage }]
+                              )
+                                .slice(0, 4)
+                                .map((g: any, gIdx: number) => (
+                                  <img
+                                    key={gIdx}
+                                    src={typeof g === 'string' ? g : g.url}
+                                    alt=""
+                                    className="w-4 h-5 object-cover border border-[#D5CCC0] rounded-xs bg-[#ECE6DD]"
+                                  />
+                                ))}
+                              {(p.gallery?.length || 0) > 4 && (
+                                <span className="text-[9px] text-[#7C736A] font-mono">
+                                  +{p.gallery!.length - 4}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 text-[#5C544D]">
+                          <span className="px-2 py-0.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[11px]">
+                            {p.category}
+                          </span>
+                        </td>
+
+                        {/* Sizes Badges */}
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {(p.sizes || []).map((s) => (
+                              <span
+                                key={s}
+                                className="px-1.5 py-0.5 bg-[#FAF8F5] border border-[#D5CCC0] text-[10px] font-mono font-medium text-[#1E1B18]"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="font-mono text-sm font-semibold text-[#1E1B18]">
+                            {formatINR(p.price)}
+                          </div>
+                          {p.originalPrice && (
+                            <div className="font-mono text-[11px] text-[#8C8278] line-through">
+                              {formatINR(p.originalPrice)}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStock(p)}
+                            className={`px-2.5 py-1 text-[11px] font-medium cursor-pointer border flex items-center gap-1.5 w-fit ${
+                              p.inStock
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {p.inStock ? (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5" /> In Stock
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-3.5 h-3.5" /> Out of Stock
+                              </>
+                            )}
+                          </button>
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <a
+                              href={`/product/${p.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-[#6E5043] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer"
+                              title="Preview Dynamic Product Page"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </a>
+                            <Link
+                              href={`/admin/products/edit?id=${p.id}`}
+                              className="p-1.5 text-[#5C544D] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer flex items-center gap-1"
+                              title="Edit Silhouette & Multi-Angle Photos on Full Page"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-medium hidden sm:inline">Edit</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(p.id)}
+                              className="p-1.5 text-[#C62828] hover:text-[#B71C1C] border border-[#FFCDD2] bg-[#FFF5F5] cursor-pointer"
+                              title="Delete Silhouette"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#5C544D] border-t border-[#ECE6DD]">
+                <p>
+                  Showing <span className="font-mono font-medium text-[#1E1B18]">{(currentPage - 1) * PRODUCTS_PER_PAGE + 1}</span> to{' '}
+                  <span className="font-mono font-medium text-[#1E1B18]">
+                    {Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)}
+                  </span>{' '}
+                  of <span className="font-mono font-medium text-[#1E1B18]">{filteredProducts.length}</span> silhouettes
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 bg-[#F3EFEA] border border-[#ECE6DD] hover:bg-[#EAE4DC] disabled:opacity-40 disabled:cursor-not-allowed text-[#1E1B18]"
+                    aria-label="Previous Page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="px-3 py-1 font-mono text-xs bg-[#FAF8F5] border border-[#ECE6DD]">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 bg-[#F3EFEA] border border-[#ECE6DD] hover:bg-[#EAE4DC] disabled:opacity-40 disabled:cursor-not-allowed text-[#1E1B18]"
+                    aria-label="Next Page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit Modal with Size Inventory Organizer */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={() => setModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative bg-[#FAF8F5] border border-[#ECE6DD] max-w-2xl w-full p-5 sm:p-8 space-y-5 sm:space-y-6 relative max-h-[92vh] overflow-y-auto z-10 shadow-2xl">
+            <button
+              onClick={() => setModalOpen(false)}
+              aria-label="Close editor"
+              className="absolute top-4 right-4 p-1.5 text-[#7C736A] hover:text-[#1E1B18] cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <p className="text-xs uppercase tracking-wider text-[#7C736A]">
+                {editingProduct ? 'Edit Existing Garment' : 'Create New Silhouette'}
+              </p>
+              <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
+                {editingProduct ? editingProduct.name : 'Add New Garment to Collection'}
+              </h2>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[#1E1B18] font-medium mb-1">Garment Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Anarkali 03 — Ivory Handspun Kalidar"
+                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-[#1E1B18] font-medium mb-1">Category *</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none cursor-pointer"
+                  >
+                    <option value="Anarkali">Anarkali</option>
+                    <option value="3-Piece Dresses">3-Piece Dresses</option>
+                    <option value="Co-ord Sets">Co-ord Sets</option>
+                    <option value="Chikankari Suit">Chikankari Suit</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#1E1B18] font-medium mb-1">Selling Price (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="4850"
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-[#1E1B18] font-medium mb-1">
+                    MRP / Original Price (₹) (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={originalPrice}
+                    onChange={(e) => setOriginalPrice(e.target.value)}
+                    placeholder="5800"
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[#1E1B18] font-medium mb-1">Fabric & Weave</label>
+                  <input
+                    type="text"
+                    value={fabric}
+                    onChange={(e) => setFabric(e.target.value)}
+                    placeholder="Pure Handloom Chanderi Silk"
+                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  />
+                </div>
+              </div>
+
+              {/* SIZE INVENTORY ORGANIZER */}
+              <div className="p-4 bg-[#F3EFEA] border border-[#E0D8CE] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[#1E1B18] font-medium">
+                      Size Inventory Organizer *
+                    </label>
+                    <p className="text-[11px] text-[#7C736A] mt-0.5">
+                      Toggle active sizes for this silhouette or add custom tailor sizing:
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono font-medium text-[#6E5043]">
+                    {selectedSizes.length} Active
+                  </span>
+                </div>
+
+                {/* Standard Sizes Toggle Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {STANDARD_SIZES.map((sz) => {
+                    const isSelected = selectedSizes.includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => toggleSize(sz)}
+                        className={`px-3 py-1.5 text-xs font-mono font-medium border transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
+                            : 'bg-[#FAF8F5] text-[#5C544D] border-[#D5CCC0] hover:border-[#1E1B18]'
+                        }`}
+                      >
+                        {sz} {isSelected && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Size Addition */}
+                <div className="flex items-center gap-2 pt-2 border-t border-[#E0D8CE]">
+                  <input
+                    type="text"
+                    value={customSizeInput}
+                    onChange={(e) => setCustomSizeInput(e.target.value)}
+                    placeholder="Add custom size (e.g. 4XL, PETITE, STITCHED)..."
+                    className="flex-1 bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-1.5 text-xs text-[#1E1B18] focus:outline-none uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomSize}
+                    className="px-3 py-1.5 bg-[#FAF8F5] border border-[#1E1B18] text-[#1E1B18] font-medium text-xs hover:bg-[#1E1B18] hover:text-[#FAF8F5] transition-colors cursor-pointer"
+                  >
+                    + Add Size
+                  </button>
+                </div>
+              </div>
+
+              {/* STUDIO PHOTOGRAPHY & MULTI-IMAGE GALLERY MANAGER */}
+              <div className="p-4 sm:p-5 bg-[#F3EFEA] border border-[#E0D8CE] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E0D8CE] pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-[#6E5043]" />
+                      <h3 className="font-serif text-lg text-[#1E1B18] font-normal">
+                        Studio Photography & Gallery Angles
+                      </h3>
+                      <span className="px-2 py-0.5 bg-[#231F1D] text-[#FAF8F5] text-[10px] font-mono">
+                        {gallery.length} {gallery.length === 1 ? 'Photo' : 'Photos'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#7C736A] mt-0.5">
+                      Configure every angle shown in the customer product page gallery. First photo is catalog cover.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => galleryFileInputRef.current?.click()}
+                      disabled={uploadingGallery}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium hover:bg-[#14110E] transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {uploadingGallery ? 'Uploading...' : '+ Upload Photo(s)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddUrlForm(!showAddUrlForm)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF8F5] border border-[#1E1B18] text-[#1E1B18] text-xs font-medium hover:bg-[#1E1B18] hover:text-[#FAF8F5] transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add by URL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hidden File Inputs */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  ref={secondaryFileInputRef}
+                  onChange={handleSecondaryUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  ref={galleryFileInputRef}
+                  onChange={handleGalleryUpload}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                />
+
+                {/* Inline Add by URL Form */}
+                {showAddUrlForm && (
+                  <div className="p-3 bg-[#FAF8F5] border border-[#D5CCC0] space-y-2">
+                    <p className="text-[11px] font-medium text-[#1E1B18]">Add Photo via Image URL</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-7">
+                        <input
+                          type="text"
+                          value={newGalleryUrl}
+                          onChange={(e) => setNewGalleryUrl(e.target.value)}
+                          placeholder="Paste image URL (e.g. /images/... or https://...)"
+                          className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <input
+                          type="text"
+                          value={newGalleryLabel}
+                          onChange={(e) => setNewGalleryLabel(e.target.value)}
+                          placeholder="Angle Label (e.g. Back Detail)"
+                          className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-1.5 text-xs text-[#1E1B18] focus:outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-2 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={handleAddGalleryUrl}
+                          className="w-full py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium hover:bg-[#14110E] cursor-pointer"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lead Cover & Hover Drape Key Roles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-[#FAF8F5] border border-[#E0D8CE]">
+                  {/* Primary Cover Role */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
+                      <img
+                        src={gallery[0]?.url || primaryImage}
+                        alt="Primary Cover"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-[#231F1D]/85 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
+                        COVER
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Star className="w-3 h-3 fill-[#D97706] text-[#D97706]" />
+                        <span className="text-xs font-medium text-[#1E1B18]">Catalog Cover Photo</span>
+                      </div>
+                      <p className="text-[10px] text-[#7C736A] truncate">
+                        Position #1 in gallery: {gallery[0]?.label || 'Full Studio Silhouette'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingImage}
+                        className="text-[10px] text-[#6E5043] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Upload className="w-2.5 h-2.5" />
+                        {uploadingImage ? 'Uploading...' : 'Replace Cover Image'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Secondary Hover Drape Role */}
+                  <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-[#E0D8CE] pt-2 sm:pt-0 sm:pl-3">
+                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
+                      <img
+                        src={secondaryImage}
+                        alt="Hover Drape"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-[#6E5043]/90 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
+                        HOVER
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-[#6E5043]" />
+                        <span className="text-xs font-medium text-[#1E1B18]">Secondary Hover Drape</span>
+                      </div>
+                      <p className="text-[10px] text-[#7C736A] truncate">
+                        Shown when customer hovers over card in catalog
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => secondaryFileInputRef.current?.click()}
+                        disabled={uploadingSecondary}
+                        className="text-[10px] text-[#6E5043] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Upload className="w-2.5 h-2.5" />
+                        {uploadingSecondary ? 'Uploading...' : 'Replace Hover Drape'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* All Gallery Photos Grid */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-medium text-[#1E1B18]">
+                    <span>Product Page Image Sequence ({gallery.length} Photos):</span>
+                    <span className="text-[11px] text-[#7C736A] font-normal">
+                      Drag / Reorder using buttons · Click "Make Cover" to swap primary
+                    </span>
+                  </div>
+
+                  {gallery.length === 0 ? (
+                    <div className="py-8 text-center bg-[#FAF8F5] border border-dashed border-[#D5CCC0]">
+                      <p className="text-xs text-[#7C736A]">No gallery photos yet. Upload photos above.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto p-1">
+                      {gallery.map((item, idx) => {
+                        const isPrimary = idx === 0;
+                        const isSecondary = item.url === secondaryImage;
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-2.5 bg-[#FAF8F5] border transition-all flex gap-3 ${
+                              isPrimary
+                                ? 'border-[#D97706] ring-1 ring-[#D97706]/40'
+                                : 'border-[#D5CCC0] hover:border-[#1E1B18]'
+                            }`}
+                          >
+                            {/* 3:4 Aspect Thumbnail */}
+                            <div className="relative aspect-[3/4] w-20 shrink-0 bg-[#ECE6DD] border border-[#E0D8CE] overflow-hidden group">
+                              <img
+                                src={item.url}
+                                alt={item.label || `Photo ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-[#1E1B18]/80 text-[#FAF8F5] font-mono text-[9px] font-medium">
+                                #{idx + 1}
+                              </span>
+                            </div>
+
+                            {/* Details & Controls */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-between">
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {isPrimary && (
+                                      <span className="px-1.5 py-0.2 bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] text-[9px] font-medium flex items-center gap-0.5">
+                                        <Star className="w-2.5 h-2.5 fill-[#D97706]" /> Primary Cover
+                                      </span>
+                                    )}
+                                    {isSecondary && (
+                                      <span className="px-1.5 py-0.2 bg-[#E0E7FF] text-[#3730A3] border border-[#C7D2FE] text-[9px] font-medium">
+                                        Hover Drape
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Reorder Buttons */}
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveGalleryItem(idx, 'up')}
+                                      disabled={idx === 0}
+                                      title="Move earlier in gallery"
+                                      className="p-1 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-20 cursor-pointer"
+                                    >
+                                      <ArrowUp className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveGalleryItem(idx, 'down')}
+                                      disabled={idx === gallery.length - 1}
+                                      title="Move later in gallery"
+                                      className="p-1 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-20 cursor-pointer"
+                                    >
+                                      <ArrowDown className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Angle / Shot Label */}
+                                <div>
+                                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">
+                                    Angle Description / Label:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.label || ''}
+                                    onChange={(e) =>
+                                      handleUpdateGalleryItem(idx, { label: e.target.value })
+                                    }
+                                    placeholder="e.g. Pleated Bodice & Neckline Detail"
+                                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                                  />
+                                </div>
+
+                                {/* URL Input */}
+                                <div>
+                                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">
+                                    Image URL:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.url}
+                                    onChange={(e) =>
+                                      handleUpdateGalleryItem(idx, { url: e.target.value })
+                                    }
+                                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2 py-0.5 text-[10px] font-mono text-[#5C544D] focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Card Action Bar */}
+                              <div className="flex items-center justify-between gap-1 pt-2 border-t border-[#E0D8CE] mt-2">
+                                <div className="flex items-center gap-1.5">
+                                  {!isPrimary && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetPrimary(idx)}
+                                      className="px-2 py-0.5 bg-[#FAF8F5] border border-[#D97706] text-[#92400E] text-[10px] font-medium hover:bg-[#FEF3C7] transition-colors cursor-pointer"
+                                    >
+                                      ★ Make Cover
+                                    </button>
+                                  )}
+                                  {!isSecondary && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetSecondary(idx)}
+                                      className="px-2 py-0.5 bg-[#FAF8F5] border border-[#C7D2FE] text-[#3730A3] text-[10px] font-medium hover:bg-[#EEF2FF] transition-colors cursor-pointer"
+                                    >
+                                      Set Hover
+                                    </button>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveGalleryItem(idx)}
+                                  title="Delete photo"
+                                  className="p-1 text-[#C62828] hover:bg-[#FFEBEE] transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Preset Editorial Asset Library */}
+                <div className="pt-2 border-t border-[#E0D8CE]">
+                  <p className="text-[11px] text-[#7C736A] mb-1.5">
+                    Or quickly add angles from high-resolution editorial asset library:
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {PRESET_IMAGES.map((preset) => (
+                      <button
+                        key={preset.url}
+                        type="button"
+                        onClick={() =>
+                          setGallery((prev) => [
+                            ...prev,
+                            { url: preset.url, label: preset.label, focalClass: 'object-center' },
+                          ])
+                        }
+                        title={`Click to add ${preset.label} to gallery`}
+                        className="group aspect-[3/4] overflow-hidden border border-[#D5CCC0] relative cursor-pointer hover:border-[#1E1B18] transition-colors"
+                      >
+                        <img
+                          src={preset.url}
+                          alt={preset.label}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <span className="absolute bottom-0 inset-x-0 bg-[#1E1B18]/85 text-[#FAF8F5] text-[8px] truncate px-1 py-0.5 text-center">
+                          + {preset.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#1E1B18] font-medium mb-1">
+                  Garment Description & Cut Notes
+                </label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Architectural kalidar panels, french seams, and deep functional pockets..."
+                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] p-3 text-xs text-[#1E1B18] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#ECE6DD]">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-5 py-2.5 border border-[#E0D8CE] text-xs font-medium uppercase tracking-wider text-[#7C736A] hover:bg-[#F3EFEA] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : editingProduct ? 'Save Silhouette' : 'Add Garment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </AdminLayout>
+  );
+}

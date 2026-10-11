@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rev_seed_01",
+    "productId": "anarkali-01",
+    "productName": "Anarkali 01 — Earthen Ochre Kalidar",
+    "author": "Kaveri Murthy",
+    "sizePurchased": "M",
+    "rating": 5,
+    "date": "October 2026",
+    "title": "Sublime drape and immaculate tailoring",
+    "comment": "The fall of the Chanderi silk is extraordinary. The 16 panels create effortless volume without looking heavy. Also thrilled with the deep concealed pockets!",
+    "createdAt": "2026-10-09T12:00:00.000Z"
+  },
+  {
+    "id": "rev_seed_02",
+    "productId": "coords-01",
+    "productName": "Co-ord Set 01 — Charcoal Raw Silk Twin-Set",
+    "author": "Dr. Sneha Pillai",
+    "sizePurchased": "S",
+    "rating": 5,
+    "date": "October 2026",
+    "title": "Understated luxury for conference & evenings",
+    "comment": "The cut is precise, the raw silk texture has genuine character, and the lining feels gentle against skin all day long.",
+    "createdAt": "2026-10-10T16:30:00.000Z"
+  },
+  {
+    "id": "rev_seed_03",
+    "productId": "dress-01",
+    "productName": "Three-Piece Dress 01 — Ivory & Sage Ensemble",
+    "author": "Ananya Sharma",
+    "sizePurchased": "M",
+    "rating": 5,
+    "date": "October 2026",
+    "title": "Timeless celebration silhouette",
+    "comment": "Wore this for an intimate pooja celebration. Received so many compliments. Beautiful muslin packaging as well.",
+    "createdAt": "2026-10-11T09:15:00.000Z"
+  }
+]

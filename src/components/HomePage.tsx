@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+'use client';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ArrowRight,
   ChevronLeft,
@@ -19,6 +20,8 @@ import {
 import { EditorialImage } from './EditorialImage';
 import { ProductCard } from './ProductCard';
 
+import type { SiteSettings } from '../app/api/settings/route';
+
 interface HeroSlide {
   id: string;
   image: string;
@@ -30,42 +33,10 @@ interface HeroSlide {
   targetCategory: CollectionFilter;
 }
 
-const HERO_SLIDES: HeroSlide[] = [
-  {
-    id: 'slide-1',
-    image: EDITORIAL_ASSETS.heroBanner,
-    alt: 'Graceful Indian models in AABHA CLOTHING contemporary ivory and sand Chanderi silk ensembles',
-    eyebrow: 'INAUGURAL 17-PIECE EDIT · HANDLOOM',
-    heading: 'EFFORTLESSLY INDIAN.',
-    subheading: 'Modern silhouettes. Timeless elegance.',
-    buttonLabel: 'SHOP THE COLLECTION',
-    targetCategory: 'All Collection',
-  },
-  {
-    id: 'slide-2',
-    image: EDITORIAL_ASSETS.heroCoords,
-    alt: 'Indian female model in AABHA CLOTHING contemporary tailored khadi-silk co-ord outfit',
-    eyebrow: 'THE CO-ORD EDIT',
-    heading: 'MODERN. EFFORTLESS. YOURS.',
-    subheading: 'Contemporary silhouettes designed for everyday elegance.',
-    buttonLabel: 'SHOP CO-ORDS',
-    targetCategory: 'Co-ord Sets',
-  },
-  {
-    id: 'slide-3',
-    image: EDITORIAL_ASSETS.heroEthnic,
-    alt: 'Indian female model in AABHA CLOTHING flowing earthen ochre and champagne Chanderi ethnic silhouette',
-    eyebrow: 'TIMELESS INDIAN',
-    heading: 'MADE FOR EVERY MOMENT.',
-    subheading: 'Refined Indian silhouettes for celebrations and everyday occasions.',
-    buttonLabel: 'EXPLORE THE COLLECTION',
-    targetCategory: 'All Collection',
-  },
-];
-
 interface HomePageProps {
   products: Product[];
   wishlistIds: string[];
+  siteSettings?: SiteSettings | null;
   onShopCollection: (category?: CollectionFilter) => void;
   onSelectProduct: (product: Product) => void;
   onToggleWishlist: (productId: string, e: React.MouseEvent) => void;
@@ -76,6 +47,7 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({
   products,
   wishlistIds,
+  siteSettings,
   onShopCollection,
   onSelectProduct,
   onToggleWishlist,
@@ -86,18 +58,63 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [showAllInNewArrivals, setShowAllInNewArrivals] = useState(false);
 
+  const heroSlides = useMemo<HeroSlide[]>(() => {
+    return [
+      {
+        id: 'slide-1',
+        image: siteSettings?.heroBanner || EDITORIAL_ASSETS.heroBanner,
+        alt: 'Graceful Indian models in AABHA CLOTHING contemporary ivory and sand Chanderi silk ensembles',
+        eyebrow: 'INAUGURAL 17-PIECE EDIT · HANDLOOM',
+        heading: 'EFFORTLESSLY INDIAN.',
+        subheading: 'Modern silhouettes. Timeless elegance.',
+        buttonLabel: 'SHOP THE COLLECTION',
+        targetCategory: 'All Collection',
+      },
+      {
+        id: 'slide-2',
+        image: siteSettings?.heroCoords || EDITORIAL_ASSETS.heroCoords,
+        alt: 'Indian female model in AABHA CLOTHING contemporary tailored khadi-silk co-ord outfit',
+        eyebrow: 'THE CO-ORD EDIT',
+        heading: 'MODERN. EFFORTLESS. YOURS.',
+        subheading: 'Contemporary silhouettes designed for everyday elegance.',
+        buttonLabel: 'SHOP CO-ORDS',
+        targetCategory: 'Co-ord Sets',
+      },
+      {
+        id: 'slide-3',
+        image: siteSettings?.heroEthnic || EDITORIAL_ASSETS.heroEthnic,
+        alt: 'Indian female model in AABHA CLOTHING flowing earthen ochre and champagne Chanderi ethnic silhouette',
+        eyebrow: 'TIMELESS INDIAN',
+        heading: 'MADE FOR EVERY MOMENT.',
+        subheading: 'Refined Indian silhouettes for celebrations and everyday occasions.',
+        buttonLabel: 'EXPLORE THE COLLECTION',
+        targetCategory: 'All Collection',
+      },
+    ];
+  }, [siteSettings]);
+
+  const instagramGallery = useMemo(() => {
+    if (siteSettings?.igPhotos && siteSettings.igPhotos.length >= 6) {
+      return INSTAGRAM_GALLERY.map((post, idx) => ({
+        ...post,
+        image: siteSettings.igPhotos[idx] || post.image,
+      }));
+    }
+    return INSTAGRAM_GALLERY;
+  }, [siteSettings]);
+
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const dragStartX = useRef<number | null>(null);
   const isDragging = useRef<boolean>(false);
 
   const nextSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
-  }, []);
+    setActiveSlide((prev) => (prev + 1) % heroSlides.length);
+  }, [heroSlides.length]);
 
   const prevSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
-  }, []);
+    setActiveSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
+  }, [heroSlides.length]);
 
   // Auto-slide every 5 seconds when not paused by user interaction
   useEffect(() => {
@@ -198,7 +215,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onMouseUp={handleMouseUp}
         className="relative w-full h-[84vh] min-h-[560px] sm:h-[88vh] max-h-[880px] overflow-hidden bg-[#181512] select-none"
       >
-        {HERO_SLIDES.map((slide, index) => {
+        {heroSlides.map((slide, index) => {
           const isActive = index === activeSlide;
           return (
             <div
@@ -226,7 +243,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               {/* Slide Content Container */}
               <div className="absolute inset-0 flex items-end">
-                <div className="max-w-[1400px] w-full mx-auto px-5 sm:px-8 lg:px-12 pb-20 sm:pb-24 lg:pb-28">
+                <div className="max-w-[1920px] w-full mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 pb-16 sm:pb-24 lg:pb-28">
                   <div
                     className={`max-w-2xl text-[#FAF8F5] transition-all duration-700 ease-out ${
                       isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
@@ -264,10 +281,10 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         {/* Bottom Navigation Bar: 3 Pagination Dots & Desktop Arrow Controls */}
         <div className="absolute inset-x-0 bottom-6 sm:bottom-9 z-20 pointer-events-none">
-          <div className="max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-12 flex items-center justify-between">
+          <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
             {/* 3 Small Pagination Dots */}
             <div className="flex items-center gap-2.5 pointer-events-auto">
-              {HERO_SLIDES.map((slide, idx) => {
+              {heroSlides.map((slide, idx) => {
                 const isActive = idx === activeSlide;
                 return (
                   <button
@@ -318,7 +335,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* 2. Shop By Category — Exact 4 Categories */}
-      <section className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
+      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14">
           <div>
             <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -333,49 +350,53 @@ export const HomePage: React.FC<HomePageProps> = ({
             onClick={() => onShopCollection('All Collection')}
             className="mt-3 sm:mt-0 self-start sm:self-auto inline-flex items-center gap-2 text-xs tracking-[0.14em] uppercase text-[#4A433D] hover:text-[#1E1B18] pb-1 border-b border-[#D5CCC0] hover:border-[#1E1B18] transition-colors whitespace-nowrap cursor-pointer"
           >
-            <span>All Collection (17)</span>
+            <span>All Collection ({products.length})</span>
             <ArrowRight className="w-3.5 h-3.5 stroke-[1.4]" />
           </button>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-7">
-          {CATEGORIES.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => onShopCollection(category.id)}
-              className="group text-left flex flex-col cursor-pointer"
-            >
-              {/* Reduced-Height Editorial Frame (4:3 on mobile, 5:4 on desktop) */}
-              <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full bg-[#F3EFEA] overflow-hidden mb-3.5 sm:mb-4">
-                <EditorialImage
-                  src={category.image}
-                  alt={`${category.name} — ${category.tagline}`}
-                  containerClassName="w-full h-full"
-                  className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                />
-              </div>
+          {CATEGORIES.map((category) => {
+            const dynamicCount = products.filter((p) => p.category === category.id).length;
+            const pieceCount = dynamicCount > 0 ? dynamicCount : category.pieceCount;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => onShopCollection(category.id)}
+                className="group text-left flex flex-col cursor-pointer"
+              >
+                {/* Reduced-Height Editorial Frame (4:3 on mobile, 5:4 on desktop) */}
+                <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full bg-[#F3EFEA] overflow-hidden mb-3.5 sm:mb-4">
+                  <EditorialImage
+                    src={category.image}
+                    alt={`${category.name} — ${category.tagline}`}
+                    containerClassName="w-full h-full"
+                    className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                  />
+                </div>
 
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="font-serif text-xl sm:text-[26px] text-[#1E1B18] font-normal group-hover:text-[#6E5043] transition-colors">
-                  {category.name}
-                </h3>
-                <span className="text-[11px] tracking-[0.1em] text-[#7C736A] tabular-nums group-hover:text-[#1E1B18] transition-colors">
-                  {category.pieceCount} {category.pieceCount === 1 ? 'Piece' : 'Pieces'} →
-                </span>
-              </div>
-              <p className="hidden sm:block text-xs text-[#7C736A] mt-1 line-clamp-1 font-light">
-                {category.tagline}
-              </p>
-            </button>
-          ))}
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="font-serif text-xl sm:text-[26px] text-[#1E1B18] font-normal group-hover:text-[#6E5043] transition-colors">
+                    {category.name}
+                  </h3>
+                  <span className="text-[11px] tracking-[0.1em] text-[#7C736A] tabular-nums group-hover:text-[#1E1B18] transition-colors">
+                    {pieceCount} {pieceCount === 1 ? 'Piece' : 'Pieces'} →
+                  </span>
+                </div>
+                <p className="hidden sm:block text-xs text-[#7C736A] mt-1 line-clamp-1 font-light">
+                  {category.tagline}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* 3. New Arrivals (From the 17-Product Launch Collection) */}
+      {/* 3. New Arrivals (From the Launch Collection) */}
       <section
         id="new-arrivals"
-        className="max-w-[1400px] mx-auto px-3.5 sm:px-8 lg:px-12 scroll-mt-24"
+        className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 scroll-mt-24"
       >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0 gap-4">
           <div>
@@ -392,7 +413,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               onClick={() => setShowAllInNewArrivals((prev) => !prev)}
               className="text-xs tracking-[0.14em] uppercase text-[#4A433D] hover:text-[#1E1B18] pb-1 border-b border-[#D5CCC0] hover:border-[#1E1B18] transition-colors cursor-pointer"
             >
-              {showAllInNewArrivals ? 'Show Featured 8' : 'Show All 17 Products'}
+              {showAllInNewArrivals ? 'Show Featured 8' : `Show All ${products.length} Products`}
             </button>
           </div>
         </div>
@@ -416,20 +437,20 @@ export const HomePage: React.FC<HomePageProps> = ({
             onClick={() => onShopCollection('All Collection')}
             className="inline-flex items-center gap-3 px-9 py-4 border border-[#1E1B18]/80 text-[#1E1B18] text-[11px] sm:text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#231F1D] hover:text-[#FAF8F5] hover:border-[#231F1D] transition-colors whitespace-nowrap cursor-pointer"
           >
-            <span>Explore Full Collection (17 Products)</span>
+            <span>Explore Full Collection ({products.length} Products)</span>
             <ArrowRight className="w-3.5 h-3.5 stroke-[1.4]" />
           </button>
         </div>
       </section>
 
       {/* 4. Brand Story — Generous Editorial Rest Section */}
-      <section className="bg-[#F3EFEA] py-20 sm:py-32">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+      <section className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
+        <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
               <div className="aspect-[16/10] w-full overflow-hidden bg-[#EAE3DA]">
                 <EditorialImage
-                  src={EDITORIAL_ASSETS.brandStory}
+                  src={siteSettings?.brandStory || EDITORIAL_ASSETS.brandStory}
                   alt="AABHA CLOTHING handloom mulmul and organza silhouette in sunlit sandstone verandah"
                   containerClassName="w-full h-full"
                   className="w-full h-full object-cover"
@@ -470,7 +491,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* 5. Curated Collection (4 Selected Products from the 17 Products) */}
-      <section className="max-w-[1400px] mx-auto px-3.5 sm:px-8 lg:px-12">
+      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
           <div>
             <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -481,7 +502,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-[#7C736A] mt-2 sm:mt-0 font-light">
-            Four signature silhouettes selected from our 17-piece collection
+            Four signature silhouettes selected from our launch collection
           </p>
         </div>
 
@@ -500,7 +521,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* 6. Instagram-Style Fashion Gallery & 7. Minimal Trust Section */}
-      <section className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 space-y-20 sm:space-y-28">
+      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 space-y-16 sm:space-y-24 lg:space-y-28">
         <div>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-12">
             <div>
@@ -517,7 +538,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-5">
-            {INSTAGRAM_GALLERY.map((post) => (
+            {instagramGallery.map((post) => (
               <button
                 key={post.id}
                 type="button"
@@ -561,9 +582,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           <div className="space-y-2">
             <ShieldCheck className="w-5 h-5 text-[#6E5043] stroke-[1.3]" />
-            <h3 className="font-serif text-xl text-[#1E1B18] font-normal">Secure Payments</h3>
+            <h3 className="font-serif text-xl text-[#1E1B18] font-normal">Pure COD Mode</h3>
             <p className="text-xs sm:text-[13px] text-[#7C736A] font-light leading-relaxed">
-              Encrypted checkout supporting UPI, Cards, NetBanking & COD.
+              Zero advance payment. Pay conveniently via cash or UPI upon delivery.
             </p>
           </div>
 

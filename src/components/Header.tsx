@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, Heart, ShoppingBag, ChevronDown, Menu, X } from 'lucide-react';
-import { CollectionFilter } from '../data/products';
+'use client';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Search, Heart, ShoppingBag, ChevronDown, Menu, X, User, Shield } from 'lucide-react';
+import { CollectionFilter, Product } from '../data/products';
 import { BrandLogo } from './BrandLogo';
+import { useAuth } from '../context/AuthContext';
 
 export type ActivePage = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'checkout' | 'policy';
 
@@ -10,6 +12,7 @@ interface HeaderProps {
   selectedCategory: CollectionFilter;
   wishlistCount: number;
   cartCount: number;
+  products?: Product[];
   onNavigateHome: () => void;
   onNavigateNewArrivals: () => void;
   onNavigateShopCategory: (category: CollectionFilter) => void;
@@ -18,6 +21,8 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onOpenWishlist: () => void;
   onOpenCart: () => void;
+  onOpenAccount?: () => void;
+  logoUrl?: string;
 }
 
 const SHOP_CATEGORIES: Array<{ label: CollectionFilter; count: number }> = [
@@ -33,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedCategory,
   wishlistCount,
   cartCount,
+  products,
   onNavigateHome,
   onNavigateNewArrivals,
   onNavigateShopCategory,
@@ -41,10 +47,36 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onOpenWishlist,
   onOpenCart,
+  onOpenAccount,
+  logoUrl,
 }) => {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { user, role, setAuthModalOpen, logout } = useAuth();
+
+  const shopCategories = useMemo(() => {
+    if (!products || products.length === 0) return SHOP_CATEGORIES;
+    return [
+      { label: 'All Collection' as CollectionFilter, count: products.length },
+      {
+        label: 'Anarkali' as CollectionFilter,
+        count: products.filter((p) => p.category === 'Anarkali').length,
+      },
+      {
+        label: '3-Piece Dresses' as CollectionFilter,
+        count: products.filter((p) => p.category === '3-Piece Dresses').length,
+      },
+      {
+        label: 'Co-ord Sets' as CollectionFilter,
+        count: products.filter((p) => p.category === 'Co-ord Sets').length,
+      },
+      {
+        label: 'Chikankari Suit' as CollectionFilter,
+        count: products.filter((p) => p.category === 'Chikankari Suit').length,
+      },
+    ];
+  }, [products]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -64,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
-      <div className="relative max-w-[1400px] mx-auto h-full px-4 sm:px-8 lg:px-12 flex items-center justify-between">
+      <div className="relative max-w-[1920px] mx-auto w-full h-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
         {/* Mobile Left Hamburger Trigger (flex-1 on mobile so logo stays centered) */}
         <div className="flex-1 flex items-center justify-start md:hidden">
           <button
@@ -92,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className="flex items-center justify-center whitespace-nowrap shrink-0"
           >
-            <BrandLogo variant="header" />
+            <BrandLogo variant="header" customLogoUrl={logoUrl} />
           </a>
         </div>
 
@@ -132,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
             {shopMenuOpen && (
               <div className="absolute left-0 top-full pt-3 w-60 z-50">
                 <div className="bg-[#FAF8F5] border border-[#E8E1D7] py-2.5">
-                  {SHOP_CATEGORIES.map(({ label, count }) => {
+                  {shopCategories.map(({ label, count }) => {
                     const isSelected = activePage === 'shop' && selectedCategory === label;
                     return (
                       <button
@@ -180,10 +212,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Contact
           </button>
+
+          <a
+            href="/my-orders"
+            className="py-1 border-b border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60 transition-colors whitespace-nowrap shrink-0 text-xs tracking-wider uppercase font-medium text-[#6E5043]"
+          >
+            Track Orders
+          </a>
         </nav>
 
         {/* Zone 3: Minimal Refined Actions (Search | Wishlist | Cart) */}
-        <div className="flex-1 md:flex-none flex items-center justify-end gap-1.5 sm:gap-5">
+        <div className="flex-1 md:flex-none flex items-center justify-end gap-1 sm:gap-4">
           <button
             type="button"
             onClick={onOpenSearch}
@@ -198,7 +237,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onOpenWishlist}
             aria-label="Open wishlist"
-            className="flex items-center gap-1 p-2 text-[13px] text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="hidden sm:flex items-center gap-1 p-2 text-[13px] text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Heart className="w-[18px] h-[18px] stroke-[1.35]" />
             <span className="hidden lg:inline tracking-wide">Wishlist</span>
@@ -213,7 +252,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onOpenCart}
             aria-label="Open shopping bag"
-            className="flex items-center gap-1 p-2 -mr-1 text-[13px] text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="flex items-center gap-1 p-2 text-[13px] text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <ShoppingBag className="w-[18px] h-[18px] stroke-[1.35]" />
             <span className="hidden sm:inline tracking-wide">Cart</span>
@@ -221,6 +260,50 @@ export const Header: React.FC<HeaderProps> = ({
               ({cartCount})
             </span>
           </button>
+
+          {/* Mobile Account Trigger */}
+          <button
+            type="button"
+            onClick={onOpenAccount || (() => setAuthModalOpen(true))}
+            aria-label="Open Account"
+            className="sm:hidden flex items-center p-2 text-[13px] text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <User className="w-[18px] h-[18px] stroke-[1.35]" />
+          </button>
+
+          {/* Customer Account Area (Desktop / Tablet) */}
+          <div className="hidden sm:flex pl-2 border-l border-[#ECE6DD] items-center">
+            {user ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onOpenAccount || (() => setAuthModalOpen(true))}
+                  className="text-xs font-medium text-[#1E1B18] hover:text-[#6E5043] flex items-center gap-1.5 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5 text-[#6E5043]" />
+                  <span>{(user.name || 'Member').split(' ')[0]}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="text-[#7C736A] hover:text-[#C62828] text-[11px] cursor-pointer"
+                  title="Sign Out"
+                >
+                  Exit
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenAccount || (() => setAuthModalOpen(true))}
+                className="flex items-center gap-1.5 p-1.5 text-xs text-[#1E1B18] hover:text-[#6E5043] transition-colors cursor-pointer"
+                title="Customer Sign In & Account"
+              >
+                <User className="w-4 h-4 stroke-[1.35]" />
+                <span className="hidden md:inline text-xs tracking-wide">Sign In</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -244,7 +327,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Shop Collection
               </p>
               <div className="flex flex-col space-y-2.5 pl-1">
-                {SHOP_CATEGORIES.map(({ label, count }) => (
+                {shopCategories.map(({ label, count }) => (
                   <button
                     key={label}
                     type="button"
@@ -284,6 +367,47 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Contact
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenWishlist();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center justify-between text-left font-serif text-2xl text-[#1E1B18] font-normal"
+              >
+                <span>Wishlist</span>
+                {wishlistCount > 0 && (
+                  <span className="text-sm font-mono text-[#6E5043]">({wishlistCount})</span>
+                )}
+              </button>
+
+              <a
+                href="/my-orders"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-left font-serif text-2xl text-[#6E5043] font-normal"
+              >
+                Track Orders & Bills
+              </a>
+
+              <div className="pt-3 border-t border-[#ECE6DD]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (onOpenAccount) onOpenAccount();
+                    else setAuthModalOpen(true);
+                  }}
+                  className="w-full py-3 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-[0.16em] text-center flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>
+                    {user
+                      ? `My Account (${(user.name || 'Member').split(' ')[0]})`
+                      : 'Customer Sign In / Register'}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
