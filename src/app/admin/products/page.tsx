@@ -77,7 +77,6 @@ export default function AdminProductsPage() {
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'x-admin-pin': 'aabha2026',
     };
   };
 
@@ -87,7 +86,6 @@ export default function AdminProductsPage() {
       (typeof window !== 'undefined' ? localStorage.getItem('aabha_admin_jwt') : null);
     return {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'x-admin-pin': 'aabha2026',
     };
   };
 

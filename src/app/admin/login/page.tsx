@@ -9,21 +9,17 @@ import {
   RefreshCw,
   Mail,
   KeyRound,
-  CheckCircle2,
-  Copy,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 
 export default function AdminLoginPage() {
   const { loginAsAdmin, isAdmin, isInitialized } = useAuth();
   const [loginMode, setLoginMode] = useState<'credentials' | 'pin'>('credentials');
-  const [email, setEmail] = useState('admin@aabhaclothing.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [copiedNotice, setCopiedNotice] = useState(false);
 
   useEffect(() => {
     if (isInitialized && isAdmin) {
@@ -37,22 +33,15 @@ export default function AdminLoginPage() {
     setSubmitting(true);
     try {
       const secretToSubmit = loginMode === 'credentials' ? password : pin;
-      const success = await loginAsAdmin(secretToSubmit);
+      const success = await loginAsAdmin(secretToSubmit, loginMode === 'credentials' ? email : undefined);
       if (success) {
         window.location.href = '/admin/dashboard';
       } else {
-        setError('Invalid admin credentials. Use the default email and password below.');
+        setError('Invalid admin credentials. Please verify your email and password.');
       }
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleAutofillDemo = () => {
-    setEmail('admin@aabhaclothing.com');
-    setPassword('aabha2026');
-    setPin('aabha2026');
-    setError('');
   };
 
   if (!isInitialized || isAdmin) {
@@ -135,7 +124,7 @@ export default function AdminLoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@aabhaclothing.com"
+                    placeholder="Enter admin email"
                     className="w-full bg-[#FAF8F5] border border-[#E0D8CE] pl-9 pr-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
                   />
                 </div>
@@ -150,7 +139,7 @@ export default function AdminLoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password (aabha2026)"
+                    placeholder="Enter admin password"
                     className="w-full bg-[#FAF8F5] border border-[#E0D8CE] pl-9 pr-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
                   />
                 </div>
@@ -166,7 +155,7 @@ export default function AdminLoginPage() {
                   required
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="Enter Admin PIN (aabha2026)"
+                  placeholder="Enter security PIN"
                   className="w-full bg-[#FAF8F5] border border-[#E0D8CE] pl-9 pr-3.5 py-2.5 text-sm font-mono tracking-widest text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
                 />
               </div>
@@ -184,34 +173,6 @@ export default function AdminLoginPage() {
             <span>{submitting ? 'Verifying Credentials...' : 'Authenticate & Enter Dashboard'}</span>
           </button>
         </form>
-
-        {/* Prominent Default Credentials Card */}
-        <div className="p-4 bg-[#FAF8F5] border border-[#E0D8CE] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6E5043] flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#6E5043]" />
-              Default Admin Credentials
-            </span>
-            <button
-              type="button"
-              onClick={handleAutofillDemo}
-              className="text-[11px] text-[#1E1B18] hover:text-[#6E5043] font-medium underline underline-offset-2 cursor-pointer"
-            >
-              ⚡ 1-Click Auto-Fill
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-[#F3EFEA] p-2.5 border border-[#ECE6DD]">
-            <div>
-              <span className="text-[10px] uppercase text-[#7C736A] font-sans block">Default Email</span>
-              <strong className="text-[#1E1B18] select-all">admin@aabhaclothing.com</strong>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-[#7C736A] font-sans block">Default Password / PIN</span>
-              <strong className="text-[#1E1B18] select-all">aabha2026</strong>
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Footer */}

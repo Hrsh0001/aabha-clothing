@@ -1,10 +1,11 @@
+import crypto from 'crypto';
 import { verifyJwt } from './jwt';
 
 /**
  * Validates whether an incoming HTTP request is authenticated with valid admin credentials.
  * Checks:
  * 1. Authorization: Bearer <JWT_TOKEN>
- * 2. x-admin-pin: "aabha2026" (for quick PIN operations)
+ * 2. x-admin-pin: Matching configured environment password or hash
  */
 export function isAuthorizedAdmin(request: Request): boolean {
   try {
@@ -22,10 +23,20 @@ export function isAuthorizedAdmin(request: Request): boolean {
       }
     }
 
-    // 2. Check x-admin-pin header
+    // 2. Check x-admin-pin header against env
     const pinHeader = request.headers.get('x-admin-pin');
-    if (pinHeader && (pinHeader === 'aabha2026' || pinHeader === 'admin123')) {
-      return true;
+    const defaultHash = 'c4ec45989e2e3671041b0795cd1e84e9a96240c92e620f8f190d571872acd0b4';
+    const configuredHash = process.env.ADMIN_PASSWORD_HASH || defaultHash;
+    const configuredPassword = process.env.ADMIN_PASSWORD;
+
+    if (pinHeader) {
+      const pinHash = crypto.createHash('sha256').update(pinHeader).digest('hex');
+      if (
+        pinHash === configuredHash ||
+        (Boolean(configuredPassword) && pinHeader === configuredPassword)
+      ) {
+        return true;
+      }
     }
 
     // 3. In development local mode without headers, check if cookies have admin session

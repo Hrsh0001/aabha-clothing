@@ -31,7 +31,7 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<AuthResponse>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<AuthResponse>;
   loginAsCustomerLegacy: (name: string, phone: string) => void;
-  loginAsAdmin: (secretKey: string) => Promise<boolean>;
+  loginAsAdmin: (secretKey: string, email?: string) => Promise<boolean>;
   logout: () => void;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
@@ -213,12 +213,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Admin Login via JWT
-  const loginAsAdmin = async (secretKey: string): Promise<boolean> => {
+  const loginAsAdmin = async (secretKey: string, email?: string): Promise<boolean> => {
     try {
       const res = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: secretKey, password: secretKey }),
+        body: JSON.stringify({
+          email: email || '',
+          username: email || '',
+          pin: secretKey,
+          password: secretKey,
+        }),
       });
       const data = await res.json();
       if (data.success && data.token) {
@@ -229,12 +234,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     } catch (err) {
       console.error('Admin login error:', err);
-      if (secretKey.trim() === 'aabha2026' || secretKey.trim().toLowerCase() === 'admin123') {
-        const dummyToken = `demo_${Date.now()}`;
-        setAdminToken(dummyToken);
-        localStorage.setItem('aabha_admin_jwt', dummyToken);
-        return true;
-      }
       return false;
     }
   };

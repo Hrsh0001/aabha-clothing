@@ -105,7 +105,6 @@ function ProductEditorContent() {
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'x-admin-pin': 'aabha2026',
     };
   };
 
@@ -115,7 +114,6 @@ function ProductEditorContent() {
       (typeof window !== 'undefined' ? localStorage.getItem('aabha_admin_jwt') : null);
     return {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'x-admin-pin': 'aabha2026',
     };
   };
 

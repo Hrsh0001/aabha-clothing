@@ -52,7 +52,6 @@ export default function AdminOrdersPage() {
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      'x-admin-pin': 'aabha2026',
     };
   };
 

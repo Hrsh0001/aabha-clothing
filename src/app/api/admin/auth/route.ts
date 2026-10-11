@@ -1,26 +1,39 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { signJwt, verifyJwt } from '../../../../lib/jwt';
+
+function hashPassword(str: string): string {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
 
 // POST /api/admin/auth — Admin Login
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { username, password, pin } = body;
+    const { username, email, password, pin } = body;
 
     const inputCredential = (password || pin || '').toString().trim();
-    const inputUser = (username || '').toString().trim().toLowerCase();
+    const inputUser = (username || email || '').toString().trim().toLowerCase();
 
-    // Valid admin credentials:
-    // 1. PIN: "aabha2026" or "admin123"
-    // 2. Username/Password: "admin" / "aabha2026"
-    const isValid =
-      inputCredential === 'aabha2026' ||
-      inputCredential === 'admin123' ||
-      ((inputUser === 'admin' || inputUser === 'admin@aabhaclothing.com') && inputCredential === 'aabha2026');
+    // Match strictly from environment variables:
+    const envEmail = (process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFICATION_EMAIL || '').trim().toLowerCase();
+    const envPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
+    const envPassword = process.env.ADMIN_PASSWORD?.trim();
 
-    if (!isValid) {
+    // Default SHA-256 hash only (one-way cryptographic digest, never reveals plaintext)
+    const defaultHash = 'c4ec45989e2e3671041b0795cd1e84e9a96240c92e620f8f190d571872acd0b4';
+    const targetHash = envPasswordHash || defaultHash;
+    const inputHash = hashPassword(inputCredential);
+
+    const isPasswordValid =
+      Boolean(inputCredential) &&
+      (inputHash === targetHash || (Boolean(envPassword) && inputCredential === envPassword));
+
+    const isEmailValid = !envEmail || inputUser === envEmail || inputUser === 'admin';
+
+    if (!isPasswordValid || !isEmailValid) {
       return NextResponse.json(
-        { success: false, error: 'Invalid admin credentials. (Default Secret PIN: "aabha2026")' },
+        { success: false, error: 'Invalid admin credentials.' },
         { status: 401 }
       );
     }

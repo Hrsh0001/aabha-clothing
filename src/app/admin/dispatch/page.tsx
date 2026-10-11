@@ -54,7 +54,6 @@ export default function AdminDispatchMapPage() {
     try {
       const res = await fetch('/api/orders', {
         headers: {
-          'x-admin-pin': 'aabha2026',
           ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
         },
       });
@@ -81,7 +80,6 @@ export default function AdminDispatchMapPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-pin': 'aabha2026',
           ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
         },
         body: JSON.stringify({ orderId, status: newStatus }),
