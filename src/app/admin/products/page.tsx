@@ -452,14 +452,44 @@ export default function AdminProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedSizes.length === 0) {
-      alert('Please select at least one available size for this garment.');
+
+    // 1. Validate Garment Name
+    if (!name.trim()) {
+      showToast('Validation Error: Garment name is required.');
+      return;
+    }
+
+    // 2. Validate Price
+    const parsedPrice = Number(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      showToast('Validation Error: Please enter a valid positive price in ₹ INR.');
+      return;
+    }
+
+    // 3. Validate Original Price (if provided)
+    if (originalPrice && Number(originalPrice) < parsedPrice) {
+      showToast('Validation Warning: Original price is lower than selling price.');
+    }
+
+    // 4. Validate Sizes
+    const validSizes = selectedSizes
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => Boolean(s));
+
+    if (validSizes.length === 0) {
+      showToast('Validation Error: Please select at least one available size (e.g., S, M, L).');
+      return;
+    }
+
+    // 5. Validate Photos
+    const leadImage = gallery[0]?.url || primaryImage;
+    if (!leadImage) {
+      showToast('Validation Error: Please upload at least one garment photo.');
       return;
     }
 
     setSaving(true);
     try {
-      const leadImage = gallery[0]?.url || primaryImage;
       const drapeImage = secondaryImage || leadImage;
       const galleryToSubmit =
         gallery.length > 0
@@ -473,16 +503,16 @@ export default function AdminProductsPage() {
           headers: getAuthHeaders(),
           body: JSON.stringify({
             id: editingProduct.id,
-            name,
+            name: name.trim(),
             category,
-            price: Number(price),
+            price: parsedPrice,
             originalPrice: originalPrice ? Number(originalPrice) : undefined,
             primaryImage: leadImage,
             secondaryImage: drapeImage,
             gallery: galleryToSubmit,
-            fabric,
-            description,
-            sizes: selectedSizes,
+            fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
+            description: description.trim(),
+            sizes: validSizes,
           }),
         });
         const data = await res.json();
@@ -501,9 +531,9 @@ export default function AdminProductsPage() {
             )
           );
           setModalOpen(false);
-          showToast(`Updated ${name} & its multi-image gallery successfully!`);
+          showToast(`Updated "${name}" & its multi-image gallery successfully!`);
         } else {
-          showToast(data.error || 'Failed to update garment');
+          showToast(`Save Error: ${data.error || 'Failed to update garment'}`);
         }
       } else {
         // Add mode
@@ -511,25 +541,25 @@ export default function AdminProductsPage() {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            name,
+            name: name.trim(),
             category,
-            price: Number(price),
+            price: parsedPrice,
             originalPrice: originalPrice ? Number(originalPrice) : undefined,
             primaryImage: leadImage,
             secondaryImage: drapeImage,
             gallery: galleryToSubmit,
-            fabric,
-            description,
-            sizes: selectedSizes,
+            fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
+            description: description.trim(),
+            sizes: validSizes,
           }),
         });
         const data = await res.json();
         if (data.success && data.product) {
           setProducts((prev) => [data.product, ...prev]);
           setModalOpen(false);
-          showToast(`Added ${name} with full gallery to collection!`);
+          showToast(`Added "${name}" with full gallery to collection!`);
         } else {
-          showToast(data.error || 'Failed to add garment');
+          showToast(`Save Error: ${data.error || 'Failed to add garment'}`);
         }
       }
     } catch (err) {
