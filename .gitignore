@@ -22,3 +22,11 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Vercel & Deployment
+.vercel
+
+# Security credentials & certificates
+*.pem
+*.key
+*.cert
