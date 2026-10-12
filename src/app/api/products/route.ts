@@ -4,22 +4,29 @@ import path from 'path';
 import { prisma } from '../../../lib/db';
 import { PRODUCTS } from '../../../data/products';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
+import { persistImageUrlForCloud } from '../../../lib/image-store';
 
 const PRODUCTS_FILE_PATH = path.join(process.cwd(), 'data', 'products.json');
+const DEFAULT_HERO_PLACEHOLDER = '/images/hero_editorial_banner_1791119088652.jpg';
 
 function ensureProductsFile(): void {
-  const dir = path.join(process.cwd(), 'data');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(PRODUCTS_FILE_PATH)) {
-    // Seed with the inaugural 17 products
-    fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(PRODUCTS, null, 2), 'utf-8');
+  try {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(PRODUCTS_FILE_PATH)) {
+      fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(PRODUCTS, null, 2), 'utf-8');
+    }
+  } catch {
+    // Read-only filesystem in cloud deployment
   }
 }
 
-// In-memory fallback cache for serverless environments where local filesystem is read-only
+// In-memory fallback cache for environments where local filesystem is read-only and DB is absent
 let inMemoryProductsCache: any[] | null = null;
+let isDbSeededThisInstance = false;
+let deletedDefaultProductIdsCache: Set<string> = new Set();
 
 function readLocalProducts(): any[] {
   if (inMemoryProductsCache && inMemoryProductsCache.length > 0) {
@@ -27,11 +34,15 @@ function readLocalProducts(): any[] {
   }
   try {
     ensureProductsFile();
-    const data = fs.readFileSync(PRODUCTS_FILE_PATH, 'utf-8');
-    inMemoryProductsCache = JSON.parse(data);
+    if (fs.existsSync(PRODUCTS_FILE_PATH)) {
+      const data = fs.readFileSync(PRODUCTS_FILE_PATH, 'utf-8');
+      inMemoryProductsCache = JSON.parse(data);
+      return inMemoryProductsCache || [...PRODUCTS];
+    }
+    inMemoryProductsCache = [...PRODUCTS];
     return inMemoryProductsCache;
-  } catch (err) {
-    return inMemoryProductsCache || PRODUCTS;
+  } catch {
+    return inMemoryProductsCache || [...PRODUCTS];
   }
 }
 
@@ -40,8 +51,353 @@ function saveLocalProducts(products: any[]): void {
   try {
     ensureProductsFile();
     fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(products, null, 2), 'utf-8');
-  } catch (fsErr) {
-    console.warn('Serverless filesystem notice (kept in memory cache):', fsErr);
+  } catch {
+    // Kept in memory cache on serverless
+  }
+}
+
+/**
+ * Validates an image URL and rejects truncated/corrupted test Data URLs (< 64 chars),
+ * while routing any legacy localhost `/images/garment_*` paths through `/api/images/*`.
+ */
+function sanitizeImageUrl(url: any, fallback: string): string {
+  if (!url || typeof url !== 'string') return fallback;
+  const trimmed = url.trim();
+  if (!trimmed) return fallback;
+  if (
+    trimmed.startsWith('data:image/') &&
+    !trimmed.startsWith('data:image/svg') &&
+    trimmed.length < 64
+  ) {
+    return fallback;
+  }
+  if (trimmed.startsWith('/images/garment_')) {
+    return `/api/images/${path.basename(trimmed)}`;
+  }
+  return trimmed;
+}
+
+function parseGalleryArray(
+  rawGallery: any,
+  primaryImage: string,
+  secondaryImage?: string | null
+): { url: string; label: string; focalClass: string }[] {
+  const lead = sanitizeImageUrl(primaryImage, DEFAULT_HERO_PLACEHOLDER);
+  if (!Array.isArray(rawGallery) || rawGallery.length === 0) {
+    const fallback = [
+      { url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' },
+    ];
+    const cleanSecondary = secondaryImage ? sanitizeImageUrl(secondaryImage, '') : '';
+    if (cleanSecondary && cleanSecondary !== lead) {
+      fallback.push({
+        url: cleanSecondary,
+        label: 'Editorial Daylight Drape',
+        focalClass: 'object-center',
+      });
+    }
+    return fallback;
+  }
+
+  const parsed = rawGallery
+    .map((item: any, idx: number) => {
+      if (typeof item === 'object' && item !== null) {
+        const cleanUrl = sanitizeImageUrl(item.url, lead);
+        return {
+          url: cleanUrl,
+          label:
+            item.label?.trim() ||
+            (idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`),
+          focalClass: item.focalClass || 'object-center',
+        };
+      }
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed.startsWith('{')) {
+          try {
+            const obj = JSON.parse(trimmed);
+            if (obj && obj.url) {
+              const cleanUrl = sanitizeImageUrl(String(obj.url), lead);
+              return {
+                url: cleanUrl,
+                label:
+                  obj.label?.trim() ||
+                  (idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`),
+                focalClass: obj.focalClass || 'object-center',
+              };
+            }
+          } catch {
+            // Fall through to plain URL string handling
+          }
+        }
+        if (trimmed) {
+          const cleanUrl = sanitizeImageUrl(trimmed, lead);
+          return {
+            url: cleanUrl,
+            label: idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`,
+            focalClass: 'object-center',
+          };
+        }
+      }
+      return null;
+    })
+    .filter(Boolean) as { url: string; label: string; focalClass: string }[];
+
+  return parsed.length > 0
+    ? parsed
+    : [{ url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+}
+
+function serializeGalleryForDb(
+  gallery: any,
+  primaryImage: string,
+  secondaryImage?: string | null
+): string[] {
+  const structured = parseGalleryArray(gallery, primaryImage, secondaryImage);
+  return structured.map((g) =>
+    JSON.stringify({
+      url: g.url,
+      label: g.label,
+      focalClass: g.focalClass || 'object-center',
+    })
+  );
+}
+
+function normalizeProduct(raw: any): any {
+  const staticMatch = PRODUCTS.find((p) => p.id === raw.id || p.sku === raw.sku);
+  const fallbackLead = staticMatch?.primaryImage || DEFAULT_HERO_PLACEHOLDER;
+  const lead = sanitizeImageUrl(raw.primaryImage, fallbackLead);
+  const rawSec = sanitizeImageUrl(
+    raw.secondaryImage,
+    staticMatch?.secondaryImage || lead
+  );
+  const gallery = parseGalleryArray(
+    raw.gallery && raw.gallery.length > 0 ? raw.gallery : staticMatch?.gallery,
+    lead,
+    rawSec
+  );
+  const primaryImage = sanitizeImageUrl(gallery[0]?.url, lead);
+  const secondaryImage = sanitizeImageUrl(
+    raw.secondaryImage,
+    gallery[1]?.url || staticMatch?.secondaryImage || primaryImage
+  );
+  const fabric = raw.fabric || staticMatch?.fabric || 'Pure Handloom Chanderi Silk';
+  const category = raw.category || staticMatch?.category || 'Anarkali';
+
+  return {
+    id: raw.id,
+    sku: raw.sku || staticMatch?.sku || `AB-${String(raw.id).toUpperCase().slice(0, 8)}`,
+    name: raw.name || staticMatch?.name || 'Handcrafted Silhouette',
+    subtitle:
+      raw.subtitle ||
+      staticMatch?.subtitle ||
+      `${fabric} ${category} silhouette`,
+    category,
+    price: Number(raw.price) || 0,
+    originalPrice:
+      raw.originalPrice !== null && raw.originalPrice !== undefined && Number(raw.originalPrice) > 0
+        ? Number(raw.originalPrice)
+        : undefined,
+    colorName:
+      raw.colorName ||
+      staticMatch?.colorName ||
+      fabric.split(' ').slice(0, 2).join(' ') ||
+      'Artisan Handloom',
+    colorHex: raw.colorHex || staticMatch?.colorHex || '#6E5043',
+    fabric,
+    isNewArrival:
+      typeof raw.isNewArrival === 'boolean'
+        ? raw.isNewArrival
+        : staticMatch?.isNewArrival ?? true,
+    isCurated:
+      typeof raw.isCurated === 'boolean' ? raw.isCurated : staticMatch?.isCurated ?? false,
+    inStock: typeof raw.inStock === 'boolean' ? raw.inStock : true,
+    sizes:
+      Array.isArray(raw.sizes) && raw.sizes.length > 0
+        ? raw.sizes
+        : staticMatch?.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    primaryImage,
+    secondaryImage,
+    gallery,
+    description:
+      raw.description ||
+      staticMatch?.description ||
+      'Exquisite handcrafted Indian silhouette tailored in breathable natural fibers.',
+    highlights:
+      Array.isArray(raw.highlights) && raw.highlights.length > 0
+        ? raw.highlights
+        : staticMatch?.highlights || [
+            'Handcrafted artisan detailing',
+            'Breathable natural luxury weave',
+            'Deep concealed side-seam pockets',
+          ],
+    fabricAndCare:
+      Array.isArray(raw.fabricAndCare) && raw.fabricAndCare.length > 0
+        ? raw.fabricAndCare
+        : staticMatch?.fabricAndCare || [
+            'Dry clean recommended to preserve natural sheen',
+            'Store in breathable cotton muslin bag',
+          ],
+    sizeAndFit:
+      raw.sizeAndFit ||
+      staticMatch?.sizeAndFit || [
+        'Relaxed tailored silhouette',
+        'Model is 5\'8" (173 cm) and wears size S',
+      ],
+    deliveryInfo:
+      raw.deliveryInfo ||
+      staticMatch?.deliveryInfo ||
+      'Complimentary insured express shipping across India. Dispatched within 24–48 business hours.',
+    returnsInfo:
+      raw.returnsInfo ||
+      staticMatch?.returnsInfo ||
+      'Complimentary 14-day easy returns and doorstep size exchanges.',
+    reviews: Array.isArray(raw.reviews) ? raw.reviews : staticMatch?.reviews || [],
+  };
+}
+
+/**
+ * Ensures the PostgreSQL Product table exists and seeds the 17 default catalog products
+ * into Supabase PostgreSQL so the storefront never loses its launch catalog on Vercel production.
+ * Isolated try/catch blocks ensure DDL or SiteSetting notices never block Product CRUD operations.
+ */
+async function ensureProductsDatabaseReady(seedIfNeeded: boolean = true): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  if (!seedIfNeeded) return true;
+
+  try {
+    let count = 0;
+    try {
+      count = await prisma.product.count();
+    } catch {
+      // Table does not exist yet — create it
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "Product" (
+          "id" TEXT NOT NULL,
+          "sku" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "category" TEXT NOT NULL,
+          "price" DOUBLE PRECISION NOT NULL,
+          "originalPrice" DOUBLE PRECISION,
+          "inStock" BOOLEAN NOT NULL DEFAULT true,
+          "isNewArrival" BOOLEAN NOT NULL DEFAULT false,
+          "isCurated" BOOLEAN NOT NULL DEFAULT false,
+          "primaryImage" TEXT NOT NULL,
+          "secondaryImage" TEXT,
+          "gallery" TEXT[] DEFAULT ARRAY[]::TEXT[],
+          "sizes" TEXT[] DEFAULT ARRAY['XS', 'S', 'M', 'L', 'XL', 'XXL']::TEXT[],
+          "description" TEXT NOT NULL DEFAULT '',
+          "fabric" TEXT NOT NULL DEFAULT '',
+          "colorName" TEXT NOT NULL DEFAULT '',
+          "highlights" TEXT[] DEFAULT ARRAY[]::TEXT[],
+          "fabricAndCare" TEXT[] DEFAULT ARRAY[]::TEXT[],
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "Product_sku_key" ON "Product"("sku");
+      `);
+      count = await prisma.product.count();
+    }
+
+    if (!isDbSeededThisInstance) {
+      let needsSeed = count === 0;
+
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "SiteSetting" (
+            "id" TEXT NOT NULL,
+            "data" JSONB NOT NULL,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
+          );
+        `);
+
+        const seedMarker = await prisma.$queryRawUnsafe<{ id: string }[]>(
+          `SELECT "id" FROM "SiteSetting" WHERE "id" = 'catalog_seed_v2' LIMIT 1`
+        );
+        if (!seedMarker || seedMarker.length === 0) {
+          needsSeed = true;
+        }
+
+        const deletedRows = await prisma.$queryRawUnsafe<{ data: any }[]>(
+          `SELECT "data" FROM "SiteSetting" WHERE "id" = 'deleted_product_ids' LIMIT 1`
+        );
+        if (deletedRows && deletedRows.length > 0 && Array.isArray(deletedRows[0].data)) {
+          deletedDefaultProductIdsCache = new Set(deletedRows[0].data);
+        }
+      } catch {
+        // Non-fatal if SiteSetting query fails
+      }
+
+      if (needsSeed) {
+        try {
+          const seedRows = PRODUCTS.filter((p) => !deletedDefaultProductIdsCache.has(p.id)).map(
+            (p, index) => ({
+              id: p.id,
+              sku: p.sku,
+              name: p.name,
+              category: p.category,
+              price: p.price,
+              originalPrice: p.originalPrice ?? null,
+              inStock: p.inStock,
+              isNewArrival: p.isNewArrival,
+              isCurated: p.isCurated,
+              primaryImage: p.primaryImage,
+              secondaryImage: p.secondaryImage || p.primaryImage,
+              gallery: serializeGalleryForDb(p.gallery, p.primaryImage, p.secondaryImage),
+              sizes: p.sizes as string[],
+              description: p.description,
+              fabric: p.fabric,
+              colorName: p.colorName || '',
+              highlights: p.highlights || [],
+              fabricAndCare: p.fabricAndCare || [],
+              createdAt: new Date(Date.now() - index * 60_000),
+            })
+          );
+
+          await prisma.product.createMany({
+            data: seedRows,
+            skipDuplicates: true,
+          });
+
+          // Repair anarkali-01 if it was mutated by earlier test scripts with a 36-char dummy base64 string
+          const anarkali01 = await prisma.product.findUnique({ where: { id: 'anarkali-01' } });
+          if (
+            anarkali01 &&
+            anarkali01.primaryImage.startsWith('data:image/') &&
+            anarkali01.primaryImage.length < 200
+          ) {
+            const p0 = PRODUCTS[0];
+            await prisma.product.update({
+              where: { id: 'anarkali-01' },
+              data: {
+                inStock: true,
+                primaryImage: p0.primaryImage,
+                secondaryImage: p0.secondaryImage,
+                gallery: serializeGalleryForDb(p0.gallery, p0.primaryImage, p0.secondaryImage),
+              },
+            });
+          }
+
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+             VALUES ('catalog_seed_v2', '{"seeded":true}'::jsonb, CURRENT_TIMESTAMP)
+             ON CONFLICT ("id") DO UPDATE SET "updatedAt" = CURRENT_TIMESTAMP`
+          );
+        } catch (seedErr) {
+          console.warn('Catalog seed notice:', seedErr);
+        }
+      }
+
+      isDbSeededThisInstance = true;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('Database initialization notice:', err);
+    return true; // Allow Prisma operations to attempt execution
   }
 }
 
@@ -51,29 +407,58 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    if (process.env.DATABASE_URL && prisma) {
+    const dbReady = await ensureProductsDatabaseReady();
+
+    if (dbReady && prisma) {
       try {
         if (id) {
-          const single = await prisma.product.findUnique({ where: { id } });
+          const single = await prisma.product.findFirst({
+            where: {
+              OR: [{ id }, { sku: id }],
+            },
+          });
           if (single) {
-            return NextResponse.json({ success: true, product: single });
+            return NextResponse.json({
+              success: true,
+              product: normalizeProduct(single),
+            });
           }
         } else {
           const dbProducts = await prisma.product.findMany({
             orderBy: { createdAt: 'desc' },
           });
           if (dbProducts.length > 0) {
-            return NextResponse.json({ success: true, products: dbProducts });
+            const normalizedDb = dbProducts.map(normalizeProduct);
+            const existingIds = new Set(normalizedDb.map((p) => p.id));
+            const existingSkus = new Set(normalizedDb.map((p) => p.sku));
+
+            // Ensure all non-deleted default catalog products are always present
+            for (const defaultProd of PRODUCTS) {
+              if (
+                !existingIds.has(defaultProd.id) &&
+                !existingSkus.has(defaultProd.sku) &&
+                !deletedDefaultProductIdsCache.has(defaultProd.id)
+              ) {
+                normalizedDb.push(normalizeProduct(defaultProd));
+              }
+            }
+
+            return NextResponse.json({
+              success: true,
+              products: normalizedDb,
+            });
           }
         }
       } catch (e) {
-        console.warn('Prisma fetch notice, falling back to local file:', e);
+        console.warn('Prisma fetch notice, falling back to local cache:', e);
       }
     }
 
-    const localProducts = readLocalProducts();
+    const localProducts = readLocalProducts().map(normalizeProduct);
     if (id) {
-      const matched = localProducts.find((p: any) => p.id === id || p.sku === id);
+      const matched = localProducts.find(
+        (p: any) => p.id === id || p.sku?.toLowerCase() === id.toLowerCase()
+      );
       if (matched) {
         return NextResponse.json({ success: true, product: matched });
       }
@@ -102,59 +487,132 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       name,
+      sku: customSku,
       category,
       price,
       originalPrice,
+      inStock,
       primaryImage,
       secondaryImage,
       gallery,
       description,
       fabric,
+      colorName,
       sizes,
     } = body;
 
-    if (!name || !category || !price) {
+    const fieldErrors: Record<string, string> = {};
+    if (!name || !String(name).trim()) {
+      fieldErrors.name = 'Garment silhouette name is required.';
+    } else if (String(name).trim().length < 3) {
+      fieldErrors.name = 'Garment silhouette name must be at least 3 characters.';
+    }
+    if (!category || !String(category).trim()) {
+      fieldErrors.category = 'Collection category is required.';
+    }
+    const parsedPrice = Number(price);
+    if (price === undefined || price === null || price === '' || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      fieldErrors.price = 'Selling price must be a valid amount greater than ₹0.';
+    }
+    if (originalPrice !== undefined && originalPrice !== null && originalPrice !== '') {
+      const parsedOriginal = Number(originalPrice);
+      if (Number.isNaN(parsedOriginal) || parsedOriginal <= 0) {
+        fieldErrors.originalPrice = 'MRP / Original price must be a valid positive amount in ₹ INR.';
+      } else if (!Number.isNaN(parsedPrice) && parsedPrice > 0 && parsedOriginal < parsedPrice) {
+        fieldErrors.originalPrice = `MRP / Original price (₹${parsedOriginal}) must be greater than or equal to selling price (₹${parsedPrice}).`;
+      }
+    }
+    const maxDataUrlLength = Math.ceil(5 * 1024 * 1024 * 1.37) + 256;
+    if (Array.isArray(gallery) && gallery.length > 10) {
+      fieldErrors.gallery = 'Gallery cannot exceed 10 photos per garment.';
+    } else if (Array.isArray(gallery)) {
+      const oversizedIdx = gallery.findIndex((g: any) => {
+        const u = typeof g === 'string' ? g : g?.url;
+        return typeof u === 'string' && u.startsWith('data:image/') && u.length > maxDataUrlLength;
+      });
+      if (oversizedIdx !== -1) {
+        fieldErrors.gallery = `Photo #${oversizedIdx + 1} exceeds the 5 MB image size limit.`;
+      }
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
       return NextResponse.json(
-        { success: false, error: 'Name, category, and price are required' },
+        {
+          success: false,
+          error: Object.values(fieldErrors).join(' '),
+          errors: fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const leadImg = primaryImage?.trim() || '/images/hero_editorial_banner_1791119088652.jpg';
-    const drapeImg = secondaryImage?.trim() || leadImg;
-
-    // Build dynamic gallery array
-    let resolvedGallery = Array.isArray(gallery) && gallery.length > 0 ? gallery : [];
-    if (resolvedGallery.length === 0) {
-      resolvedGallery = [
-        { url: leadImg, label: 'Full Studio Silhouette', focalClass: 'object-center' },
-        { url: drapeImg, label: 'Editorial Drape', focalClass: 'object-center' },
-      ];
-    } else {
-      // Ensure first item is primary image
-      if (resolvedGallery[0]?.url !== leadImg) {
-        resolvedGallery[0] = { ...resolvedGallery[0], url: leadImg };
-      }
+    // Persist any inline Data URLs or local garment paths into cloud PostgreSQL image store
+    const rawLead = (await persistImageUrlForCloud(primaryImage)) || DEFAULT_HERO_PLACEHOLDER;
+    const parsedGallery = parseGalleryArray(gallery, rawLead, secondaryImage);
+    const cloudGallery: { url: string; label: string; focalClass: string }[] = [];
+    for (const item of parsedGallery) {
+      const cloudUrl = (await persistImageUrlForCloud(item.url)) || rawLead;
+      cloudGallery.push({
+        url: cloudUrl,
+        label: item.label,
+        focalClass: item.focalClass || 'object-center',
+      });
     }
 
-    const sku = `AB-${category.toUpperCase().replace(/\s+/g, '').slice(0, 3)}-${Math.floor(100 + Math.random() * 899)}`;
+    const leadImg = cloudGallery[0]?.url || rawLead;
+    if (cloudGallery.length > 0 && cloudGallery[0].url !== leadImg) {
+      cloudGallery[0] = { ...cloudGallery[0], url: leadImg };
+    }
+
+    const persistedSecondary = await persistImageUrlForCloud(secondaryImage);
+    const drapeImg =
+      persistedSecondary &&
+      !(persistedSecondary === DEFAULT_HERO_PLACEHOLDER && leadImg !== DEFAULT_HERO_PLACEHOLDER)
+        ? persistedSecondary
+        : cloudGallery[1]?.url || leadImg;
+
+    const cleanCategoryCode =
+      category
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 3) || 'GAR';
+    const baseSku =
+      customSku && String(customSku).trim()
+        ? String(customSku).trim().toUpperCase()
+        : `AB-${cleanCategoryCode}-${Math.floor(100 + Math.random() * 899)}`;
+
+    const resolvedInStock = typeof inStock === 'boolean' ? inStock : true;
+    const resolvedFabric = fabric?.trim() || 'Pure Handloom Chanderi Silk';
+    const resolvedColorName =
+      colorName?.trim() ||
+      resolvedFabric.split(' ').slice(0, 2).join(' ') ||
+      'Artisan Handloom';
+    const resolvedSizes =
+      Array.isArray(sizes) && sizes.length > 0
+        ? sizes.map((s: any) => String(s).trim().toUpperCase()).filter(Boolean)
+        : ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
     const newProduct = {
       id: `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      sku,
+      sku: baseSku,
       name: name.trim(),
-      subtitle: `${fabric || 'Handloom'} ${category} silhouette`,
+      subtitle: `${resolvedFabric} ${category} silhouette`,
       category,
       price: Number(price),
-      originalPrice: originalPrice ? Number(originalPrice) : undefined,
-      inStock: true,
+      originalPrice:
+        originalPrice !== undefined && originalPrice !== null && Number(originalPrice) > 0
+          ? Number(originalPrice)
+          : undefined,
+      inStock: resolvedInStock,
       isNewArrival: true,
       isCurated: false,
       primaryImage: leadImg,
       secondaryImage: drapeImg,
-      gallery: resolvedGallery,
-      sizes: sizes && sizes.length > 0 ? sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+      gallery: cloudGallery,
+      sizes: resolvedSizes,
       description: description?.trim() || 'Exquisite handcrafted Indian silhouette.',
-      fabric: fabric?.trim() || 'Pure Handloom Chanderi Silk',
+      fabric: resolvedFabric,
+      colorName: resolvedColorName,
       highlights: ['Handcrafted detailing', 'Breathable luxury weave', 'Side seam pockets'],
       fabricAndCare: ['Dry clean only', 'Store in cotton muslin bag'],
       sizeAndFit: ['Relaxed tailored silhouette', 'Model is 5ft 8in wearing Size S'],
@@ -163,32 +621,55 @@ export async function POST(request: Request) {
       reviews: [],
     };
 
-    if (process.env.DATABASE_URL && prisma) {
+    const dbReady = await ensureProductsDatabaseReady(false);
+
+    if (dbReady && prisma) {
       try {
-        const galleryUrls: string[] = Array.isArray(newProduct.gallery)
-          ? newProduct.gallery
-              .map((g: any) => (typeof g === 'string' ? g : g?.url || ''))
-              .filter(Boolean)
-          : [];
+        // Ensure SKU uniqueness in PostgreSQL to prevent unique constraint failure
+        let finalSku = newProduct.sku;
+        const existingSku = await prisma.product.findUnique({
+          where: { sku: finalSku },
+        });
+        if (existingSku) {
+          finalSku = `${finalSku}-${Math.floor(100 + Math.random() * 899)}`;
+          newProduct.sku = finalSku;
+        }
+
+        const serializedGallery = serializeGalleryForDb(
+          newProduct.gallery,
+          newProduct.primaryImage,
+          newProduct.secondaryImage
+        );
 
         const created = await prisma.product.create({
           data: {
             id: newProduct.id,
-            sku: newProduct.sku,
+            sku: finalSku,
             name: newProduct.name,
             category: newProduct.category,
             price: newProduct.price,
-            originalPrice: newProduct.originalPrice,
-            inStock: true,
+            originalPrice: newProduct.originalPrice ?? null,
+            inStock: newProduct.inStock,
+            isNewArrival: true,
+            isCurated: false,
             primaryImage: newProduct.primaryImage,
             secondaryImage: newProduct.secondaryImage,
-            gallery: galleryUrls,
+            gallery: serializedGallery,
             description: newProduct.description,
             fabric: newProduct.fabric,
+            colorName: newProduct.colorName,
             sizes: newProduct.sizes,
+            highlights: newProduct.highlights,
+            fabricAndCare: newProduct.fabricAndCare,
           },
         });
-        return NextResponse.json({ success: true, product: created });
+
+        const normalized = normalizeProduct(created);
+        const localProducts = readLocalProducts();
+        localProducts.unshift(normalized);
+        saveLocalProducts(localProducts);
+
+        return NextResponse.json({ success: true, product: normalized });
       } catch (dbErr) {
         console.warn('Prisma create fallback notice:', dbErr);
       }
@@ -198,17 +679,21 @@ export async function POST(request: Request) {
     localProducts.unshift(newProduct);
     saveLocalProducts(localProducts);
 
-    return NextResponse.json({ success: true, product: newProduct });
+    return NextResponse.json({ success: true, product: normalizeProduct(newProduct) });
   } catch (error: any) {
     console.error('Error adding product:', error);
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to create product', details: String(error) },
+      {
+        success: false,
+        error: error?.message || 'Failed to create product',
+        details: String(error),
+      },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/products — Edit existing product (Price, Stock toggle, Name, Gallery Images)
+// PUT /api/products — Edit existing product (Price, Stock toggle, Name, Gallery Images, SKU)
 export async function PUT(request: Request) {
   try {
     if (!isAuthorizedAdmin(request)) {
@@ -225,26 +710,146 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: 'Product ID required' }, { status: 400 });
     }
 
-    if (process.env.DATABASE_URL && prisma) {
-      try {
-        const galleryUrls: string[] = Array.isArray(updates.gallery)
-          ? updates.gallery
-              .map((g: any) => (typeof g === 'string' ? g : g?.url || ''))
-              .filter(Boolean)
-          : [];
+    const putErrors: Record<string, string> = {};
+    if (updates.name !== undefined && !String(updates.name).trim()) {
+      putErrors.name = 'Garment silhouette name cannot be empty.';
+    }
+    if (updates.price !== undefined) {
+      const p = Number(updates.price);
+      if (updates.price === '' || updates.price === null || Number.isNaN(p) || p <= 0) {
+        putErrors.price = 'Selling price must be a valid amount greater than ₹0.';
+      }
+    }
+    if (updates.originalPrice !== undefined && updates.originalPrice !== null && updates.originalPrice !== '') {
+      const orig = Number(updates.originalPrice);
+      const sell = updates.price !== undefined ? Number(updates.price) : NaN;
+      if (Number.isNaN(orig) || orig <= 0) {
+        putErrors.originalPrice = 'MRP / Original price must be a valid positive amount.';
+      } else if (!Number.isNaN(sell) && sell > 0 && orig < sell) {
+        putErrors.originalPrice = `MRP / Original price (₹${orig}) must be greater than or equal to selling price (₹${sell}).`;
+      }
+    }
+    if (Array.isArray(updates.gallery) && updates.gallery.length > 10) {
+      putErrors.gallery = 'Gallery cannot exceed 10 photos per garment.';
+    }
+    if (Object.keys(putErrors).length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: Object.values(putErrors).join(' '),
+          errors: putErrors,
+        },
+        { status: 400 }
+      );
+    }
 
-        const prismaData: any = {
-          name: updates.name,
-          category: updates.category,
-          price: Number(updates.price),
-          originalPrice: updates.originalPrice ? Number(updates.originalPrice) : null,
-          inStock: updates.inStock !== undefined ? Boolean(updates.inStock) : true,
-          primaryImage: updates.primaryImage || '',
-          secondaryImage: updates.secondaryImage || null,
-          gallery: galleryUrls,
-          sizes: Array.isArray(updates.sizes) ? updates.sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-          description: updates.description || '',
-          fabric: updates.fabric || '',
+    // Persist any incoming Data URLs or local garment paths to cloud PostgreSQL image store
+    if (updates.primaryImage !== undefined) {
+      updates.primaryImage =
+        (await persistImageUrlForCloud(updates.primaryImage)) || updates.primaryImage;
+    }
+    if (updates.secondaryImage !== undefined) {
+      updates.secondaryImage =
+        (await persistImageUrlForCloud(updates.secondaryImage)) || updates.secondaryImage;
+    }
+    if (Array.isArray(updates.gallery) && updates.gallery.length > 0) {
+      const processedGallery: any[] = [];
+      for (const g of updates.gallery) {
+        if (typeof g === 'object' && g !== null && g.url) {
+          const cloudUrl = (await persistImageUrlForCloud(g.url)) || g.url;
+          processedGallery.push({ ...g, url: cloudUrl });
+        } else if (typeof g === 'string') {
+          const cloudUrl = (await persistImageUrlForCloud(g)) || g;
+          processedGallery.push(cloudUrl);
+        }
+      }
+      updates.gallery = processedGallery;
+    }
+
+    const dbReady = await ensureProductsDatabaseReady(false);
+
+    if (dbReady && prisma) {
+      try {
+        const existingDb = await prisma.product.findUnique({ where: { id } });
+        const staticFallback = PRODUCTS.find((p) => p.id === id);
+        const base = existingDb
+          ? normalizeProduct(existingDb)
+          : staticFallback
+          ? normalizeProduct(staticFallback)
+          : null;
+
+        const mergedName =
+          updates.name !== undefined ? String(updates.name).trim() : base?.name || 'Garment';
+        const mergedCategory =
+          updates.category !== undefined ? updates.category : base?.category || 'Anarkali';
+        const mergedPrice =
+          updates.price !== undefined ? Number(updates.price) : Number(base?.price || 0);
+        const mergedOriginalPrice =
+          updates.originalPrice !== undefined
+            ? updates.originalPrice && Number(updates.originalPrice) > 0
+              ? Number(updates.originalPrice)
+              : null
+            : base?.originalPrice ?? null;
+        const mergedInStock =
+          updates.inStock !== undefined ? Boolean(updates.inStock) : Boolean(base?.inStock ?? true);
+        const mergedPrimaryImage =
+          updates.primaryImage !== undefined
+            ? updates.primaryImage
+            : base?.primaryImage || DEFAULT_HERO_PLACEHOLDER;
+        const mergedSecondaryImage =
+          updates.secondaryImage !== undefined
+            ? updates.secondaryImage
+            : base?.secondaryImage || mergedPrimaryImage;
+        const mergedGallery =
+          Array.isArray(updates.gallery) && updates.gallery.length > 0
+            ? updates.gallery
+            : base?.gallery || [];
+        const mergedSizes =
+          Array.isArray(updates.sizes) && updates.sizes.length > 0
+            ? updates.sizes
+            : base?.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+        const mergedDescription =
+          updates.description !== undefined ? updates.description : base?.description || '';
+        const mergedFabric =
+          updates.fabric !== undefined ? updates.fabric : base?.fabric || '';
+        const mergedColorName =
+          updates.colorName !== undefined
+            ? updates.colorName
+            : base?.colorName || mergedFabric.split(' ').slice(0, 2).join(' ') || 'Artisan Handloom';
+
+        let mergedSku =
+          updates.sku !== undefined && String(updates.sku).trim()
+            ? String(updates.sku).trim().toUpperCase()
+            : base?.sku || `AB-${String(id).toUpperCase().slice(0, 8)}`;
+
+        // Prevent unique SKU collision with a different product
+        const skuCollision = await prisma.product.findUnique({
+          where: { sku: mergedSku },
+        });
+        if (skuCollision && skuCollision.id !== id) {
+          mergedSku = `${mergedSku}-${Math.floor(100 + Math.random() * 899)}`;
+        }
+
+        const serializedGallery = serializeGalleryForDb(
+          mergedGallery,
+          mergedPrimaryImage,
+          mergedSecondaryImage
+        );
+
+        const prismaData = {
+          sku: mergedSku,
+          name: mergedName,
+          category: mergedCategory,
+          price: mergedPrice,
+          originalPrice: mergedOriginalPrice,
+          inStock: mergedInStock,
+          primaryImage: mergedPrimaryImage,
+          secondaryImage: mergedSecondaryImage,
+          gallery: serializedGallery,
+          sizes: mergedSizes,
+          description: mergedDescription,
+          fabric: mergedFabric,
+          colorName: mergedColorName,
         };
 
         const updated = await prisma.product.upsert({
@@ -252,11 +857,23 @@ export async function PUT(request: Request) {
           update: prismaData,
           create: {
             id,
-            sku: updates.sku || `AB-${id.toUpperCase().slice(0, 8)}`,
             ...prismaData,
+            highlights: base?.highlights || ['Handcrafted detailing', 'Breathable luxury weave'],
+            fabricAndCare: base?.fabricAndCare || ['Dry clean recommended'],
           },
         });
-        return NextResponse.json({ success: true, product: updated });
+
+        const normalized = normalizeProduct(updated);
+        const localProducts = readLocalProducts();
+        const lIdx = localProducts.findIndex((p: any) => p.id === id);
+        if (lIdx !== -1) {
+          localProducts[lIdx] = normalized;
+        } else {
+          localProducts.unshift(normalized);
+        }
+        saveLocalProducts(localProducts);
+
+        return NextResponse.json({ success: true, product: normalized });
       } catch (dbErr) {
         console.warn('Prisma upsert fallback notice:', dbErr);
       }
@@ -277,7 +894,7 @@ export async function PUT(request: Request) {
       const newPrimary = updates.primaryImage.trim();
       if (Array.isArray(nextGallery) && nextGallery.length > 0) {
         nextGallery = [
-          { ...nextGallery[0], url: newPrimary },
+          { ...(typeof nextGallery[0] === 'object' ? nextGallery[0] : {}), url: newPrimary },
           ...nextGallery.slice(1),
         ];
       } else {
@@ -287,11 +904,11 @@ export async function PUT(request: Request) {
       }
     }
 
-    localProducts[index] = {
+    localProducts[index] = normalizeProduct({
       ...existing,
       ...updates,
       gallery: nextGallery,
-    };
+    });
     saveLocalProducts(localProducts);
 
     return NextResponse.json({ success: true, product: localProducts[index] });
@@ -325,10 +942,22 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Product ID required' }, { status: 400 });
     }
 
-    if (process.env.DATABASE_URL && prisma) {
+    deletedDefaultProductIdsCache.add(id);
+
+    const dbReady = await ensureProductsDatabaseReady(false);
+
+    if (dbReady && prisma) {
       try {
-        await prisma.product.delete({ where: { id } });
-        return NextResponse.json({ success: true });
+        await prisma.product.deleteMany({ where: { id } });
+
+        if (PRODUCTS.some((p) => p.id === id)) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+             VALUES ('deleted_product_ids', $1::jsonb, CURRENT_TIMESTAMP)
+             ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
+            JSON.stringify(Array.from(deletedDefaultProductIdsCache))
+          );
+        }
       } catch (dbErr) {
         console.warn('Prisma delete fallback notice:', dbErr);
       }

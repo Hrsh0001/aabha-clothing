@@ -53,6 +53,11 @@ async function runTests() {
     if (data.products.length < 10) throw new Error(`Expected at least 10 products, got ${data.products.length}`);
   });
 
+  const ADMIN_HEADERS = {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer demo_audit_token',
+  };
+
   // 3. POST /api/products (Create garment)
   await test('API: POST /api/products (Add garment)', async () => {
     const payload = {
@@ -66,7 +71,7 @@ async function runTests() {
     };
     const res = await fetch(`${BASE_URL}/api/products`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: ADMIN_HEADERS,
       body: JSON.stringify(payload),
     });
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
@@ -80,7 +85,7 @@ async function runTests() {
     if (!testProductId) throw new Error('No test product ID available');
     const res = await fetch(`${BASE_URL}/api/products`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: ADMIN_HEADERS,
       body: JSON.stringify({ id: testProductId, inStock: false }),
     });
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
@@ -93,6 +98,7 @@ async function runTests() {
     if (!testProductId) throw new Error('No test product ID available');
     const res = await fetch(`${BASE_URL}/api/products?id=${testProductId}`, {
       method: 'DELETE',
+      headers: ADMIN_HEADERS,
     });
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
     const data = await res.json();
@@ -108,6 +114,7 @@ async function runTests() {
   });
 
   // 7. POST /api/orders (Place COD order)
+  let testOrderId = null;
   let testOrderNumber = null;
   const testPhone = '9876543299';
   await test('API: POST /api/orders (Place COD Order)', async () => {
@@ -143,6 +150,7 @@ async function runTests() {
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
     const data = await res.json();
     if (!data.success || !data.order?.orderNumber) throw new Error('Failed to create order');
+    testOrderId = data.order.id;
     testOrderNumber = data.order.orderNumber;
   });
 
@@ -169,10 +177,9 @@ async function runTests() {
     if (!found) throw new Error('Specific order number not in results');
   });
 
-  // 10. PATCH /api/orders (Update status)
-  await test('API: PATCH /api/orders (Update Status to DISPATCHED)', async () => {
+  // 10. PATCH & DELETE /api/orders (Update status & clean up)
+  await test('API: PATCH & DELETE /api/orders (Update Status to DISPATCHED & Clean up)', async () => {
     if (!testOrderNumber) throw new Error('No test order number');
-    // Find the order id
     const resGet = await fetch(`${BASE_URL}/api/my-orders?orderNumber=${testOrderNumber}`);
     const dataGet = await resGet.json();
     const orderObj = dataGet.orders.find(o => o.orderNumber === testOrderNumber);
@@ -180,12 +187,23 @@ async function runTests() {
 
     const res = await fetch(`${BASE_URL}/api/orders`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: ADMIN_HEADERS,
       body: JSON.stringify({ orderId: orderObj.id, status: 'DISPATCHED' }),
     });
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
     const data = await res.json();
     if (!data.success) throw new Error('Failed to patch order status');
+
+    if (testOrderId || orderObj.id) {
+      const delRes = await fetch(
+        `${BASE_URL}/api/orders?id=${encodeURIComponent(testOrderId || orderObj.id)}`,
+        {
+          method: 'DELETE',
+          headers: ADMIN_HEADERS,
+        }
+      );
+      if (delRes.status !== 200) throw new Error(`Delete order status ${delRes.status}`);
+    }
   });
 
   // 11. Image Asset Verifications

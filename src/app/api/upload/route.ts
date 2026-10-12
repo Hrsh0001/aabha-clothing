@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
+import { saveUploadedImage } from '../../../lib/image-store';
 
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB maximum per photo limit
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
+  'image/jpg',
   'image/png',
   'image/webp',
   'image/gif',
@@ -33,19 +35,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Validate max file size
+    if (file.size <= 0) {
+      return NextResponse.json(
+        { success: false, error: 'Uploaded file is empty (0 bytes)' },
+        { status: 400 }
+      );
+    }
+
+    // 1. Validate max file size (5 MB)
     if (file.size > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
         {
           success: false,
-          error: `File size exceeds the 5MB maximum limit (received ${(file.size / (1024 * 1024)).toFixed(2)} MB)`,
+          error: `File "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds the 5 MB maximum limit`,
         },
         { status: 400 }
       );
     }
 
     // 2. Validate MIME type
-    if (!ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
+    const mimeType = (file.type || 'image/jpeg').toLowerCase();
+    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
       return NextResponse.json(
         {
           success: false,
@@ -56,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Validate file extension
-    const ext = (path.extname(file.name) || '.jpg').toLowerCase();
+    const ext = (path.extname(file.name) || '.webp').toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return NextResponse.json(
         {
@@ -75,31 +85,61 @@ export async function POST(request: Request) {
     const cleanBase = rawBase.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 32);
     const filename = `garment_${cleanBase}_${Date.now()}${ext}`;
 
-    // Try saving locally to public/images/
-    try {
-      const publicImagesDir = path.join(process.cwd(), 'public', 'images');
-      if (!fs.existsSync(publicImagesDir)) {
-        fs.mkdirSync(publicImagesDir, { recursive: true });
+    // 5. Try uploading to Supabase Storage bucket if SUPABASE_URL & key are configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'products';
+        const uploadEndpoint = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${bucket}/${filename}`;
+        const storageRes = await fetch(uploadEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${supabaseKey}`,
+            apikey: supabaseKey,
+            'Content-Type': mimeType,
+            'x-upsert': 'true',
+          },
+          body: buffer,
+        });
+
+        if (storageRes.ok) {
+          const publicUrl = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${filename}`;
+          return NextResponse.json({
+            success: true,
+            imageUrl: publicUrl,
+            message: 'Image uploaded to Supabase cloud storage',
+          });
+        }
+      } catch (storageErr) {
+        console.warn('Supabase Storage fallback notice:', storageErr);
       }
-      const filePath = path.join(publicImagesDir, filename);
-      fs.writeFileSync(filePath, buffer);
-
-      return NextResponse.json({
-        success: true,
-        imageUrl: `/images/${filename}`,
-        message: 'Image validated and uploaded successfully',
-      });
-    } catch (fsErr) {
-      // Vercel serverless environment fallback: return optimized data URL
-      const base64Data = buffer.toString('base64');
-      const dataUrl = `data:${file.type};base64,${base64Data}`;
-
-      return NextResponse.json({
-        success: true,
-        imageUrl: dataUrl,
-        message: 'Image verified and encoded for cloud deployment',
-      });
     }
+
+    // 6. Optional local backup copy when running in local dev (non-fatal on Vercel read-only fs)
+    if (!process.env.VERCEL) {
+      try {
+        const publicImagesDir = path.join(process.cwd(), 'public', 'images');
+        if (!fs.existsSync(publicImagesDir)) {
+          fs.mkdirSync(publicImagesDir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(publicImagesDir, filename), buffer);
+      } catch {
+        // Ignore on read-only filesystems
+      }
+    }
+
+    // 7. Persist in Supabase PostgreSQL ("UploadedImage") and return /api/images/<filename>
+    //    (Falls back to compressed Data URL only if PostgreSQL is offline)
+    const imageUrl = await saveUploadedImage(filename, mimeType, buffer);
+
+    return NextResponse.json({
+      success: true,
+      imageUrl,
+      message: 'Image verified and saved to cloud storage',
+    });
   } catch (error) {
     console.error('Upload API validation error:', error);
     return NextResponse.json(

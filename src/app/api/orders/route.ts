@@ -38,6 +38,43 @@ const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'orders.json');
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryOrdersCache: CODOrder[] | null = null;
+let isOrdersTableInitialized = false;
+
+async function ensureOrdersTable(): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  try {
+    if (!isOrdersTableInitialized) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "Order" (
+          "id" TEXT NOT NULL,
+          "orderNumber" TEXT NOT NULL,
+          "customerName" TEXT NOT NULL,
+          "phone" TEXT NOT NULL,
+          "email" TEXT,
+          "address" TEXT NOT NULL,
+          "city" TEXT NOT NULL,
+          "state" TEXT NOT NULL,
+          "pincode" TEXT NOT NULL,
+          "total" DOUBLE PRECISION NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION',
+          "paymentMethod" TEXT NOT NULL DEFAULT 'CASH_ON_DELIVERY',
+          "items" JSONB NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "Order_orderNumber_key" ON "Order"("orderNumber");
+      `);
+      isOrdersTableInitialized = true;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Order table init notice:', err);
+    return true;
+  }
+}
 
 function ensureDataDirectory(): void {
   try {
@@ -83,23 +120,30 @@ function saveOrders(orders: CODOrder[]): void {
 // GET /api/orders — Fetch all COD orders (Used by Admin Dashboard)
 export async function GET() {
   try {
-    if (process.env.DATABASE_URL && prisma) {
+    const localOrders = [...readOrders()].reverse();
+    const dbReady = await ensureOrdersTable();
+    if (dbReady && prisma) {
       try {
         const dbOrders = await prisma.order.findMany({
           orderBy: { createdAt: 'desc' },
         });
-        if (dbOrders && dbOrders.length > 0) {
-          return NextResponse.json({ success: true, orders: dbOrders });
+        if (dbOrders.length > 0) {
+          const seenIds = new Set(dbOrders.map((o: any) => o.id));
+          const seenNums = new Set(dbOrders.map((o: any) => o.orderNumber));
+          const merged = [...dbOrders];
+          for (const loc of localOrders) {
+            if (!seenIds.has(loc.id) && !seenNums.has(loc.orderNumber)) {
+              merged.push(loc as any);
+            }
+          }
+          return NextResponse.json({ success: true, orders: merged });
         }
       } catch (dbErr) {
         console.warn('Prisma orders fetch notice:', dbErr);
       }
     }
 
-    const orders = readOrders();
-    // Return sorted newest first
-    const sorted = [...orders].reverse();
-    return NextResponse.json({ success: true, orders: sorted });
+    return NextResponse.json({ success: true, orders: localOrders });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch orders' },
@@ -184,10 +228,12 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    if (process.env.DATABASE_URL && prisma) {
+    const dbReady = await ensureOrdersTable();
+    if (dbReady && prisma) {
       try {
         await prisma.order.create({
           data: {
+            id: newOrder.id,
             orderNumber: newOrder.orderNumber,
             customerName: newOrder.customerName,
             phone: newOrder.phone,
@@ -264,13 +310,20 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (process.env.DATABASE_URL && prisma) {
+    let updatedDbOrder: any = null;
+    const dbReady = await ensureOrdersTable();
+    if (dbReady && prisma) {
       try {
         await prisma.order.updateMany({
           where: {
             OR: [{ id: orderId }, { orderNumber: orderId }],
           },
           data: { status },
+        });
+        updatedDbOrder = await prisma.order.findFirst({
+          where: {
+            OR: [{ id: orderId }, { orderNumber: orderId }],
+          },
         });
       } catch (dbErr) {
         console.warn('Prisma order update notice:', dbErr);
@@ -280,20 +333,72 @@ export async function PATCH(request: Request) {
     const orders = readOrders();
     const index = orders.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
 
-    if (index === -1) {
-      return NextResponse.json(
-        { success: false, error: 'Order not found' },
-        { status: 404 }
-      );
+    if (index !== -1) {
+      orders[index].status = status;
+      saveOrders(orders);
+      return NextResponse.json({ success: true, order: orders[index] });
     }
 
-    orders[index].status = status;
-    saveOrders(orders);
+    if (updatedDbOrder) {
+      return NextResponse.json({ success: true, order: updatedDbOrder });
+    }
 
-    return NextResponse.json({ success: true, order: orders[index] });
+    return NextResponse.json(
+      { success: false, error: 'Order not found' },
+      { status: 404 }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to update order status' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/orders?id=... — Remove Order (Admin)
+export async function DELETE(request: Request) {
+  try {
+    if (!isAuthorizedAdmin(request)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Administrator access required' },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Order ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const dbReady = await ensureOrdersTable();
+    if (dbReady && prisma) {
+      try {
+        await prisma.order.deleteMany({
+          where: {
+            OR: [{ id }, { orderNumber: id }],
+          },
+        });
+      } catch (dbErr) {
+        console.warn('Prisma order delete notice:', dbErr);
+      }
+    }
+
+    const orders = readOrders();
+    const filtered = orders.filter((o) => o.id !== id && o.orderNumber !== id);
+    saveOrders(filtered);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Order removed successfully',
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete order' },
       { status: 500 }
     );
   }

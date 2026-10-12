@@ -18,22 +18,33 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
   fallbackLabel,
   priority = false,
 }) => {
+  const imgRef = React.useRef<HTMLImageElement>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
   const [hasError, setHasError] = useState(false);
   const [attemptedFallback, setAttemptedFallback] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(() => Boolean(src && src.startsWith('data:')));
 
   useEffect(() => {
     setCurrentSrc(src);
     setHasError(false);
     setAttemptedFallback(false);
-    setIsLoaded(false);
+    if (
+      (src && src.startsWith('data:')) ||
+      (imgRef.current?.complete && imgRef.current?.naturalWidth > 0)
+    ) {
+      setIsLoaded(true);
+    } else {
+      setIsLoaded(false);
+    }
   }, [src]);
 
   const handleError = () => {
     if (!attemptedFallback) {
       setAttemptedFallback(true);
-      if (currentSrc.startsWith('/images/')) {
+      if (currentSrc.startsWith('/api/images/')) {
+        setCurrentSrc('/images/hero_editorial_banner_1791119088652.jpg');
+        return;
+      } else if (currentSrc.startsWith('/images/')) {
         setCurrentSrc(currentSrc.replace('/images/', '/src/assets/images/'));
         return;
       } else if (currentSrc.startsWith('/src/assets/images/')) {
@@ -53,14 +64,15 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
             <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse" />
           )}
           <img
+            ref={imgRef}
             src={currentSrc}
             alt={alt}
-            loading={priority ? 'eager' : 'lazy'}
+            loading={priority || currentSrc?.startsWith('data:') ? 'eager' : 'lazy'}
             decoding="async"
             onLoad={() => setIsLoaded(true)}
             onError={handleError}
             className={`${className} transition-opacity duration-500 ease-out ${
-              isLoaded || priority ? 'opacity-100' : 'opacity-0'
+              isLoaded || priority || currentSrc?.startsWith('data:') ? 'opacity-100' : 'opacity-0'
             }`}
           />
         </>

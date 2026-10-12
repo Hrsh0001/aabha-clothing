@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ShieldCheck,
   CheckCircle2,
+  AlertCircle,
   Truck,
   Lock,
   MessageCircle,
@@ -17,6 +18,12 @@ import { formatINR } from '../data/products';
 import { EditorialImage } from './EditorialImage';
 import { useAuth } from '../context/AuthContext';
 import { LocationPickerModal, LocationData } from './LocationPickerModal';
+import {
+  validateCheckoutForm,
+  type CheckoutFormField,
+  type CheckoutFormErrors,
+  type CheckoutFormValues,
+} from '../lib/form-validation';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -40,20 +47,75 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [stateName, setStateName] = useState('Maharashtra');
   const [postalCode, setPostalCode] = useState('');
 
+  // useForm-style simultaneous validation state
+  const [errors, setErrors] = useState<CheckoutFormErrors>({});
+  const [touched, setTouched] = useState<Partial<Record<CheckoutFormField, boolean>>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
   // Exact Doorstep GPS & Map Selection states (100% Free OpenStreetMap)
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [mapUrl, setMapUrl] = useState<string | null>(null);
 
+  const getCurrentValues = (overrides?: Partial<CheckoutFormValues>): CheckoutFormValues => ({
+    fullName,
+    email,
+    phone,
+    address,
+    city,
+    stateName,
+    postalCode,
+    ...overrides,
+  });
+
+  const syncFieldValidation = (
+    field: CheckoutFormField,
+    overrides?: Partial<CheckoutFormValues>
+  ) => {
+    const nextTouched = { ...touched, [field]: true };
+    setTouched(nextTouched);
+
+    const result = validateCheckoutForm(getCurrentValues(overrides));
+    if (isSubmitted) {
+      setErrors(result.errors);
+    } else {
+      setErrors((prev) => {
+        const next: CheckoutFormErrors = { ...prev };
+        if (result.errors[field]) {
+          next[field] = result.errors[field];
+        } else {
+          delete next[field];
+        }
+        return next;
+      });
+    }
+  };
+
   const handleLocationSelected = (loc: LocationData) => {
     setLatitude(loc.latitude);
     setLongitude(loc.longitude);
     setMapUrl(loc.mapUrl);
+    const nextAddress = loc.address || address;
+    const nextCity = loc.city || city;
+    const nextState = loc.state || stateName;
+    const nextPostal = loc.pincode || postalCode;
     if (loc.address) setAddress(loc.address);
     if (loc.city) setCity(loc.city);
     if (loc.state) setStateName(loc.state);
     if (loc.pincode) setPostalCode(loc.pincode);
+
+    if (isSubmitted) {
+      const check = validateCheckoutForm(
+        getCurrentValues({
+          address: nextAddress,
+          city: nextCity,
+          stateName: nextState,
+          postalCode: nextPostal,
+        })
+      );
+      setErrors(check.errors);
+    }
   };
 
   useEffect(() => {
@@ -113,6 +175,23 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     e.preventDefault();
     if (items.length === 0) return;
 
+    setIsSubmitted(true);
+    setTouched({
+      fullName: true,
+      email: true,
+      phone: true,
+      address: true,
+      city: true,
+      stateName: true,
+      postalCode: true,
+    });
+
+    const validation = validateCheckoutForm(getCurrentValues());
+    setErrors(validation.errors);
+    if (!validation.isValid) {
+      return;
+    }
+
     setIsSubmitting(true);
     const fallbackOrderNumber = `AB-${Math.floor(24000 + Math.random() * 5999)}`;
 
@@ -131,7 +210,14 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           latitude: latitude || undefined,
           longitude: longitude || undefined,
           mapUrl: mapUrl || undefined,
-          items,
+          items: items.map((i) => ({
+            productId: i.product.id,
+            name: i.product.name,
+            size: i.size,
+            quantity: i.quantity,
+            price: i.product.price,
+            image: i.product.primaryImage,
+          })),
           total: finalTotal,
         }),
       });
@@ -279,6 +365,8 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     );
   }
 
+  const activeErrorList = Object.values(errors).filter(Boolean) as string[];
+
   return (
     <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 sm:py-12 lg:py-16">
       <div className="pb-6 mb-8 border-b border-[#ECE6DD] flex items-center justify-between">
@@ -299,7 +387,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         {/* Left Form: Shipping & Payment */}
-        <form onSubmit={handlePlaceOrder} className="lg:col-span-7 space-y-8">
+        <form onSubmit={handlePlaceOrder} noValidate className="lg:col-span-7 space-y-8">
           {!user && (
             <div className="bg-[#F3EFEA] border border-[#ECE6DD] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2.5 text-[#5C544D]">
@@ -323,6 +411,26 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </h1>
           </div>
 
+          {/* Simultaneous Validation Summary Alert */}
+          {activeErrorList.length > 0 && (
+            <div
+              role="alert"
+              className="p-4 bg-[#FFF5F5] border border-[#C62828] text-xs text-[#C62828] space-y-1.5"
+            >
+              <div className="flex items-center gap-1.5 font-semibold uppercase tracking-wider">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  Please complete all required delivery details ({activeErrorList.length} field{activeErrorList.length === 1 ? '' : 's'})
+                </span>
+              </div>
+              <ul className="list-disc pl-6 space-y-0.5 text-[#B71C1C]">
+                {activeErrorList.map((msg, i) => (
+                  <li key={i}>{msg}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-xs text-[#1E1B18] mb-1.5">
@@ -330,12 +438,27 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </label>
               <input
                 type="text"
-                required
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFullName(val);
+                  syncFieldValidation('fullName', { fullName: val });
+                }}
+                onBlur={() => syncFieldValidation('fullName')}
                 placeholder="Full Name"
-                className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                aria-invalid={Boolean(errors.fullName)}
+                className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                  errors.fullName
+                    ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                    : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                }`}
               />
+              {errors.fullName && (
+                <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.fullName}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -344,12 +467,27 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </label>
               <input
                 type="email"
-                required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEmail(val);
+                  syncFieldValidation('email', { email: val });
+                }}
+                onBlur={() => syncFieldValidation('email')}
                 placeholder="you@domain.com"
-                className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                aria-invalid={Boolean(errors.email)}
+                className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                  errors.email
+                    ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                    : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                }`}
               />
+              {errors.email && (
+                <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.email}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -358,12 +496,27 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </label>
               <input
                 type="tel"
-                required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPhone(val);
+                  syncFieldValidation('phone', { phone: val });
+                }}
+                onBlur={() => syncFieldValidation('phone')}
                 placeholder="+91 98200 00000"
-                className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                aria-invalid={Boolean(errors.phone)}
+                className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                  errors.phone
+                    ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                    : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                }`}
               />
+              {errors.phone && (
+                <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.phone}</span>
+                </p>
+              )}
             </div>
 
             {/* 100% Free Interactive OpenStreetMap & GPS Doorstep Location Selector */}
@@ -418,24 +571,54 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </label>
               <input
                 type="text"
-                required
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAddress(val);
+                  syncFieldValidation('address', { address: val });
+                }}
+                onBlur={() => syncFieldValidation('address')}
                 placeholder="Street Address, Building & Apartment"
-                className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                aria-invalid={Boolean(errors.address)}
+                className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                  errors.address
+                    ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                    : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                }`}
               />
+              {errors.address && (
+                <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.address}</span>
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-xs text-[#1E1B18] mb-1.5">City *</label>
               <input
                 type="text"
-                required
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCity(val);
+                  syncFieldValidation('city', { city: val });
+                }}
+                onBlur={() => syncFieldValidation('city')}
                 placeholder="City"
-                className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                aria-invalid={Boolean(errors.city)}
+                className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                  errors.city
+                    ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                    : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                }`}
               />
+              {errors.city && (
+                <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.city}</span>
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -443,8 +626,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 <label className="block text-xs text-[#1E1B18] mb-1.5">State *</label>
                 <select
                   value={stateName}
-                  onChange={(e) => setStateName(e.target.value)}
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStateName(val);
+                    syncFieldValidation('stateName', { stateName: val });
+                  }}
+                  onBlur={() => syncFieldValidation('stateName')}
+                  aria-invalid={Boolean(errors.stateName)}
+                  className={`w-full bg-[#FAF8F5] border px-3 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                    errors.stateName
+                      ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                      : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                  }`}
                 >
                   <option>Maharashtra</option>
                   <option>Delhi NCR</option>
@@ -456,6 +649,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   <option>West Bengal</option>
                   <option>Uttar Pradesh</option>
                 </select>
+                {errors.stateName && (
+                  <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1 font-medium" role="alert">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{errors.stateName}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-[#1E1B18] mb-1.5">
@@ -463,13 +662,28 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </label>
                 <input
                   type="text"
-                  required
                   maxLength={6}
                   value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPostalCode(val);
+                    syncFieldValidation('postalCode', { postalCode: val });
+                  }}
+                  onBlur={() => syncFieldValidation('postalCode')}
                   placeholder="400001"
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  aria-invalid={Boolean(errors.postalCode)}
+                  className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none ${
+                    errors.postalCode
+                      ? 'border-[#C62828] bg-[#FFF5F5]/40 focus:border-[#C62828]'
+                      : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                  }`}
                 />
+                {errors.postalCode && (
+                  <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1 font-medium" role="alert">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{errors.postalCode}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
+import { prisma } from '../../../lib/db';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
 
 export interface SanitizedCustomer {
@@ -17,12 +17,29 @@ export interface SanitizedCustomer {
 const USERS_FILE_PATH = path.join(process.cwd(), 'data', 'users.json');
 const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'orders.json');
 
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password.trim()).digest('hex');
-}
-
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryCustomersCache: any[] | null = null;
+let isCustomersTableReady = false;
+
+async function ensureCustomersStorage(): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  try {
+    if (!isCustomersTableReady) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SiteSetting" (
+          "id" TEXT NOT NULL,
+          "data" JSONB NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      isCustomersTableReady = true;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 function ensureUsersFile(): void {
   try {
@@ -31,15 +48,29 @@ function ensureUsersFile(): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(USERS_FILE_PATH)) {
-      // Empty array for clean production state (no static dummy patrons)
       fs.writeFileSync(USERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     }
-  } catch (fsErr) {
+  } catch {
     // Read-only filesystem in cloud deployment
   }
 }
 
-function readUsers(): any[] {
+async function readUsers(): Promise<any[]> {
+  const dbReady = await ensureCustomersStorage();
+  if (dbReady && prisma) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ data: any }[]>(
+        `SELECT "data" FROM "SiteSetting" WHERE "id" = 'site_users' LIMIT 1`
+      );
+      if (rows && rows.length > 0 && Array.isArray(rows[0].data)) {
+        inMemoryCustomersCache = rows[0].data;
+        return inMemoryCustomersCache || [];
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   if (inMemoryCustomersCache && inMemoryCustomersCache.length > 0) {
     return inMemoryCustomersCache;
   }
@@ -51,31 +82,67 @@ function readUsers(): any[] {
       return inMemoryCustomersCache || [];
     }
     return inMemoryCustomersCache || [];
-  } catch (err) {
+  } catch {
     return inMemoryCustomersCache || [];
   }
 }
 
-function saveUsers(users: any[]): void {
+async function saveUsers(users: any[]): Promise<void> {
   inMemoryCustomersCache = users;
+
+  const dbReady = await ensureCustomersStorage();
+  if (dbReady && prisma) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+         VALUES ('site_users', $1::jsonb, CURRENT_TIMESTAMP)
+         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
+        JSON.stringify(users)
+      );
+    } catch (err) {
+      console.warn('Database customers save notice:', err);
+    }
+  }
+
   try {
     ensureUsersFile();
     fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
-  } catch (fsErr) {
-    console.warn('Serverless filesystem notice (customers kept in memory cache):', fsErr);
+  } catch {
+    // Kept in memory / DB on serverless
   }
 }
 
-function readOrders(): any[] {
+async function readOrders(): Promise<any[]> {
+  let dbOrders: any[] = [];
+  if (process.env.DATABASE_URL && prisma) {
+    try {
+      dbOrders = await prisma.order.findMany();
+    } catch {
+      // Fallback
+    }
+  }
+  let localOrders: any[] = [];
   try {
     if (fs.existsSync(ORDERS_FILE_PATH)) {
       const data = fs.readFileSync(ORDERS_FILE_PATH, 'utf-8');
-      return JSON.parse(data);
+      localOrders = JSON.parse(data);
     }
-    return [];
-  } catch (err) {
-    return [];
+  } catch {
+    localOrders = [];
   }
+
+  if (dbOrders.length === 0) return Array.isArray(localOrders) ? localOrders : [];
+  if (!Array.isArray(localOrders) || localOrders.length === 0) return dbOrders;
+
+  const seenIds = new Set(dbOrders.map((o: any) => o.id));
+  const seenNums = new Set(dbOrders.map((o: any) => o.orderNumber));
+  const merged = [...dbOrders];
+  for (const loc of localOrders) {
+    if (loc && !seenIds.has(loc.id) && !seenNums.has(loc.orderNumber)) {
+      merged.push(loc);
+    }
+  }
+  return merged;
 }
 
 // GET /api/customers — List all registered customer accounts (Admin Only)
@@ -88,8 +155,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const rawUsers = readUsers();
-    const orders = readOrders();
+    const rawUsers = await readUsers();
+    const orders = await readOrders();
 
     // Map and sanitize patron data, never leaking passwordHash or resetToken
     const sanitizedCustomers: SanitizedCustomer[] = rawUsers.map((u: any) => {
@@ -161,7 +228,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const rawUsers = readUsers();
+    const rawUsers = await readUsers();
     const filtered = rawUsers.filter((u: any) => u.id !== id);
 
     if (filtered.length === rawUsers.length) {
@@ -171,7 +238,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    saveUsers(filtered);
+    await saveUsers(filtered);
 
     return NextResponse.json({
       success: true,
