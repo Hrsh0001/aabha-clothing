@@ -25,9 +25,26 @@ import {
   ExternalLink,
   Camera,
   Eye,
+  AlertTriangle,
+  HardDrive,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
+import {
+  uploadAdminImage,
+  compressDataUrlIfNeeded,
+  safeParseJsonResponse,
+  IMAGE_UPLOAD_LIMIT_BADGE,
+  MAX_GALLERY_PHOTOS,
+} from '@/src/lib/image-upload';
+import {
+  validateProductForm,
+  validateImageFile,
+  validateImageFilesBatch,
+  validateJsonPayloadSize,
+  ProductFormValues,
+} from '@/src/lib/form-validation';
+
 
 export interface GalleryItem {
   url: string;
@@ -111,6 +128,12 @@ export default function AdminProductsPage() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
   const [customSizeInput, setCustomSizeInput] = useState('');
 
+  // Simultaneous Validation & Image Upload Error States
+  const [errors, setErrors] = useState<Partial<Record<keyof ProductFormValues, string>>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [serverError, setServerError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingSecondary, setUploadingSecondary] = useState(false);
@@ -123,7 +146,47 @@ export default function AdminProductsPage() {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  const getCurrentValues = (overrides?: Partial<ProductFormValues>): ProductFormValues => ({
+    name,
+    category,
+    price,
+    originalPrice,
+    fabric,
+    description,
+    selectedSizes,
+    primaryImage,
+    gallery,
+    ...overrides,
+  });
+
+  const revalidateField = (
+    field: keyof ProductFormValues,
+    overrides?: Partial<ProductFormValues>
+  ) => {
+    setServerError(null);
+    const currentVals = getCurrentValues(overrides);
+    const result = validateProductForm(currentVals);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (result.errors[field]) {
+        if (isSubmitted || prev[field]) {
+          next[field] = result.errors[field];
+        }
+      } else {
+        delete next[field];
+      }
+      if (field === 'price' || field === 'originalPrice') {
+        if (result.errors.originalPrice) {
+          if (isSubmitted || prev.originalPrice) next.originalPrice = result.errors.originalPrice;
+        } else {
+          delete next.originalPrice;
+        }
+      }
+      return next;
+    });
   };
 
   const fetchProducts = async () => {
@@ -155,36 +218,39 @@ export default function AdminProductsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Photo exceeds 5MB limit. Please upload an image under 5MB.');
+    setUploadErrors([]);
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      const errMsg = check.error || 'Invalid image file.';
+      setUploadErrors([errMsg]);
+      showToast(errMsg);
+      if (e.target) e.target.value = '';
       return;
     }
 
     setUploadingImage(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: getUploadHeaders(),
-        body: formData,
-      });
-      const data = await res.json();
+      const data = await uploadAdminImage(file, getUploadHeaders());
       if (data.success && data.imageUrl) {
-        setPrimaryImage(data.imageUrl);
-        // Also sync first gallery photo with uploaded cover
+        const uploadedUrl = data.imageUrl;
+        setPrimaryImage(uploadedUrl);
         setGallery((prev) => {
-          if (prev.length === 0) {
-            return [{ url: data.imageUrl, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
-          }
-          return prev.map((item, idx) => (idx === 0 ? { ...item, url: data.imageUrl } : item));
+          const nextGallery =
+            prev.length === 0
+              ? [{ url: uploadedUrl, label: 'Full Studio Silhouette', focalClass: 'object-center' }]
+              : prev.map((item, idx) => (idx === 0 ? { ...item, url: uploadedUrl } : item));
+          revalidateField('gallery', { primaryImage: uploadedUrl, gallery: nextGallery });
+          return nextGallery;
         });
-        showToast('Primary cover image uploaded successfully!');
+        showToast('Primary cover image optimized & uploaded successfully!');
       } else {
-        showToast(data.error || 'Failed to upload photo');
+        const msg = data.error || 'Failed to upload photo';
+        setUploadErrors([msg]);
+        showToast(msg);
       }
     } catch (err) {
       console.error('Upload error:', err);
+      setUploadErrors(['Error during photo upload']);
       showToast('Error during photo upload');
     } finally {
       setUploadingImage(false);
@@ -196,36 +262,38 @@ export default function AdminProductsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Photo exceeds 5MB limit. Please upload an image under 5MB.');
+    setUploadErrors([]);
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      const errMsg = check.error || 'Invalid image file.';
+      setUploadErrors([errMsg]);
+      showToast(errMsg);
+      if (e.target) e.target.value = '';
       return;
     }
 
     setUploadingSecondary(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: getUploadHeaders(),
-        body: formData,
-      });
-      const data = await res.json();
+      const data = await uploadAdminImage(file, getUploadHeaders());
       if (data.success && data.imageUrl) {
-        setSecondaryImage(data.imageUrl);
+        const uploadedUrl = data.imageUrl;
+        setSecondaryImage(uploadedUrl);
         setGallery((prev) => {
-          const exists = prev.some((g) => g.url === data.imageUrl);
-          if (!exists) {
-            return [...prev, { url: data.imageUrl, label: 'Editorial Daylight Drape', focalClass: 'object-center' }];
+          const exists = prev.some((g) => g.url === uploadedUrl);
+          if (!exists && prev.length < MAX_GALLERY_PHOTOS) {
+            return [...prev, { url: uploadedUrl, label: 'Editorial Daylight Drape', focalClass: 'object-center' }];
           }
           return prev;
         });
-        showToast('Secondary drape image uploaded and added to gallery!');
+        showToast('Secondary drape image optimized and added to gallery!');
       } else {
-        showToast(data.error || 'Failed to upload secondary photo');
+        const msg = data.error || 'Failed to upload secondary photo';
+        setUploadErrors([msg]);
+        showToast(msg);
       }
     } catch (err) {
       console.error('Upload error:', err);
+      setUploadErrors(['Error during secondary photo upload']);
       showToast('Error during secondary photo upload');
     } finally {
       setUploadingSecondary(false);
@@ -237,25 +305,27 @@ export default function AdminProductsPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    setUploadErrors([]);
+    const batchResult = validateImageFilesBatch(files, gallery.length);
+    if (batchResult.errors.length > 0) {
+      setUploadErrors(batchResult.errors);
+      showToast(batchResult.errors[0]);
+    }
+
+    if (batchResult.validFiles.length === 0) {
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     setUploadingGallery(true);
     try {
       let added = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.size > 5 * 1024 * 1024) {
-          showToast(`Photo "${file.name}" exceeds 5MB limit.`);
-          continue;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: getUploadHeaders(),
-          body: formData,
-        });
-        const data = await res.json();
+      const runtimeErrors: string[] = [...batchResult.errors];
+      for (let i = 0; i < batchResult.validFiles.length; i++) {
+        const file = batchResult.validFiles[i];
+        const data = await uploadAdminImage(file, getUploadHeaders());
         if (data.success && data.imageUrl) {
+          const uploadedUrl = data.imageUrl;
           const defaultLabel =
             gallery.length + added === 0
               ? 'Full Studio Silhouette'
@@ -264,18 +334,29 @@ export default function AdminProductsPage() {
               : gallery.length + added === 2
               ? 'Kalidar Flare & Zari Hem'
               : `Studio Angle ${gallery.length + added + 1}`;
-          setGallery((prev) => [
-            ...prev,
-            { url: data.imageUrl, label: defaultLabel, focalClass: 'object-center' },
-          ]);
+          setGallery((prev) => {
+            const next = [
+              ...prev,
+              { url: uploadedUrl, label: defaultLabel, focalClass: 'object-center' },
+            ];
+            revalidateField('gallery', { gallery: next });
+            return next;
+          });
           added++;
+        } else if (data.error) {
+          runtimeErrors.push(data.error);
+          showToast(data.error);
         }
       }
+      if (runtimeErrors.length > 0) {
+        setUploadErrors(runtimeErrors);
+      }
       if (added > 0) {
-        showToast(`Added ${added} photo(s) to garment gallery!`);
+        showToast(`Added ${added} optimized photo(s) to garment gallery!`);
       }
     } catch (err) {
       console.error('Gallery upload error:', err);
+      setUploadErrors((prev) => [...prev, 'Error uploading gallery photos']);
       showToast('Error uploading gallery photos');
     } finally {
       setUploadingGallery(false);
@@ -285,6 +366,12 @@ export default function AdminProductsPage() {
 
   const handleAddGalleryUrl = () => {
     if (!newGalleryUrl.trim()) return;
+    if (gallery.length >= MAX_GALLERY_PHOTOS) {
+      const msg = `Maximum ${MAX_GALLERY_PHOTOS} photos allowed per garment gallery.`;
+      setUploadErrors([msg]);
+      showToast(msg);
+      return;
+    }
     const cleanUrl = newGalleryUrl.trim();
     const cleanLabel =
       newGalleryLabel.trim() ||
@@ -294,10 +381,14 @@ export default function AdminProductsPage() {
         ? 'Bodice & Neckline Detail'
         : `Studio Angle ${gallery.length + 1}`);
 
-    setGallery((prev) => [
-      ...prev,
-      { url: cleanUrl, label: cleanLabel, focalClass: 'object-center' },
-    ]);
+    setGallery((prev) => {
+      const next = [
+        ...prev,
+        { url: cleanUrl, label: cleanLabel, focalClass: 'object-center' },
+      ];
+      revalidateField('gallery', { gallery: next });
+      return next;
+    });
     setNewGalleryUrl('');
     setNewGalleryLabel('');
     setShowAddUrlForm(false);
@@ -384,6 +475,10 @@ export default function AdminProductsPage() {
     setNewGalleryUrl('');
     setNewGalleryLabel('');
     setShowAddUrlForm(false);
+    setErrors({});
+    setIsSubmitted(false);
+    setUploadErrors([]);
+    setServerError(null);
     setModalOpen(true);
   };
 
@@ -428,94 +523,112 @@ export default function AdminProductsPage() {
     setGallery(existingGallery);
     setFabric(p.fabric || 'Pure Handloom Chanderi Silk');
     setDescription(p.description || '');
-    setSelectedSizes(p.sizes && p.sizes.length > 0 ? p.sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+    setSelectedSizes(p.sizes && p.sizes.length > 0 ? p.sizes : ['XS', 'S', 'M', 'L', 'XXL']);
     setNewGalleryUrl('');
     setNewGalleryLabel('');
     setShowAddUrlForm(false);
+    setErrors({});
+    setIsSubmitted(false);
+    setUploadErrors([]);
+    setServerError(null);
     setModalOpen(true);
   };
 
   const toggleSize = (size: string) => {
-    setSelectedSizes((prev) =>
-      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
-    );
+    setSelectedSizes((prev) => {
+      const next = prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size];
+      revalidateField('selectedSizes', { selectedSizes: next });
+      return next;
+    });
   };
 
   const addCustomSize = () => {
     const cleaned = customSizeInput.trim().toUpperCase();
     if (!cleaned) return;
     if (!selectedSizes.includes(cleaned)) {
-      setSelectedSizes((prev) => [...prev, cleaned]);
+      setSelectedSizes((prev) => {
+        const next = [...prev, cleaned];
+        revalidateField('selectedSizes', { selectedSizes: next });
+        return next;
+      });
     }
     setCustomSizeInput('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitted(true);
+    setServerError(null);
 
-    // 1. Validate Garment Name
-    if (!name.trim()) {
-      showToast('Validation Error: Garment name is required.');
+    // Run simultaneous validation across all fields
+    const validation = validateProductForm(getCurrentValues());
+    setErrors(validation.errors);
+
+    if (!validation.isValid) {
+      const errorCount = Object.keys(validation.errors).length;
+      showToast(`Please fix ${errorCount} highlighted validation issue(s) before saving.`);
       return;
     }
 
-    // 2. Validate Price
     const parsedPrice = Number(price);
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      showToast('Validation Error: Please enter a valid positive price in ₹ INR.');
-      return;
-    }
-
-    // 3. Validate Original Price (if provided)
-    if (originalPrice && Number(originalPrice) < parsedPrice) {
-      showToast('Validation Warning: Original price is lower than selling price.');
-    }
-
-    // 4. Validate Sizes
     const validSizes = selectedSizes
       .map((s) => s.trim().toUpperCase())
       .filter((s) => Boolean(s));
-
-    if (validSizes.length === 0) {
-      showToast('Validation Error: Please select at least one available size (e.g., S, M, L).');
-      return;
-    }
-
-    // 5. Validate Photos
-    const leadImage = gallery[0]?.url || primaryImage;
-    if (!leadImage) {
-      showToast('Validation Error: Please upload at least one garment photo.');
-      return;
-    }
+    const rawLeadImage = gallery[0]?.url || primaryImage;
 
     setSaving(true);
     try {
-      const drapeImage = secondaryImage || leadImage;
-      const galleryToSubmit =
+      const rawGallery =
         gallery.length > 0
           ? gallery
-          : [{ url: leadImage, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+          : [{ url: rawLeadImage, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+
+      const galleryToSubmit: GalleryItem[] = [];
+      for (let idx = 0; idx < rawGallery.length; idx++) {
+        const item = rawGallery[idx];
+        const compressedUrl = await compressDataUrlIfNeeded(item.url.trim());
+        galleryToSubmit.push({
+          url: compressedUrl,
+          label: item.label?.trim() || (idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`),
+          focalClass: item.focalClass || 'object-center',
+        });
+      }
+
+      const leadImage = galleryToSubmit[0]?.url || (await compressDataUrlIfNeeded(rawLeadImage));
+      const drapeImage = secondaryImage
+        ? await compressDataUrlIfNeeded(secondaryImage)
+        : leadImage;
+
+      const payloadObj = {
+        ...(editingProduct ? { id: editingProduct.id } : {}),
+        name: name.trim(),
+        category,
+        price: parsedPrice,
+        originalPrice: originalPrice ? Number(originalPrice) : undefined,
+        primaryImage: leadImage,
+        secondaryImage: drapeImage,
+        gallery: galleryToSubmit,
+        fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
+        description: description.trim(),
+        sizes: validSizes,
+      };
+
+      const payloadCheck = validateJsonPayloadSize(payloadObj);
+      if (!payloadCheck.valid) {
+        const msg = payloadCheck.error || 'Payload size exceeds serverless request limit.';
+        setServerError(msg);
+        showToast(msg);
+        setSaving(false);
+        return;
+      }
 
       if (editingProduct) {
-        // Edit mode
         const res = await fetch('/api/products', {
           method: 'PUT',
           headers: getAuthHeaders(),
-          body: JSON.stringify({
-            id: editingProduct.id,
-            name: name.trim(),
-            category,
-            price: parsedPrice,
-            originalPrice: originalPrice ? Number(originalPrice) : undefined,
-            primaryImage: leadImage,
-            secondaryImage: drapeImage,
-            gallery: galleryToSubmit,
-            fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
-            description: description.trim(),
-            sizes: validSizes,
-          }),
+          body: JSON.stringify(payloadObj),
         });
-        const data = await res.json();
+        const data = await safeParseJsonResponse(res);
         if (data.success) {
           setProducts((prev) =>
             prev.map((p) =>
@@ -533,38 +646,32 @@ export default function AdminProductsPage() {
           setModalOpen(false);
           showToast(`Updated "${name}" & its multi-image gallery successfully!`);
         } else {
-          showToast(`Save Error: ${data.error || 'Failed to update garment'}`);
+          const msg = data.error || 'Failed to update garment';
+          setServerError(msg);
+          showToast(`Save Error: ${msg}`);
         }
       } else {
-        // Add mode
         const res = await fetch('/api/products', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({
-            name: name.trim(),
-            category,
-            price: parsedPrice,
-            originalPrice: originalPrice ? Number(originalPrice) : undefined,
-            primaryImage: leadImage,
-            secondaryImage: drapeImage,
-            gallery: galleryToSubmit,
-            fabric: fabric.trim() || 'Handcrafted Luxury Fabric',
-            description: description.trim(),
-            sizes: validSizes,
-          }),
+          body: JSON.stringify(payloadObj),
         });
-        const data = await res.json();
+        const data = await safeParseJsonResponse(res);
         if (data.success && data.product) {
           setProducts((prev) => [data.product, ...prev]);
           setModalOpen(false);
           showToast(`Added "${name}" with full gallery to collection!`);
         } else {
-          showToast(`Save Error: ${data.error || 'Failed to add garment'}`);
+          const msg = data.error || 'Failed to add garment';
+          setServerError(msg);
+          showToast(`Save Error: ${msg}`);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save product:', err);
-      showToast('Error saving garment');
+      const msg = err?.message || 'Error saving garment';
+      setServerError(msg);
+      showToast(`Save Error: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -580,7 +687,7 @@ export default function AdminProductsPage() {
           inStock: !p.inStock,
         }),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res);
       if (data.success) {
         setProducts((prev) =>
           prev.map((item) => (item.id === p.id ? { ...item, inStock: !p.inStock } : item))
@@ -588,6 +695,8 @@ export default function AdminProductsPage() {
         showToast(
           `${p.name} marked as ${!p.inStock ? 'In Stock (Available)' : 'Out of Stock (Sold Out)'}`
         );
+      } else {
+        showToast(data.error || 'Failed to toggle stock status');
       }
     } catch (err) {
       showToast('Failed to toggle stock status');
@@ -605,7 +714,7 @@ export default function AdminProductsPage() {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-      const data = await res.json();
+      const data = await safeParseJsonResponse(res);
       if (data.success) {
         setProducts((prev) => prev.filter((p) => p.id !== id));
         showToast('Silhouette removed from catalog');
@@ -676,15 +785,6 @@ export default function AdminProductsPage() {
           <span>{toastMsg}</span>
         </div>
       )}
-
-      {/* Hidden File Input for Product Photos */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileUpload}
-        accept="image/png,image/jpeg,image/webp"
-        className="hidden"
-      />
 
       <div className="space-y-6">
         {/* Metric Badges */}
@@ -1038,17 +1138,30 @@ export default function AdminProductsPage() {
               </h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 text-xs">
               <div>
                 <label className="block text-[#1E1B18] font-medium mb-1">Garment Name *</label>
                 <input
                   type="text"
-                  required
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setName(val);
+                    revalidateField('name', { name: val });
+                  }}
                   placeholder="e.g. Anarkali 03 — Ivory Handspun Kalidar"
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                    errors.name
+                      ? 'border-[#C62828] bg-[#FFF5F5]'
+                      : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                  }`}
                 />
+                {errors.name && (
+                  <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    {errors.name}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -1056,26 +1169,51 @@ export default function AdminProductsPage() {
                   <label className="block text-[#1E1B18] font-medium mb-1">Category *</label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none cursor-pointer"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCategory(val);
+                      revalidateField('category', { category: val });
+                    }}
+                    className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none cursor-pointer ${
+                      errors.category ? 'border-[#C62828] bg-[#FFF5F5]' : 'border-[#E0D8CE]'
+                    }`}
                   >
                     <option value="Anarkali">Anarkali</option>
                     <option value="3-Piece Dresses">3-Piece Dresses</option>
                     <option value="Co-ord Sets">Co-ord Sets</option>
                     <option value="Chikankari Suit">Chikankari Suit</option>
                   </select>
+                  {errors.category && (
+                    <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {errors.category}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-[#1E1B18] font-medium mb-1">Selling Price (₹) *</label>
                   <input
                     type="number"
-                    required
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPrice(val);
+                      revalidateField('price', { price: val });
+                    }}
                     placeholder="4850"
-                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                    className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none ${
+                      errors.price
+                        ? 'border-[#C62828] bg-[#FFF5F5]'
+                        : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                    }`}
                   />
+                  {errors.price && (
+                    <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {errors.price}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1087,26 +1225,58 @@ export default function AdminProductsPage() {
                   <input
                     type="number"
                     value={originalPrice}
-                    onChange={(e) => setOriginalPrice(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOriginalPrice(val);
+                      revalidateField('originalPrice', { originalPrice: val });
+                    }}
                     placeholder="5800"
-                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                    className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm font-mono text-[#1E1B18] focus:outline-none ${
+                      errors.originalPrice
+                        ? 'border-[#C62828] bg-[#FFF5F5]'
+                        : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                    }`}
                   />
+                  {errors.originalPrice && (
+                    <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {errors.originalPrice}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-[#1E1B18] font-medium mb-1">Fabric & Weave</label>
+                  <label className="block text-[#1E1B18] font-medium mb-1">Fabric & Weave *</label>
                   <input
                     type="text"
                     value={fabric}
-                    onChange={(e) => setFabric(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFabric(val);
+                      revalidateField('fabric', { fabric: val });
+                    }}
                     placeholder="Pure Handloom Chanderi Silk"
-                    className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                    className={`w-full bg-[#FAF8F5] border px-3.5 py-2.5 text-sm text-[#1E1B18] focus:outline-none ${
+                      errors.fabric
+                        ? 'border-[#C62828] bg-[#FFF5F5]'
+                        : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                    }`}
                   />
+                  {errors.fabric && (
+                    <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {errors.fabric}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* SIZE INVENTORY ORGANIZER */}
-              <div className="p-4 bg-[#F3EFEA] border border-[#E0D8CE] space-y-3">
+              <div
+                className={`p-4 bg-[#F3EFEA] border space-y-3 ${
+                  errors.selectedSizes ? 'border-[#C62828]' : 'border-[#E0D8CE]'
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block text-[#1E1B18] font-medium">
@@ -1116,10 +1286,21 @@ export default function AdminProductsPage() {
                       Toggle active sizes for this silhouette or add custom tailor sizing:
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono font-medium text-[#6E5043]">
+                  <span
+                    className={`text-[11px] font-mono font-medium ${
+                      selectedSizes.length === 0 ? 'text-[#C62828]' : 'text-[#6E5043]'
+                    }`}
+                  >
                     {selectedSizes.length} Active
                   </span>
                 </div>
+
+                {errors.selectedSizes && (
+                  <p className="text-[11px] text-[#C62828] font-medium flex items-center gap-1 bg-[#FFF5F5] border border-[#FFCDD2] p-2">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    {errors.selectedSizes}
+                  </p>
+                )}
 
                 {/* Standard Sizes Toggle Chips */}
                 <div className="flex flex-wrap gap-1.5">
@@ -1162,7 +1343,11 @@ export default function AdminProductsPage() {
               </div>
 
               {/* STUDIO PHOTOGRAPHY & MULTI-IMAGE GALLERY MANAGER */}
-              <div className="p-4 sm:p-5 bg-[#F3EFEA] border border-[#E0D8CE] space-y-4">
+              <div
+                className={`p-4 sm:p-5 bg-[#F3EFEA] border space-y-4 ${
+                  errors.gallery || uploadErrors.length > 0 ? 'border-[#C62828]' : 'border-[#E0D8CE]'
+                }`}
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E0D8CE] pb-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -1171,7 +1356,7 @@ export default function AdminProductsPage() {
                         Studio Photography & Gallery Angles
                       </h3>
                       <span className="px-2 py-0.5 bg-[#231F1D] text-[#FAF8F5] text-[10px] font-mono">
-                        {gallery.length} {gallery.length === 1 ? 'Photo' : 'Photos'}
+                        {gallery.length} / {MAX_GALLERY_PHOTOS} Photos
                       </span>
                     </div>
                     <p className="text-[11px] text-[#7C736A] mt-0.5">
@@ -1183,7 +1368,7 @@ export default function AdminProductsPage() {
                     <button
                       type="button"
                       onClick={() => galleryFileInputRef.current?.click()}
-                      disabled={uploadingGallery}
+                      disabled={uploadingGallery || gallery.length >= MAX_GALLERY_PHOTOS}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium hover:bg-[#14110E] transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <Upload className="w-3.5 h-3.5" />
@@ -1199,6 +1384,33 @@ export default function AdminProductsPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Upload Size Limit Info Banner */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#FAF8F5] border border-[#D5CCC0] text-[11px] text-[#5C544D]">
+                  <HardDrive className="w-3.5 h-3.5 text-[#6E5043] shrink-0" />
+                  <span>
+                    <strong className="text-[#1E1B18]">Upload Size Limit:</strong>{' '}
+                    {IMAGE_UPLOAD_LIMIT_BADGE} · Max {MAX_GALLERY_PHOTOS} photos per garment
+                  </span>
+                </div>
+
+                {/* Inline Image Upload / Gallery Validation Errors */}
+                {(errors.gallery || uploadErrors.length > 0) && (
+                  <div className="p-3 bg-[#FFF5F5] border border-[#C62828] space-y-1 text-xs text-[#C62828]">
+                    {errors.gallery && (
+                      <p className="font-medium flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {errors.gallery}
+                      </p>
+                    )}
+                    {uploadErrors.map((err, i) => (
+                      <p key={i} className="font-medium flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
 
                 {/* Hidden File Inputs */}
                 <input
@@ -1429,10 +1641,17 @@ export default function AdminProductsPage() {
                                   </label>
                                   <input
                                     type="text"
-                                    value={item.url}
-                                    onChange={(e) =>
-                                      handleUpdateGalleryItem(idx, { url: e.target.value })
+                                    value={
+                                      item.url.startsWith('data:')
+                                        ? '[Uploaded Cloud Image — Optimized]'
+                                        : item.url
                                     }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (!val.startsWith('[Uploaded Cloud Image')) {
+                                        handleUpdateGalleryItem(idx, { url: val });
+                                      }
+                                    }}
                                     className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2 py-0.5 text-[10px] font-mono text-[#5C544D] focus:outline-none"
                                   />
                                 </div>
@@ -1512,17 +1731,65 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block text-[#1E1B18] font-medium mb-1">
-                  Garment Description & Cut Notes
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[#1E1B18] font-medium">
+                    Garment Description & Cut Notes *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoDesc = `Handcrafted ${category.toLowerCase()} tailored from ${(fabric || 'pure handloom silk').toLowerCase()} with architectural kalidar panels, French seams, and deep functional side pockets.`;
+                      setDescription(autoDesc);
+                      revalidateField('description', { description: autoDesc });
+                    }}
+                    className="text-[11px] font-medium text-[#6E5043] hover:text-[#1E1B18] underline cursor-pointer"
+                  >
+                    + Auto-Fill Craftsmanship Note
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDescription(val);
+                    revalidateField('description', { description: val });
+                  }}
                   placeholder="Architectural kalidar panels, french seams, and deep functional pockets..."
-                  className="w-full bg-[#FAF8F5] border border-[#E0D8CE] p-3 text-xs text-[#1E1B18] focus:outline-none"
+                  className={`w-full bg-[#FAF8F5] border p-3 text-xs text-[#1E1B18] focus:outline-none ${
+                    errors.description
+                      ? 'border-[#C62828] bg-[#FFF5F5]'
+                      : 'border-[#E0D8CE] focus:border-[#1E1B18]'
+                  }`}
                 />
+                {errors.description && (
+                  <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                    {errors.description}
+                  </p>
+                )}
               </div>
+
+              {/* Validation Summary Alert Box directly above Save button */}
+              {(Object.keys(errors).length > 0 || serverError || uploadErrors.length > 0) && (
+                <div className="bg-[#FFF5F5] border border-[#C62828] p-3.5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[#C62828] font-medium text-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>
+                      Please resolve the following issue(s) before saving this garment:
+                    </span>
+                  </div>
+                  <ul className="list-disc list-inside text-[11px] text-[#B71C1C] space-y-0.5 pl-1">
+                    {serverError && <li className="font-semibold">{serverError}</li>}
+                    {Object.entries(errors).map(([fieldKey, errMsg]) =>
+                      errMsg ? <li key={fieldKey}>{errMsg}</li> : null
+                    )}
+                    {uploadErrors.map((uErr, idx) => (
+                      <li key={`upload-${idx}`}>{uErr}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#ECE6DD]">
                 <button

@@ -50,3 +50,18 @@ model Order {
 
   @@index([phone])
 }
+
+model SiteSetting {
+  id        String   @id
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model UploadedImage {
+  id        String   @id
+  mimeType  String
+  data      String
+  createdAt DateTime @default(now())
+}
+
+

@@ -12,7 +12,7 @@
     "fabric": "Handwoven Kora Silk-Cotton",
     "isNewArrival": true,
     "isCurated": true,
-    "inStock": false,
+    "inStock": true,
     "sizes": [
       "XS",
       "S",
@@ -21,17 +21,27 @@
       "XL",
       "XXL"
     ],
-    "primaryImage": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+    "primaryImage": "/images/product_dress_ochre_1791119165890.jpg",
     "secondaryImage": "/images/brand_story_editorial_1791119191742.jpg",
     "gallery": [
       {
-        "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+        "url": "/images/product_dress_ochre_1791119165890.jpg",
         "label": "Full Studio Silhouette",
         "focalClass": "object-center"
       },
       {
         "url": "/images/product_dress_ochre_1791119165890.jpg",
         "label": "Pleated Bodice & Yoke Detail",
+        "focalClass": "object-top scale-125"
+      },
+      {
+        "url": "/images/product_dress_ochre_1791119165890.jpg",
+        "label": "Kalidar Flare & Zari Selvedge",
+        "focalClass": "object-bottom scale-120"
+      },
+      {
+        "url": "/images/brand_story_editorial_1791119191742.jpg",
+        "label": "Editorial Daylight Drape",
         "focalClass": "object-center"
       }
     ],

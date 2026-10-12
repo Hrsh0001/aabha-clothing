@@ -2,12 +2,34 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { prisma } from '../../../lib/db';
 import { signJwt, verifyJwt } from '../../../lib/jwt';
 
 const USERS_FILE_PATH = path.join(process.cwd(), 'data', 'users.json');
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryUsersCache: any[] | null = null;
+let isAuthTableReady = false;
+
+async function ensureAuthStorage(): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  try {
+    if (!isAuthTableReady) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SiteSetting" (
+          "id" TEXT NOT NULL,
+          "data" JSONB NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      isAuthTableReady = true;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 function ensureUsersFile(): void {
   try {
@@ -16,10 +38,9 @@ function ensureUsersFile(): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(USERS_FILE_PATH)) {
-      // Empty array for clean production state (no static dummy patrons)
       fs.writeFileSync(USERS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     }
-  } catch (fsErr) {
+  } catch {
     // Read-only filesystem in cloud deployment
   }
 }
@@ -28,7 +49,22 @@ function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password.trim()).digest('hex');
 }
 
-function readUsers(): any[] {
+async function readUsers(): Promise<any[]> {
+  const dbReady = await ensureAuthStorage();
+  if (dbReady && prisma) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ data: any }[]>(
+        `SELECT "data" FROM "SiteSetting" WHERE "id" = 'site_users' LIMIT 1`
+      );
+      if (rows && rows.length > 0 && Array.isArray(rows[0].data)) {
+        inMemoryUsersCache = rows[0].data;
+        return inMemoryUsersCache || [];
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   if (inMemoryUsersCache && inMemoryUsersCache.length > 0) {
     return inMemoryUsersCache;
   }
@@ -40,18 +76,33 @@ function readUsers(): any[] {
       return inMemoryUsersCache || [];
     }
     return inMemoryUsersCache || [];
-  } catch (err) {
+  } catch {
     return inMemoryUsersCache || [];
   }
 }
 
-function saveUsers(users: any[]): void {
+async function saveUsers(users: any[]): Promise<void> {
   inMemoryUsersCache = users;
+
+  const dbReady = await ensureAuthStorage();
+  if (dbReady && prisma) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+         VALUES ('site_users', $1::jsonb, CURRENT_TIMESTAMP)
+         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
+        JSON.stringify(users)
+      );
+    } catch (err) {
+      console.warn('Database users save notice:', err);
+    }
+  }
+
   try {
     ensureUsersFile();
     fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2), 'utf-8');
-  } catch (fsErr) {
-    console.warn('Serverless filesystem notice (users kept in memory cache):', fsErr);
+  } catch {
+    // Kept in memory / DB on serverless
   }
 }
 
@@ -70,7 +121,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    const users = readUsers();
+    const users = await readUsers();
     const user = users.find((u: any) => u.id === decoded.sub || u.email === decoded.email);
     if (!user) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
@@ -86,7 +137,7 @@ export async function GET(request: Request) {
         role: 'customer',
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Auth check failed' }, { status: 500 });
   }
 }
@@ -97,7 +148,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const action = body.action || new URL(request.url).searchParams.get('action') || 'login';
 
-    const users = readUsers();
+    const users = await readUsers();
 
     // 1. REGISTER / SIGN UP
     if (action === 'register' || action === 'signup') {
@@ -131,7 +182,7 @@ export async function POST(request: Request) {
       };
 
       users.push(newUser);
-      saveUsers(users);
+      await saveUsers(users);
 
       const token = signJwt({
         sub: newUser.id,
@@ -209,27 +260,23 @@ export async function POST(request: Request) {
       const userIndex = users.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
 
       if (userIndex === -1) {
-        // For privacy, we still return a reassuring response
         return NextResponse.json({
           success: true,
           message: 'If an account exists with this email, a 6-digit reset code has been generated.',
         });
       }
 
-      // Generate 6-digit OTP code
       const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
       users[userIndex].resetToken = resetCode;
-      users[userIndex].resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 mins expiry
-      saveUsers(users);
+      users[userIndex].resetTokenExpiry = Date.now() + 15 * 60 * 1000;
+      await saveUsers(users);
 
-      // In production, an email service (SendGrid/Resend/SES) would send this.
-      // Here we log it and return demoCode for easy evaluation in dev.
       console.log(`[AABHA Password Reset] Code for ${cleanEmail}: ${resetCode}`);
 
       return NextResponse.json({
         success: true,
         message: `A password reset code has been sent to ${cleanEmail}. Check your inbox!`,
-        demoCode: resetCode, // Returned for effortless evaluation
+        demoCode: resetCode,
       });
     }
 
@@ -266,11 +313,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Update password & clear token
       users[userIndex].passwordHash = hashPassword(newPassword);
       users[userIndex].resetToken = null;
       users[userIndex].resetTokenExpiry = null;
-      saveUsers(users);
+      await saveUsers(users);
 
       return NextResponse.json({
         success: true,

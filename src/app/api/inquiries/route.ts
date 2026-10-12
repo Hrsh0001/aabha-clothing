@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { prisma } from '../../../lib/db';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
 
 export interface CustomerInquiry {
@@ -18,6 +19,27 @@ const INQUIRIES_FILE_PATH = path.join(process.cwd(), 'data', 'inquiries.json');
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryInquiriesCache: CustomerInquiry[] | null = null;
+let isInquiriesTableReady = false;
+
+async function ensureInquiriesStorage(): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  try {
+    if (!isInquiriesTableReady) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SiteSetting" (
+          "id" TEXT NOT NULL,
+          "data" JSONB NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      isInquiriesTableReady = true;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 function ensureInquiriesFile(): void {
   try {
@@ -28,12 +50,27 @@ function ensureInquiriesFile(): void {
     if (!fs.existsSync(INQUIRIES_FILE_PATH)) {
       fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     }
-  } catch (fsErr) {
+  } catch {
     // Read-only filesystem in cloud deployment
   }
 }
 
-function readInquiries(): CustomerInquiry[] {
+async function readInquiries(): Promise<CustomerInquiry[]> {
+  const dbReady = await ensureInquiriesStorage();
+  if (dbReady && prisma) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ data: any }[]>(
+        `SELECT "data" FROM "SiteSetting" WHERE "id" = 'site_inquiries' LIMIT 1`
+      );
+      if (rows && rows.length > 0 && Array.isArray(rows[0].data)) {
+        inMemoryInquiriesCache = rows[0].data;
+        return inMemoryInquiriesCache || [];
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   if (inMemoryInquiriesCache && inMemoryInquiriesCache.length > 0) {
     return inMemoryInquiriesCache;
   }
@@ -45,26 +82,40 @@ function readInquiries(): CustomerInquiry[] {
       return inMemoryInquiriesCache || [];
     }
     return inMemoryInquiriesCache || [];
-  } catch (err) {
+  } catch {
     return inMemoryInquiriesCache || [];
   }
 }
 
-function saveInquiries(inquiries: CustomerInquiry[]): void {
+async function saveInquiries(inquiries: CustomerInquiry[]): Promise<void> {
   inMemoryInquiriesCache = inquiries;
+
+  const dbReady = await ensureInquiriesStorage();
+  if (dbReady && prisma) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+         VALUES ('site_inquiries', $1::jsonb, CURRENT_TIMESTAMP)
+         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
+        JSON.stringify(inquiries)
+      );
+    } catch (err) {
+      console.warn('Database inquiries save notice:', err);
+    }
+  }
+
   try {
     ensureInquiriesFile();
     fs.writeFileSync(INQUIRIES_FILE_PATH, JSON.stringify(inquiries, null, 2), 'utf-8');
-  } catch (fsErr) {
-    console.warn('Serverless filesystem notice (inquiries kept in memory cache):', fsErr);
+  } catch {
+    // Kept in memory / DB on serverless
   }
 }
 
 // GET /api/inquiries — List all customer inquiries
 export async function GET() {
   try {
-    const inquiries = readInquiries();
-    // Sort newest first
+    const inquiries = await readInquiries();
     inquiries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return NextResponse.json({
       success: true,
@@ -93,7 +144,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const inquiries = readInquiries();
+    const inquiries = await readInquiries();
     const newInquiry: CustomerInquiry = {
       id: `inq_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: name.trim(),
@@ -106,7 +157,7 @@ export async function POST(request: Request) {
     };
 
     inquiries.unshift(newInquiry);
-    saveInquiries(inquiries);
+    await saveInquiries(inquiries);
 
     return NextResponse.json({
       success: true,
@@ -142,7 +193,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const inquiries = readInquiries();
+    const inquiries = await readInquiries();
     const index = inquiries.findIndex((i) => i.id === id);
 
     if (index === -1) {
@@ -153,7 +204,7 @@ export async function PATCH(request: Request) {
     }
 
     inquiries[index].status = status;
-    saveInquiries(inquiries);
+    await saveInquiries(inquiries);
 
     return NextResponse.json({
       success: true,
@@ -189,7 +240,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    let inquiries = readInquiries();
+    let inquiries = await readInquiries();
     const initialLen = inquiries.length;
     inquiries = inquiries.filter((i) => i.id !== id);
 
@@ -200,7 +251,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    saveInquiries(inquiries);
+    await saveInquiries(inquiries);
 
     return NextResponse.json({
       success: true,

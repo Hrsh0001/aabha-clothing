@@ -55,6 +55,20 @@ export default function App() {
       if (savedCart) {
         setCartItems(JSON.parse(savedCart));
       }
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkout') === '1') {
+        setActivePage('checkout');
+      } else {
+        const pageParam = params.get('page');
+        if (
+          pageParam === 'about' ||
+          pageParam === 'contact' ||
+          pageParam === 'policy' ||
+          pageParam === 'shop'
+        ) {
+          setActivePage(pageParam);
+        }
+      }
     } catch {
       // ignore
     }

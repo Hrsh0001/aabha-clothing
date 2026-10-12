@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { prisma } from '../../../lib/db';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
 
 export interface Subscriber {
@@ -14,6 +15,27 @@ const NEWSLETTER_FILE_PATH = path.join(process.cwd(), 'data', 'newsletter.json')
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryNewsletterCache: Subscriber[] | null = null;
+let isNewsletterTableReady = false;
+
+async function ensureNewsletterStorage(): Promise<boolean> {
+  if (!process.env.DATABASE_URL || !prisma) return false;
+  try {
+    if (!isNewsletterTableReady) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "SiteSetting" (
+          "id" TEXT NOT NULL,
+          "data" JSONB NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      isNewsletterTableReady = true;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 function ensureNewsletterFile(): void {
   try {
@@ -24,12 +46,27 @@ function ensureNewsletterFile(): void {
     if (!fs.existsSync(NEWSLETTER_FILE_PATH)) {
       fs.writeFileSync(NEWSLETTER_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     }
-  } catch (fsErr) {
+  } catch {
     // Read-only filesystem in cloud deployment
   }
 }
 
-function readSubscribers(): Subscriber[] {
+async function readSubscribers(): Promise<Subscriber[]> {
+  const dbReady = await ensureNewsletterStorage();
+  if (dbReady && prisma) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<{ data: any }[]>(
+        `SELECT "data" FROM "SiteSetting" WHERE "id" = 'site_newsletter' LIMIT 1`
+      );
+      if (rows && rows.length > 0 && Array.isArray(rows[0].data)) {
+        inMemoryNewsletterCache = rows[0].data;
+        return inMemoryNewsletterCache || [];
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   if (inMemoryNewsletterCache && inMemoryNewsletterCache.length > 0) {
     return inMemoryNewsletterCache;
   }
@@ -41,33 +78,47 @@ function readSubscribers(): Subscriber[] {
       return inMemoryNewsletterCache || [];
     }
     return inMemoryNewsletterCache || [];
-  } catch (err) {
+  } catch {
     return inMemoryNewsletterCache || [];
   }
 }
 
-function saveSubscribers(subscribers: Subscriber[]): void {
+async function saveSubscribers(subscribers: Subscriber[]): Promise<void> {
   inMemoryNewsletterCache = subscribers;
+
+  const dbReady = await ensureNewsletterStorage();
+  if (dbReady && prisma) {
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
+         VALUES ('site_newsletter', $1::jsonb, CURRENT_TIMESTAMP)
+         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
+        JSON.stringify(subscribers)
+      );
+    } catch (err) {
+      console.warn('Database newsletter save notice:', err);
+    }
+  }
+
   try {
     ensureNewsletterFile();
     fs.writeFileSync(NEWSLETTER_FILE_PATH, JSON.stringify(subscribers, null, 2), 'utf-8');
-  } catch (fsErr) {
-    console.warn('Serverless filesystem notice (newsletter kept in memory cache):', fsErr);
+  } catch {
+    // Kept in memory / DB on serverless
   }
 }
 
 // GET /api/newsletter — List all newsletter subscribers (Admin Only)
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const subscribers = readSubscribers();
-    // Sort newest first
+    const subscribers = await readSubscribers();
     subscribers.sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime());
     return NextResponse.json({
       success: true,
       subscribers,
       totalCount: subscribers.length,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch subscribers' },
       { status: 500 }
@@ -97,7 +148,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const subscribers = readSubscribers();
+    const subscribers = await readSubscribers();
     const alreadySubscribed = subscribers.some((s) => s.email.toLowerCase() === cleanEmail);
 
     if (alreadySubscribed) {
@@ -116,7 +167,7 @@ export async function POST(request: Request) {
     };
 
     subscribers.unshift(newSubscriber);
-    saveSubscribers(subscribers);
+    await saveSubscribers(subscribers);
 
     return NextResponse.json({
       success: true,
@@ -149,12 +200,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Subscriber ID is required' }, { status: 400 });
     }
 
-    const subscribers = readSubscribers();
+    const subscribers = await readSubscribers();
     const filtered = subscribers.filter((s) => s.id !== id && s.email !== id);
-    saveSubscribers(filtered);
+    await saveSubscribers(filtered);
 
     return NextResponse.json({ success: true, message: 'Subscriber removed successfully' });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Failed to delete subscriber' }, { status: 500 });
   }
 }
