@@ -2,8 +2,8 @@ name: Keep Supabase Awake (Anti-Inactivity Heartbeat)
 
 on:
   schedule:
-    # Runs every 2 days at 05:00 UTC (10:30 AM IST)
-    - cron: '0 5 */2 * *'
+    # Runs EVERY DAY at 06:00 UTC (11:30 AM IST) as a secondary cloud heartbeat
+    - cron: '0 6 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 jobs:
