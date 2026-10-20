@@ -53,6 +53,20 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState<OrderData | null>(null);
+  const [storeWhatsApp, setStoreWhatsApp] = useState(
+    process.env.NEXT_PUBLIC_STORE_WHATSAPP || '919876543210'
+  );
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.settings?.whatsappNumber) {
+          setStoreWhatsApp(d.settings.whatsappNumber);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!invoiceOrder) return;
@@ -150,13 +164,13 @@ export default function MyOrdersPage() {
       case 'CONFIRMED':
         return (
           <span className="px-2.5 py-1 text-xs font-medium bg-[#FFF8E1] text-[#F57F17] border border-[#FFECB3] flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> Confirmed — Tailoring & Packing
+            <Clock className="w-3.5 h-3.5" /> Confirmed â€” Tailoring & Packing
           </span>
         );
       default:
         return (
           <span className="px-2.5 py-1 text-xs font-medium bg-[#F3EFEA] text-[#6E5043] border border-[#E0D8CE] flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> Order Received · Pending Verification
+            <Clock className="w-3.5 h-3.5" /> Order Received Â· Pending Verification
           </span>
         );
     }
@@ -321,12 +335,12 @@ export default function MyOrdersPage() {
                         <span className="text-[#7C736A] block mb-1">Delivery Destination</span>
                         <p className="text-[#1E1B18] leading-relaxed flex items-start gap-1.5">
                           <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#6E5043]" />
-                          <span>{order.address}, {order.city}, {order.state} — {order.pincode}</span>
+                          <span>{order.address}, {order.city}, {order.state} â€” {order.pincode}</span>
                         </p>
                         {order.latitude && order.longitude && (
                           <div className="mt-2 flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[10px] font-mono text-[#2E7D32]">
-                              📍 {order.latitude.toFixed(4)}° N, {order.longitude.toFixed(4)}° E
+                              ðŸ“ {order.latitude.toFixed(4)}Â° N, {order.longitude.toFixed(4)}Â° E
                             </span>
                             <a
                               href={order.mapUrl || `https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
@@ -357,7 +371,9 @@ export default function MyOrdersPage() {
                     {/* Help Action */}
                     <div className="pt-2 flex justify-end">
                       <a
-                        href={`https://wa.me/919876543210?text=Namaste%20AABHA,%20I%20have%20an%20inquiry%20regarding%20my%20Order%20${order.orderNumber}`}
+                        href={`https://wa.me/${storeWhatsApp.replace(/[^0-9]/g, '') || '919876543210'}?text=${encodeURIComponent(
+                          `Namaste AABHA, I have an inquiry regarding my Order #${order.orderNumber}`
+                        )}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs text-[#2E7D32] hover:underline"
@@ -398,13 +414,13 @@ export default function MyOrdersPage() {
               <div>
                 <h2 className="font-serif text-3xl text-[#1E1B18]">AABHA CLOTHING</h2>
                 <p className="text-xs text-[#7C736A] mt-1 font-medium">
-                  Handcrafted Indian Women's Ethnic Wear · GST Tax Invoice
+                  Handcrafted Indian Women's Ethnic Wear Â· GST Tax Invoice
                 </p>
                 <p className="text-[11px] text-[#7C736A] font-mono mt-0.5">
-                  GSTIN: 27AABCA1234F1Z5 · State: Maharashtra (27)
+                  GSTIN: 27AABCA1234F1Z5 Â· State: Maharashtra (27)
                 </p>
                 <p className="text-[11px] text-[#7C736A]">
-                  Bandra West, Mumbai 400050 · care@aabhaclothing.com
+                  Bandra West, Mumbai 400050 Â· care@aabhaclothing.com
                 </p>
               </div>
 
@@ -437,14 +453,14 @@ export default function MyOrdersPage() {
               <div>
                 <span className="text-[#7C736A] uppercase tracking-wider block font-medium">Delivery Destination</span>
                 <p className="text-[#1E1B18] mt-1 leading-relaxed">
-                  {invoiceOrder.address}, {invoiceOrder.city}, {invoiceOrder.state} —{' '}
+                  {invoiceOrder.address}, {invoiceOrder.city}, {invoiceOrder.state} â€”{' '}
                   <strong className="font-mono">{invoiceOrder.pincode}</strong>
                 </p>
                 <p className="text-[11px] text-[#7C736A] mt-0.5">Place of Supply: {invoiceOrder.state || 'Maharashtra'}</p>
                 {invoiceOrder.latitude && invoiceOrder.longitude && (
                   <p className="text-[11px] font-mono text-[#2E7D32] mt-1 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-[#2E7D32] shrink-0" />
-                    <span>GPS: {invoiceOrder.latitude.toFixed(4)}° N, {invoiceOrder.longitude.toFixed(4)}° E</span>
+                    <span>GPS: {invoiceOrder.latitude.toFixed(4)}Â° N, {invoiceOrder.longitude.toFixed(4)}Â° E</span>
                   </p>
                 )}
               </div>

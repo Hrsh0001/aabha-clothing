@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { ImageOff } from 'lucide-react';
 
 interface EditorialImageProps {
   src: string;
@@ -14,85 +15,80 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
   src,
   alt,
   className = 'w-full h-full object-cover',
-  containerClassName = 'relative overflow-hidden bg-[#EFECE6]',
+  containerClassName = 'w-full h-full bg-[#EFECE6]',
   fallbackLabel,
   priority = false,
 }) => {
   const imgRef = React.useRef<HTMLImageElement>(null);
-  const [currentSrc, setCurrentSrc] = useState(src);
-  const [hasError, setHasError] = useState(false);
-  const [attemptedFallback, setAttemptedFallback] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(() => Boolean(src && src.startsWith('data:')));
+  const cleanSrc = typeof src === 'string' ? src.trim() : '';
+  const [hasError, setHasError] = useState(() => !cleanSrc);
+  const [isLoaded, setIsLoaded] = useState(() => Boolean(cleanSrc && cleanSrc.startsWith('data:')));
 
   useEffect(() => {
-    setCurrentSrc(src);
+    const trimmed = typeof src === 'string' ? src.trim() : '';
+    if (!trimmed) {
+      setHasError(true);
+      setIsLoaded(false);
+      return;
+    }
     setHasError(false);
-    setAttemptedFallback(false);
-    if (
-      (src && src.startsWith('data:')) ||
-      (imgRef.current?.complete && imgRef.current?.naturalWidth > 0)
-    ) {
+    if (trimmed.startsWith('data:')) {
       setIsLoaded(true);
+    } else if (imgRef.current?.complete) {
+      if (imgRef.current.naturalWidth > 0) {
+        setIsLoaded(true);
+      } else {
+        setHasError(true);
+        setIsLoaded(false);
+      }
     } else {
       setIsLoaded(false);
     }
   }, [src]);
 
   const handleError = () => {
-    if (!attemptedFallback) {
-      setAttemptedFallback(true);
-      if (currentSrc.startsWith('/api/images/')) {
-        setCurrentSrc('/images/hero_editorial_banner_1791119088652.jpg');
-        return;
-      } else if (currentSrc.startsWith('/images/')) {
-        setCurrentSrc(currentSrc.replace('/images/', '/src/assets/images/'));
-        return;
-      } else if (currentSrc.startsWith('/src/assets/images/')) {
-        setCurrentSrc(currentSrc.replace('/src/assets/images/', '/images/'));
-        return;
-      }
-    }
     setHasError(true);
   };
 
   return (
-    <div className={containerClassName}>
-      {!hasError ? (
+    <div className={`relative overflow-hidden ${containerClassName}`}>
+      {!hasError && cleanSrc ? (
         <>
-          {/* Subtle loading shimmer placeholder while downloading */}
+          {/* Fast, subtle shimmer while downloading */}
           {!isLoaded && !priority && (
-            <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse" />
+            <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse pointer-events-none" />
           )}
           <img
             ref={imgRef}
-            src={currentSrc}
+            src={cleanSrc}
             alt={alt}
-            loading={priority || currentSrc?.startsWith('data:') ? 'eager' : 'lazy'}
-            decoding="async"
+            loading={priority || cleanSrc.startsWith('data:') ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
+            decoding={priority ? 'sync' : 'async'}
             onLoad={() => setIsLoaded(true)}
             onError={handleError}
-            className={`${className} transition-opacity duration-500 ease-out ${
-              isLoaded || priority || currentSrc?.startsWith('data:') ? 'opacity-100' : 'opacity-0'
+            className={`${className} transition-opacity duration-200 ease-out ${
+              isLoaded || priority || cleanSrc.startsWith('data:') ? 'opacity-100' : 'opacity-0'
             }`}
           />
         </>
       ) : (
-        <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#F3EFEA] via-[#EAE3DA] to-[#DFD5C8] text-[#5C5349] text-center">
-          <svg
-            className="w-8 h-8 mb-3 opacity-60"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.2"
-          >
-            <path d="M4 6h16M4 12h16M4 18h16M8 3v18M16 3v18" strokeLinecap="round" />
-          </svg>
-          <span className="font-serif text-lg tracking-wide text-[#1C1917]">
-            {fallbackLabel || alt}
+        <div
+          role="img"
+          aria-label={`Image Not Found: ${fallbackLabel || alt}`}
+          className="w-full h-full flex flex-col items-center justify-center p-2.5 sm:p-4 bg-gradient-to-br from-[#F3EFEA] via-[#EAE3DA] to-[#DFD5C8] text-[#5C5349] text-center select-none overflow-hidden"
+        >
+          <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#FAF8F5]/80 border border-[#D5CCC0] flex items-center justify-center mb-1.5 sm:mb-2.5 shadow-2xs shrink-0">
+            <ImageOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#6E5043] stroke-[1.4]" />
+          </div>
+          <span className="text-[9px] sm:text-[10px] md:text-[11px] font-medium uppercase tracking-[0.14em] text-[#1E1B18] line-clamp-1 px-1">
+            Image Not Found
           </span>
-          <span className="text-xs text-[#6E655C] mt-1">
-            AABHA CLOTHING
-          </span>
+          {(fallbackLabel || alt) && (
+            <span className="font-serif text-[10px] sm:text-xs text-[#6E655C] mt-0.5 sm:mt-1 line-clamp-1 max-w-[160px] sm:max-w-[200px] px-1">
+              {fallbackLabel || alt}
+            </span>
+          )}
         </div>
       )}
     </div>

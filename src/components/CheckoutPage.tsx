@@ -24,9 +24,11 @@ import {
   type CheckoutFormErrors,
   type CheckoutFormValues,
 } from '../lib/form-validation';
+import type { SiteSettings } from '../app/api/settings/route';
 
 interface CheckoutPageProps {
   items: CartItem[];
+  siteSettings?: SiteSettings | null;
   onBackToShopping: () => void;
   onClearCart: () => void;
 }
@@ -35,6 +37,7 @@ type PaymentMethod = 'upi' | 'card' | 'cod';
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   items,
+  siteSettings,
   onBackToShopping,
   onClearCart,
 }) => {
@@ -57,6 +60,25 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [mapUrl, setMapUrl] = useState<string | null>(null);
+
+  const [storeWhatsApp, setStoreWhatsApp] = useState<string>(
+    siteSettings?.whatsappNumber || process.env.NEXT_PUBLIC_STORE_WHATSAPP || '919876543210'
+  );
+
+  useEffect(() => {
+    if (siteSettings?.whatsappNumber) {
+      setStoreWhatsApp(siteSettings.whatsappNumber);
+    } else {
+      fetch('/api/settings')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.settings?.whatsappNumber) {
+            setStoreWhatsApp(d.settings.whatsappNumber);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [siteSettings?.whatsappNumber]);
 
   const getCurrentValues = (overrides?: Partial<CheckoutFormValues>): CheckoutFormValues => ({
     fullName,
@@ -210,14 +232,17 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           latitude: latitude || undefined,
           longitude: longitude || undefined,
           mapUrl: mapUrl || undefined,
-          items: items.map((i) => ({
-            productId: i.product.id,
-            name: i.product.name,
-            size: i.size,
-            quantity: i.quantity,
-            price: i.product.price,
-            image: i.product.primaryImage,
-          })),
+          items: items.map((i) => {
+            const matchingColor = i.product.colors?.find((c) => c.name === i.selectedColor);
+            return {
+              productId: i.product.id,
+              name: i.selectedColor ? `${i.product.name} (${i.selectedColor})` : i.product.name,
+              size: i.size,
+              quantity: i.quantity,
+              price: i.product.price,
+              image: matchingColor?.imageUrl || i.product.primaryImage,
+            };
+          }),
           total: finalTotal,
         }),
       });
@@ -308,13 +333,13 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             <div className="divide-y divide-[#E0D8CE]">
               {orderCompleted.items.map((item) => (
                 <div
-                  key={`${item.product.id}-${item.size}`}
+                  key={`${item.product.id}-${item.size}-${item.selectedColor || ''}`}
                   className="py-3 flex items-center justify-between text-sm"
                 >
                   <div>
                     <p className="font-medium text-[#1E1B18]">{item.product.name}</p>
                     <p className="text-xs text-[#7C736A]">
-                      Size {item.size} · Qty {item.quantity} · {item.product.sku}
+                      Size {item.size}{item.selectedColor ? ` · ${item.selectedColor}` : ''} · Qty {item.quantity} · {item.product.sku}
                     </p>
                   </div>
                   <span className="font-mono tabular-nums text-[#1E1B18]">
@@ -349,7 +374,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </a>
 
             <a
-              href={`https://wa.me/919876543210?text=${encodeURIComponent(
+              href={`https://wa.me/${storeWhatsApp.replace(/[^0-9]/g, '') || '919876543210'}?text=${encodeURIComponent(
                 `Namaste AABHA, I have just placed Cash on Delivery Order #${orderCompleted.orderNumber} for ${formatINR(orderCompleted.total)}. Please confirm dispatch!`
               )}`}
               target="_blank"
@@ -736,7 +761,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
           <div className="divide-y divide-[#E0D8CE] max-h-80 overflow-y-auto pr-1">
             {items.map((item) => (
-              <div key={`${item.product.id}-${item.size}`} className="py-4 flex gap-3.5">
+              <div key={`${item.product.id}-${item.size}-${item.selectedColor || ''}`} className="py-4 flex gap-3.5">
                 <div className="w-16 aspect-[3/4] bg-[#FAF8F5] shrink-0 overflow-hidden">
                   <EditorialImage
                     src={item.product.primaryImage}
@@ -750,7 +775,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     {item.product.name}
                   </p>
                   <p className="text-xs text-[#7C736A] mt-0.5">
-                    Size {item.size} · Qty {item.quantity}
+                    Size {item.size}{item.selectedColor ? ` · ${item.selectedColor}` : ''} · Qty {item.quantity}
                   </p>
                   <p className="text-sm font-medium text-[#1E1B18] mt-1 tabular-nums">
                     {formatINR(item.product.price * item.quantity)}

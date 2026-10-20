@@ -18,6 +18,8 @@ export async function GET(request: Request) {
 
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
     const cleanOrderNum = orderNumber ? orderNumber.trim() : '';
+    const strippedOrderNum = cleanOrderNum.replace(/^#/, '');
+    const withHashOrderNum = cleanOrderNum.startsWith('#') ? cleanOrderNum : `#${cleanOrderNum}`;
 
     // 1. Try Prisma / Supabase if DATABASE_URL is set
     if (process.env.DATABASE_URL && prisma) {
@@ -28,7 +30,10 @@ export async function GET(request: Request) {
         }
         if (cleanOrderNum) {
           conditions.push({ orderNumber: { equals: cleanOrderNum, mode: 'insensitive' } });
+          conditions.push({ orderNumber: { equals: strippedOrderNum, mode: 'insensitive' } });
+          conditions.push({ orderNumber: { equals: withHashOrderNum, mode: 'insensitive' } });
           conditions.push({ id: { equals: cleanOrderNum } });
+          conditions.push({ id: { equals: strippedOrderNum } });
         }
 
         const dbOrders = await prisma.order.findMany({
@@ -60,8 +65,12 @@ export async function GET(request: Request) {
       const matched = allOrders.filter((o: any) => {
         if (cleanOrderNum) {
           const matchNum =
-            (o.orderNumber && o.orderNumber.toLowerCase() === cleanOrderNum.toLowerCase()) ||
-            (o.id && o.id === cleanOrderNum);
+            (o.orderNumber && (
+              o.orderNumber.toLowerCase() === cleanOrderNum.toLowerCase() ||
+              o.orderNumber.toLowerCase() === strippedOrderNum.toLowerCase() ||
+              o.orderNumber.toLowerCase() === withHashOrderNum.toLowerCase()
+            )) ||
+            (o.id && (o.id === cleanOrderNum || o.id === strippedOrderNum));
           if (matchNum) return true;
         }
         if (cleanPhone && cleanPhone.length >= 4) {

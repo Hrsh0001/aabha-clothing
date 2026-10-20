@@ -23,14 +23,15 @@ interface HeaderProps {
   onOpenCart: () => void;
   onOpenAccount?: () => void;
   logoUrl?: string;
+  announcementText?: string;
 }
 
 const SHOP_CATEGORIES: Array<{ label: CollectionFilter; count: number }> = [
-  { label: 'All Collection', count: 17 },
-  { label: 'Anarkali', count: 2 },
-  { label: '3-Piece Dresses', count: 5 },
-  { label: 'Co-ord Sets', count: 9 },
-  { label: 'Chikankari Suit', count: 1 },
+  { label: 'All Collection', count: 0 },
+  { label: 'Anarkali', count: 0 },
+  { label: '3-Piece Dresses', count: 0 },
+  { label: 'Co-ord Sets', count: 0 },
+  { label: 'Chikankari Suit', count: 0 },
 ];
 
 export const Header: React.FC<HeaderProps> = ({
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCart,
   onOpenAccount,
   logoUrl,
+  announcementText,
 }) => {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -56,24 +58,24 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, role, setAuthModalOpen, logout } = useAuth();
 
   const shopCategories = useMemo(() => {
-    if (!products || products.length === 0) return SHOP_CATEGORIES;
+    const list = products || [];
     return [
-      { label: 'All Collection' as CollectionFilter, count: products.length },
+      { label: 'All Collection' as CollectionFilter, count: list.length },
       {
         label: 'Anarkali' as CollectionFilter,
-        count: products.filter((p) => p.category === 'Anarkali').length,
+        count: list.filter((p) => p.category === 'Anarkali').length,
       },
       {
         label: '3-Piece Dresses' as CollectionFilter,
-        count: products.filter((p) => p.category === '3-Piece Dresses').length,
+        count: list.filter((p) => p.category === '3-Piece Dresses').length,
       },
       {
         label: 'Co-ord Sets' as CollectionFilter,
-        count: products.filter((p) => p.category === 'Co-ord Sets').length,
+        count: list.filter((p) => p.category === 'Co-ord Sets').length,
       },
       {
         label: 'Chikankari Suit' as CollectionFilter,
-        count: products.filter((p) => p.category === 'Chikankari Suit').length,
+        count: list.filter((p) => p.category === 'Chikankari Suit').length,
       },
     ];
   }, [products]);
@@ -95,7 +97,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
+    <>
+      {announcementText && (
+        <div className="bg-[#231F1D] text-[#FAF8F5] text-[10px] sm:text-[11px] font-light tracking-[0.14em] uppercase py-1.5 px-4 text-center border-b border-[#3D3732]">
+          {announcementText}
+        </div>
+      )}
+      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
       <div className="relative max-w-[1920px] mx-auto w-full h-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
         {/* Mobile Left Hamburger Trigger (flex-1 on mobile so logo stays centered) */}
         <div className="flex-1 flex items-center justify-start md:hidden">
@@ -413,5 +421,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
     </header>
+    </>
   );
 };

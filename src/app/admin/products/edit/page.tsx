@@ -22,6 +22,7 @@ import {
   Check,
   X,
   Info,
+  Palette,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -48,15 +49,6 @@ export interface GalleryItem {
   label?: string;
   focalClass?: string;
 }
-
-const PRESET_IMAGES = [
-  { label: 'Ivory Kurta', url: '/images/product_kurta_ivory_1791119105107.jpg' },
-  { label: 'Sand Kurta Set', url: '/images/product_kurtaset_sand_1791119136277.jpg' },
-  { label: 'Ochre Dress', url: '/images/product_dress_ochre_1791119165890.jpg' },
-  { label: 'Charcoal Co-ords', url: '/images/product_coords_charcoal_1791119178003.jpg' },
-  { label: 'Olive Kurta', url: '/images/product_kurta_olive_1791119121380.jpg' },
-  { label: 'Rosewood Set', url: '/images/product_kurtaset_rosewood_1791119152298.jpg' },
-];
 
 const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
 
@@ -96,13 +88,15 @@ function ProductEditorContent() {
   const [description, setDescription] = useState('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
   const [customSizeInput, setCustomSizeInput] = useState('');
+  const [colors, setColors] = useState<Array<{ name: string; hex: string; imageUrl?: string }>>([]);
+  const [newColorName, setNewColorName] = useState('');
+  const [newColorHex, setNewColorHex] = useState('#6E5043');
+  const [newColorImageUrl, setNewColorImageUrl] = useState('');
 
   // Image states
-  const [primaryImage, setPrimaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
-  const [secondaryImage, setSecondaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
-  const [gallery, setGallery] = useState<GalleryItem[]>([
-    { url: '/images/hero_editorial_banner_1791119088652.jpg', label: 'Full Studio Silhouette', focalClass: 'object-center' },
-  ]);
+  const [primaryImage, setPrimaryImage] = useState('');
+  const [secondaryImage, setSecondaryImage] = useState('');
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
 
   // useForm-style simultaneous validation state
   const [errors, setErrors] = useState<ProductFormErrors>({});
@@ -226,8 +220,11 @@ function ProductEditorContent() {
           setInStock(typeof p.inStock === 'boolean' ? p.inStock : true);
           setDescription(p.description || '');
           setSelectedSizes(p.sizes && p.sizes.length > 0 ? p.sizes : ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+          if (p.colors && Array.isArray(p.colors)) {
+            setColors(p.colors);
+          }
 
-          const lead = p.primaryImage || '/images/hero_editorial_banner_1791119088652.jpg';
+          const lead = p.primaryImage || '';
           setPrimaryImage(lead);
           setSecondaryImage(p.secondaryImage || lead);
 
@@ -243,7 +240,7 @@ function ProductEditorContent() {
                 focalClass: g.focalClass || 'object-center',
               };
             });
-          } else {
+          } else if (lead) {
             gal = [{ url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
             if (p.secondaryImage && p.secondaryImage !== lead) {
               gal.push({ url: p.secondaryImage, label: 'Editorial Daylight Drape', focalClass: 'object-center' });
@@ -362,11 +359,7 @@ function ProductEditorContent() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const isInitialPlaceholder =
-      isNew &&
-      gallery.length === 1 &&
-      gallery[0]?.url === '/images/hero_editorial_banner_1791119088652.jpg';
-    const effectiveGalleryCount = isInitialPlaceholder ? 0 : gallery.length;
+    const effectiveGalleryCount = gallery.length;
 
     const batchCheck = validateImageFilesBatch(
       Array.from(files),
@@ -400,12 +393,7 @@ function ProductEditorContent() {
 
       if (uploadedUrls.length > 0) {
         setGallery((prev) => {
-          const placeholderCheck =
-            isNew &&
-            prev.length === 1 &&
-            prev[0]?.url === '/images/hero_editorial_banner_1791119088652.jpg';
-          const base = placeholderCheck ? [] : [...prev];
-          const next = [...base];
+          const next = [...prev];
 
           for (const url of uploadedUrls) {
             if (next.length >= MAX_GALLERY_PHOTOS) break;
@@ -424,11 +412,8 @@ function ProductEditorContent() {
           if (next[0]?.url) {
             setPrimaryImage(next[0].url);
           }
-          if (
-            secondaryImage === '/images/hero_editorial_banner_1791119088652.jpg' &&
-            next.length > 0
-          ) {
-            setSecondaryImage(next[1]?.url || next[0].url);
+          if (!secondaryImage && next.length > 1) {
+            setSecondaryImage(next[1]?.url);
           }
           syncFieldValidation('gallery', { gallery: next });
           return next;
@@ -629,6 +614,27 @@ function ProductEditorContent() {
     setCustomSizeInput('');
   };
 
+  const handleAddColor = () => {
+    if (!newColorName.trim()) {
+      showToast('Please enter a color name (e.g. "Rani Rose")', 'error');
+      return;
+    }
+    const newSwatch = {
+      name: newColorName.trim(),
+      hex: newColorHex || '#6E5043',
+      ...(newColorImageUrl.trim() ? { imageUrl: newColorImageUrl.trim() } : {}),
+    };
+    setColors((prev) => [...prev, newSwatch]);
+    setNewColorName('');
+    setNewColorImageUrl('');
+    showToast(`Added "${newSwatch.name}" color swatch`);
+  };
+
+  const handleRemoveColor = (index: number) => {
+    setColors((prev) => prev.filter((_, idx) => idx !== index));
+    showToast('Removed color swatch');
+  };
+
   const handleAutoGenerateDescription = () => {
     const displayName = name.trim() || `${category} Silhouette`;
     const displayFabric = fabric.trim() || 'Pure Handloom Chanderi Silk';
@@ -691,15 +697,8 @@ function ProductEditorContent() {
 
       const leadImage =
         sanitizedGallery[0]?.url || (await compressDataUrlIfNeeded(primaryImage));
-      const rawDrape =
-        secondaryImage &&
-        !(
-          secondaryImage === '/images/hero_editorial_banner_1791119088652.jpg' &&
-          leadImage !== '/images/hero_editorial_banner_1791119088652.jpg'
-        )
-          ? secondaryImage
-          : sanitizedGallery[1]?.url || leadImage;
-      const drapeImage = await compressDataUrlIfNeeded(rawDrape);
+      const rawDrape = secondaryImage || sanitizedGallery[1]?.url || leadImage || '';
+      const drapeImage = rawDrape ? await compressDataUrlIfNeeded(rawDrape) : '';
 
       const payload = {
         name: name.trim(),
@@ -711,6 +710,7 @@ function ProductEditorContent() {
         inStock: Boolean(inStock),
         description: description.trim(),
         sizes: validSizes,
+        colors: colors.length > 0 ? colors : undefined,
         primaryImage: leadImage,
         secondaryImage: drapeImage,
         gallery: sanitizedGallery,
@@ -1089,15 +1089,24 @@ function ProductEditorContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Primary Catalog Cover */}
             <div className="p-4 bg-[#F3EFEA] border border-[#E0D8CE] flex items-center gap-4">
-              <div className="relative aspect-[3/4] w-20 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
-                <img
-                  src={gallery[0]?.url || primaryImage}
-                  alt="Primary Cover"
-                  className="w-full h-full object-cover"
-                />
-                <span className="absolute bottom-0 inset-x-0 bg-[#231F1D]/85 text-[#FAF8F5] text-[9px] font-mono text-center py-0.5">
-                  COVER
-                </span>
+              <div className="relative aspect-[3/4] w-20 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden flex items-center justify-center">
+                {(gallery[0]?.url || primaryImage) ? (
+                  <>
+                    <img
+                      src={gallery[0]?.url || primaryImage}
+                      alt="Primary Cover"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-0 inset-x-0 bg-[#231F1D]/85 text-[#FAF8F5] text-[9px] font-mono text-center py-0.5">
+                      COVER
+                    </span>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-[#ECE6DD]">
+                    <Camera className="w-5 h-5 text-[#A89F91]" />
+                    <span className="text-[8px] text-[#7C736A] mt-1">No Cover</span>
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0 space-y-1.5">
                 <div className="flex items-center gap-1.5">
@@ -1117,7 +1126,7 @@ function ProductEditorContent() {
                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF8F5] border border-[#1E1B18] text-[#1E1B18] text-xs font-medium hover:bg-[#1E1B18] hover:text-[#FAF8F5] transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <Upload className="w-3 h-3" />
-                    <span>{uploadingCover ? 'Uploading...' : 'Replace Cover Photo'}</span>
+                    <span>{uploadingCover ? 'Uploading...' : (gallery[0]?.url || primaryImage ? 'Replace Cover Photo' : 'Upload Cover Photo')}</span>
                   </button>
                 </div>
               </div>
@@ -1125,15 +1134,24 @@ function ProductEditorContent() {
 
             {/* Secondary Hover Drape */}
             <div className="p-4 bg-[#F3EFEA] border border-[#E0D8CE] flex items-center gap-4">
-              <div className="relative aspect-[3/4] w-20 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
-                <img
-                  src={secondaryImage}
-                  alt="Secondary Drape"
-                  className="w-full h-full object-cover"
-                />
-                <span className="absolute bottom-0 inset-x-0 bg-[#6E5043]/90 text-[#FAF8F5] text-[9px] font-mono text-center py-0.5">
-                  HOVER
-                </span>
+              <div className="relative aspect-[3/4] w-20 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden flex items-center justify-center">
+                {secondaryImage ? (
+                  <>
+                    <img
+                      src={secondaryImage}
+                      alt="Secondary Drape"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-0 inset-x-0 bg-[#6E5043]/90 text-[#FAF8F5] text-[9px] font-mono text-center py-0.5">
+                      HOVER
+                    </span>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-[#ECE6DD]">
+                    <Sparkles className="w-5 h-5 text-[#A89F91]" />
+                    <span className="text-[8px] text-[#7C736A] mt-1">No Drape</span>
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0 space-y-1.5">
                 <div className="flex items-center gap-1.5">
@@ -1153,7 +1171,7 @@ function ProductEditorContent() {
                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF8F5] border border-[#1E1B18] text-[#1E1B18] text-xs font-medium hover:bg-[#1E1B18] hover:text-[#FAF8F5] transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <Upload className="w-3 h-3" />
-                    <span>{uploadingSecondary ? 'Uploading...' : 'Replace Hover Drape'}</span>
+                    <span>{uploadingSecondary ? 'Uploading...' : (secondaryImage ? 'Replace Hover Drape' : 'Upload Hover Drape')}</span>
                   </button>
                 </div>
               </div>
@@ -1171,196 +1189,166 @@ function ProductEditorContent() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {gallery.map((item, idx) => {
-                const isPrimary = idx === 0;
-                const isSecondary = item.url === secondaryImage;
+            {gallery.length === 0 ? (
+              <div className="py-12 text-center bg-[#FAF8F5] border border-dashed border-[#D5CCC0] p-6 space-y-1.5">
+                <Camera className="w-7 h-7 text-[#A89F91] mx-auto mb-1" />
+                <p className="text-xs font-semibold text-[#1E1B18]">No photos uploaded yet</p>
+                <p className="text-[11px] text-[#7C736A]">Upload high-resolution photography using the batch upload button above.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {gallery.map((item, idx) => {
+                  const isPrimary = idx === 0;
+                  const isSecondary = item.url === secondaryImage;
 
-                return (
-                  <div
-                    key={idx}
-                    className={`bg-[#FAF8F5] border flex flex-col justify-between transition-all shadow-xs ${
-                      isPrimary
-                        ? 'border-[#D97706] ring-2 ring-[#D97706]/30'
-                        : 'border-[#D5CCC0] hover:border-[#1E1B18]'
-                    }`}
-                  >
-                    {/* Top Preview Frame */}
-                    <div className="relative aspect-[3/4] w-full bg-[#ECE6DD] border-b border-[#E0D8CE] overflow-hidden group">
-                      <img
-                        src={item.url}
-                        alt={item.label || `Angle #${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-                      />
+                  return (
+                    <div
+                      key={idx}
+                      className={`bg-[#FAF8F5] border flex flex-col justify-between transition-all shadow-xs ${
+                        isPrimary
+                          ? 'border-[#D97706] ring-2 ring-[#D97706]/30'
+                          : 'border-[#D5CCC0] hover:border-[#1E1B18]'
+                      }`}
+                    >
+                      {/* Top Preview Frame */}
+                      <div className="relative aspect-[3/4] w-full bg-[#ECE6DD] border-b border-[#E0D8CE] overflow-hidden group">
+                        <img
+                          src={item.url}
+                          alt={item.label || `Angle #${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                        />
 
-                      {/* Sequence Badge */}
-                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-[#1E1B18]/85 text-[#FAF8F5] font-mono text-[10px] font-semibold">
-                        Angle #{idx + 1}
-                      </span>
+                        {/* Sequence Badge */}
+                        <span className="absolute top-2 left-2 px-2 py-0.5 bg-[#1E1B18]/85 text-[#FAF8F5] font-mono text-[10px] font-semibold">
+                          Angle #{idx + 1}
+                        </span>
 
-                      {/* Status Badges */}
-                      <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                        {isPrimary && (
-                          <span className="px-2 py-0.5 bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] text-[10px] font-semibold flex items-center gap-1 shadow-xs">
-                            <Star className="w-3 h-3 fill-[#D97706]" /> Cover
-                          </span>
-                        )}
-                        {isSecondary && (
-                          <span className="px-2 py-0.5 bg-[#E0E7FF] text-[#3730A3] border border-[#C7D2FE] text-[10px] font-semibold shadow-xs">
-                            Hover Drape
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Overlay: Direct Upload/Replace This Photo */}
-                      <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => handleTriggerReplace(idx)}
-                          className="px-2.5 py-1 bg-[#FAF8F5] text-[#1E1B18] text-[11px] font-medium hover:bg-white transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                          <Upload className="w-3 h-3" />
-                          <span>Replace Photo</span>
-                        </button>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleMoveItem(idx, 'up')}
-                            disabled={idx === 0}
-                            title="Move earlier"
-                            className="p-1 bg-[#FAF8F5]/90 hover:bg-white text-[#1E1B18] disabled:opacity-20 cursor-pointer"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveItem(idx, 'down')}
-                            disabled={idx === gallery.length - 1}
-                            title="Move later"
-                            className="p-1 bg-[#FAF8F5]/90 hover:bg-white text-[#1E1B18] disabled:opacity-20 cursor-pointer"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Controls */}
-                    <div className="p-3.5 space-y-3 flex-1 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        {/* Angle Label Input */}
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
-                            Angle Name / Label:
-                          </label>
-                          <input
-                            type="text"
-                            value={item.label || ''}
-                            onChange={(e) => handleUpdateItem(idx, { label: e.target.value })}
-                            placeholder="e.g. Pleated Bodice & Neckline Detail"
-                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
-                          />
+                        {/* Status Badges */}
+                        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                          {isPrimary && (
+                            <span className="px-2 py-0.5 bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] text-[10px] font-semibold flex items-center gap-1 shadow-xs">
+                              <Star className="w-3 h-3 fill-[#D97706]" /> Cover
+                            </span>
+                          )}
+                          {isSecondary && (
+                            <span className="px-2 py-0.5 bg-[#E0E7FF] text-[#3730A3] border border-[#C7D2FE] text-[10px] font-semibold shadow-xs">
+                              Hover Drape
+                            </span>
+                          )}
                         </div>
 
-                        {/* Direct URL Input */}
-                        <div>
-                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
-                            Image Path / URL:
-                          </label>
-                          <input
-                            type="text"
-                            value={
-                              item.url.startsWith('data:')
-                                ? '[Uploaded Cloud Image — Optimized]'
-                                : item.url
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (!val.startsWith('[Uploaded Cloud Image')) {
-                                handleUpdateItem(idx, { url: val });
+                        {/* Overlay: Direct Upload/Replace This Photo */}
+                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerReplace(idx)}
+                            className="px-2.5 py-1 bg-[#FAF8F5] text-[#1E1B18] text-[11px] font-medium hover:bg-white transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Replace Photo</span>
+                          </button>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveItem(idx, 'up')}
+                              disabled={idx === 0}
+                              title="Move earlier"
+                              className="p-1 bg-[#FAF8F5]/90 hover:bg-white text-[#1E1B18] disabled:opacity-20 cursor-pointer"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveItem(idx, 'down')}
+                              disabled={idx === gallery.length - 1}
+                              title="Move later"
+                              className="p-1 bg-[#FAF8F5]/90 hover:bg-white text-[#1E1B18] disabled:opacity-20 cursor-pointer"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Controls */}
+                      <div className="p-3.5 space-y-3 flex-1 flex flex-col justify-between">
+                        <div className="space-y-2">
+                          {/* Angle Label Input */}
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                              Angle Name / Label:
+                            </label>
+                            <input
+                              type="text"
+                              value={item.label || ''}
+                              onChange={(e) => handleUpdateItem(idx, { label: e.target.value })}
+                              placeholder="e.g. Pleated Bodice & Neckline Detail"
+                              className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                            />
+                          </div>
+
+                          {/* Direct URL Input */}
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                              Image Path / URL:
+                            </label>
+                            <input
+                              type="text"
+                              value={
+                                item.url.startsWith('data:')
+                                  ? '[Uploaded Cloud Image — Optimized]'
+                                  : item.url
                               }
-                            }}
-                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-[10px] font-mono text-[#5C544D] focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Card Action Buttons */}
-                      <div className="pt-2 border-t border-[#E0D8CE] flex items-center justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {!isPrimary && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetPrimary(idx)}
-                              className="px-2 py-1 bg-[#FAF8F5] border border-[#D97706] text-[#92400E] text-[10px] font-medium hover:bg-[#FEF3C7] transition-colors cursor-pointer"
-                            >
-                              ★ Make Cover
-                            </button>
-                          )}
-                          {!isSecondary && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetSecondary(idx)}
-                              className="px-2 py-1 bg-[#FAF8F5] border border-[#C7D2FE] text-[#3730A3] text-[10px] font-medium hover:bg-[#EEF2FF] transition-colors cursor-pointer"
-                            >
-                              Set Hover
-                            </button>
-                          )}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val.startsWith('[Uploaded Cloud Image')) {
+                                  handleUpdateItem(idx, { url: val });
+                                }
+                              }}
+                              className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-[10px] font-mono text-[#5C544D] focus:outline-none"
+                            />
+                          </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          title="Remove photo"
-                          className="p-1 text-[#C62828] hover:bg-[#FFEBEE] transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {/* Card Action Buttons */}
+                        <div className="pt-2 border-t border-[#E0D8CE] flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {!isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPrimary(idx)}
+                                className="px-2 py-1 bg-[#FAF8F5] border border-[#D97706] text-[#92400E] text-[10px] font-medium hover:bg-[#FEF3C7] transition-colors cursor-pointer"
+                              >
+                                ★ Make Cover
+                              </button>
+                            )}
+                            {!isSecondary && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetSecondary(idx)}
+                                className="px-2 py-1 bg-[#FAF8F5] border border-[#C7D2FE] text-[#3730A3] text-[10px] font-medium hover:bg-[#EEF2FF] transition-colors cursor-pointer"
+                              >
+                                Set Hover
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            title="Remove photo"
+                            className="p-1 text-[#C62828] hover:bg-[#FFEBEE] transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Preset Editorial Asset Library */}
-          <div className="pt-4 border-t border-[#ECE6DD]">
-            <p className="text-xs font-semibold text-[#1E1B18] mb-2 uppercase tracking-wider">
-              Luxury Editorial Preset Library (Click to add directly):
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {PRESET_IMAGES.map((preset) => (
-                <button
-                  key={preset.url}
-                  type="button"
-                  onClick={() => {
-                    if (gallery.length >= MAX_GALLERY_PHOTOS) {
-                      showToast(`Maximum ${MAX_GALLERY_PHOTOS} photos allowed per garment.`, 'error');
-                      return;
-                    }
-                    const next = [
-                      ...gallery,
-                      { url: preset.url, label: preset.label, focalClass: 'object-center' },
-                    ];
-                    setGallery(next);
-                    syncFieldValidation('gallery', { gallery: next });
-                  }}
-                  title={`Click to add ${preset.label} to gallery`}
-                  className="group aspect-[3/4] overflow-hidden border border-[#D5CCC0] relative cursor-pointer hover:border-[#1E1B18] transition-colors"
-                >
-                  <img
-                    src={preset.url}
-                    alt={preset.label}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                  <span className="absolute bottom-0 inset-x-0 bg-[#1E1B18]/85 text-[#FAF8F5] text-[9px] truncate px-1 py-1 text-center font-medium">
-                    + {preset.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -1700,6 +1688,155 @@ function ProductEditorContent() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Color Variants & Interactive Swatches */}
+            <div className="md:col-span-2 p-4 sm:p-5 bg-[#F3EFEA] border border-[#E0D8CE] space-y-4">
+              <div className="flex items-center justify-between border-b border-[#E0D8CE] pb-3">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-[#6E5043]" />
+                  <div>
+                    <label className="block text-[#1E1B18] font-semibold uppercase tracking-wider text-xs">
+                      Color Variants & Interactive Swatches
+                    </label>
+                    <p className="text-[11px] text-[#7C736A] mt-0.5">
+                      Configure color choices displayed as interactive swatches on storefront product cards and PDP.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-medium text-[#6E5043]">
+                  {colors.length} Variant{colors.length === 1 ? '' : 's'} Configured
+                </span>
+              </div>
+
+              {/* Existing Swatches */}
+              {colors.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {colors.map((c, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-[#FAF8F5] border border-[#D5CCC0] p-3 flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="w-7 h-7 rounded-full shrink-0 border border-black/15 shadow-inner"
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#1E1B18] truncate">{c.name}</p>
+                          <p className="text-[10px] font-mono text-[#7C736A]">{c.hex}</p>
+                          {c.imageUrl && (
+                            <p className="text-[9px] text-[#2E7D32] truncate">Photo linked</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveColor(idx)}
+                        className="text-[#C62828] hover:bg-[#FFEBEE] p-1 transition-colors cursor-pointer"
+                        title={`Remove ${c.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-[#7C736A] italic">
+                  No color variants added yet. By default, the garment uses single primary shade ({fabric.split(' ').slice(0, 2).join(' ') || 'Artisan'}).
+                </p>
+              )}
+
+              {/* Add New Color Swatch Form */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-3.5 space-y-3">
+                <span className="block text-[11px] font-semibold text-[#1E1B18] uppercase tracking-wider">
+                  + Add Color Swatch
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                      Color Name:
+                    </label>
+                    <input
+                      type="text"
+                      value={newColorName}
+                      onChange={(e) => setNewColorName(e.target.value)}
+                      placeholder="e.g. Rani Rose, Royal Emerald..."
+                      className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                      Hex Shade:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newColorHex}
+                        onChange={(e) => setNewColorHex(e.target.value)}
+                        className="w-8 h-8 rounded border border-[#E0D8CE] p-0.5 cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={newColorHex}
+                        onChange={(e) => setNewColorHex(e.target.value)}
+                        placeholder="#6E5043"
+                        className="flex-1 bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                      Swatch Photo URL (Optional):
+                    </label>
+                    <input
+                      type="text"
+                      value={newColorImageUrl}
+                      onChange={(e) => setNewColorImageUrl(e.target.value)}
+                      placeholder="https://... or /images/..."
+                      className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#ECE6DD]">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-[#7C736A]">Quick Presets:</span>
+                    {[
+                      { name: 'Rani Rose', hex: '#BE3455' },
+                      { name: 'Royal Emerald', hex: '#1B4D3E' },
+                      { name: 'Ivory Gold', hex: '#E6D7B9' },
+                      { name: 'Ochre Rust', hex: '#B86B35' },
+                      { name: 'Midnight Indigo', hex: '#1C2A39' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => {
+                          setNewColorName(preset.name);
+                          setNewColorHex(preset.hex);
+                        }}
+                        className="px-2 py-0.5 bg-[#FAF8F5] border border-[#D5CCC0] text-[10px] text-[#5C544D] hover:border-[#1E1B18] transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: preset.hex }} />
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddColor}
+                    className="inline-flex items-center gap-1 px-4 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Swatch</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>

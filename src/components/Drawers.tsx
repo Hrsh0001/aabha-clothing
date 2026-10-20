@@ -30,14 +30,15 @@ export interface CartItem {
   product: Product;
   size: GarmentSize;
   quantity: number;
+  selectedColor?: string;
 }
 
 interface CartDrawerProps {
   isOpen: boolean;
   items: CartItem[];
   onClose: () => void;
-  onUpdateQuantity: (productId: string, size: GarmentSize, delta: number) => void;
-  onRemoveItem: (productId: string, size: GarmentSize) => void;
+  onUpdateQuantity: (productId: string, size: GarmentSize, delta: number, color?: string) => void;
+  onRemoveItem: (productId: string, size: GarmentSize, color?: string) => void;
   onProceedToCheckout: () => void;
   onSelectProduct: (product: Product) => void;
 }
@@ -119,7 +120,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           ) : (
             items.map((item) => (
               <div
-                key={`${item.product.id}-${item.size}`}
+                key={`${item.product.id}-${item.size}-${item.selectedColor || ''}`}
                 className="py-5 flex gap-4 items-start"
               >
                 <button
@@ -152,7 +153,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onRemoveItem(item.product.id, item.size)}
+                      onClick={() => onRemoveItem(item.product.id, item.size, item.selectedColor)}
                       aria-label="Remove item"
                       className="text-[#948A80] hover:text-[#1E1B18] p-0.5 cursor-pointer"
                     >
@@ -161,14 +162,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
 
                   <p className="text-xs text-[#7C736A] mt-1">
-                    Size {item.size} · {item.product.colorName}
+                    Size {item.size} · {item.selectedColor || item.product.colorName}
                   </p>
 
                   <div className="mt-3.5 flex items-center justify-between">
                     <div className="flex items-center border border-[#E0D8CE]">
                       <button
                         type="button"
-                        onClick={() => onUpdateQuantity(item.product.id, item.size, -1)}
+                        onClick={() => onUpdateQuantity(item.product.id, item.size, -1, item.selectedColor)}
                         className="px-2.5 py-1 text-xs text-[#1E1B18] hover:bg-[#F3EFEA] cursor-pointer"
                       >
                         −
@@ -178,7 +179,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </span>
                       <button
                         type="button"
-                        onClick={() => onUpdateQuantity(item.product.id, item.size, 1)}
+                        onClick={() => onUpdateQuantity(item.product.id, item.size, 1, item.selectedColor)}
                         className="px-2.5 py-1 text-xs text-[#1E1B18] hover:bg-[#F3EFEA] cursor-pointer"
                       >
                         +

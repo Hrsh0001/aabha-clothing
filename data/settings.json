@@ -1,8 +1,12 @@
 {
   "logoUrl": "/logo.svg",
   "heroBanner": "/images/hero_editorial_banner_1791119088652.jpg",
+  "heroBannerMobile": "",
   "heroCoords": "/images/hero_slide_coords_1791228726563.jpg",
+  "heroCoordsMobile": "",
   "heroEthnic": "/images/hero_slide_ethnic_1791228741882.jpg",
+  "heroEthnicMobile": "",
+  "whatsappNumber": "919876543210",
   "brandStory": "/images/brand_story_editorial_1791119191742.jpg",
   "igPhotos": [
     "/images/product_kurta_ivory_1791119105107.jpg",
@@ -11,5 +15,18 @@
     "/images/product_coords_charcoal_1791119178003.jpg",
     "/images/product_kurta_olive_1791119121380.jpg",
     "/images/product_kurtaset_rosewood_1791119152298.jpg"
-  ]
+  ],
+  "announcementText": "Complimentary express shipping across India on orders above ₹1,999 · Artisan Handcrafted",
+  "heroSlide1Eyebrow": "INAUGURAL EDIT · HANDLOOM",
+  "heroSlide1Heading": "EFFORTLESSLY INDIAN.",
+  "heroSlide1Subheading": "Modern silhouettes. Timeless elegance.",
+  "heroSlide2Eyebrow": "THE CO-ORD EDIT",
+  "heroSlide2Heading": "MODERN. EFFORTLESS. YOURS.",
+  "heroSlide2Subheading": "Contemporary silhouettes designed for everyday elegance.",
+  "heroSlide3Eyebrow": "TIMELESS INDIAN",
+  "heroSlide3Heading": "MADE FOR EVERY MOMENT.",
+  "heroSlide3Subheading": "Refined Indian silhouettes for celebrations and everyday occasions.",
+  "brandStoryTitle": "MADE FOR YOUR EVERYDAY ELEGANCE",
+  "brandStoryParagraph1": "Born from a desire to move beyond heavy occasion-only ornamentation, AABHA reimagines Indian textile heritage for the rhythm of modern life. Our collection brings together panelled Anarkalis, three-piece Chanderi ensembles, tailored Khadi co-ord sets, and authentic hand-embroidered Chikankari.",
+  "brandStoryParagraph2": "Every garment is tailored with French seams, deep concealed pockets, and soft cotton mulmul linings—silhouettes that feel as natural in morning light as they do at an intimate evening gathering."
 }

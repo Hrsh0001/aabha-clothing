@@ -28,8 +28,8 @@ interface ProductDetailPageProps {
   onBackToShop: () => void;
   onSelectCategory: (category: ProductCategory) => void;
   onSelectProduct: (product: Product) => void;
-  onAddToCart: (product: Product, size: GarmentSize, quantity: number) => void;
-  onBuyNow: (product: Product, size: GarmentSize, quantity: number) => void;
+  onAddToCart: (product: Product, size: GarmentSize, quantity: number, color?: string) => void;
+  onBuyNow: (product: Product, size: GarmentSize, quantity: number, color?: string) => void;
   onToggleWishlist: (productId: string, e: React.MouseEvent) => void;
   onQuickAdd: (product: Product, size: GarmentSize, e: React.MouseEvent) => void;
   onAddReview: (productId: string, review: Omit<ProductReview, 'id' | 'date'>) => void;
@@ -50,6 +50,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<GarmentSize>('S');
+  const [selectedColor, setSelectedColor] = useState<string>(
+    product.colors && product.colors.length > 0 ? product.colors[0].name : product.colorName
+  );
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
@@ -72,12 +75,17 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setActiveImageIndex(0);
     setQuantity(1);
     setPinStatus(null);
+    if (product.colors && product.colors.length > 0) {
+      setSelectedColor(product.colors[0].name);
+    } else {
+      setSelectedColor(product.colorName);
+    }
     if (product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0) {
       if (!product.sizes.includes(selectedSize)) {
         setSelectedSize(product.sizes[0] as GarmentSize);
       }
     }
-  }, [product.id, product.sizes]);
+  }, [product.id, product.sizes, product.colors, product.colorName]);
 
   React.useEffect(() => {
     if (!sizeGuideOpen) return;
@@ -95,30 +103,59 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       : null;
 
   const normalizedGallery = React.useMemo(() => {
+    let items: { url: string; label: string; focalClass: string }[] = [];
     if (!product.gallery || !Array.isArray(product.gallery) || product.gallery.length === 0) {
-      return [
+      items = [
         {
-          url: product.primaryImage || '/images/hero_editorial_banner_1791119088652.jpg',
+          url: product.primaryImage || '',
           label: 'Full Studio View',
           focalClass: 'object-center',
         },
       ];
-    }
-    return product.gallery.map((item: any, idx: number) => {
-      if (typeof item === 'string') {
+    } else {
+      items = product.gallery.map((item: any, idx: number) => {
+        if (typeof item === 'string') {
+          return {
+            url: item,
+            label: `Studio View ${idx + 1}`,
+            focalClass: 'object-center',
+          };
+        }
         return {
-          url: item,
-          label: `Studio View ${idx + 1}`,
-          focalClass: 'object-center',
+          url: item.url || product.primaryImage || '',
+          label: item.label || `Studio View ${idx + 1}`,
+          focalClass: item.focalClass || 'object-center',
         };
+      });
+    }
+
+    // Ensure any color variant images exist in the gallery so clicking switches cleanly
+    if (product.colors && Array.isArray(product.colors)) {
+      const existingUrls = new Set(items.map((i) => i.url));
+      product.colors.forEach((c) => {
+        if (c.imageUrl && !existingUrls.has(c.imageUrl)) {
+          items.push({
+            url: c.imageUrl,
+            label: `${c.name} Shade`,
+            focalClass: 'object-center',
+          });
+          existingUrls.add(c.imageUrl);
+        }
+      });
+    }
+
+    return items;
+  }, [product.gallery, product.primaryImage, product.colors]);
+
+  const handleColorClick = (color: { name: string; hex: string; imageUrl?: string }) => {
+    setSelectedColor(color.name);
+    if (color.imageUrl) {
+      const idx = normalizedGallery.findIndex((g) => g.url === color.imageUrl);
+      if (idx !== -1) {
+        setActiveImageIndex(idx);
       }
-      return {
-        url: item.url || product.primaryImage,
-        label: item.label || `Studio View ${idx + 1}`,
-        focalClass: item.focalClass || 'object-center',
-      };
-    });
-  }, [product.gallery, product.primaryImage]);
+    }
+  };
 
   const currentGalleryItem = normalizedGallery[activeImageIndex] || normalizedGallery[0];
   const availableSizes =
@@ -145,7 +182,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleAddClick = () => {
     if (!product.inStock) return;
-    onAddToCart(product, selectedSize, quantity);
+    onAddToCart(product, selectedSize, quantity, selectedColor);
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1600);
   };
@@ -237,6 +274,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     <EditorialImage
                       src={item.url}
                       alt={`${product.name} — ${item.label}`}
+                      priority={idx < 4}
                       containerClassName="w-full h-full"
                       className={`w-full h-full object-cover ${item.focalClass || 'object-center'}`}
                     />
@@ -254,9 +292,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <EditorialImage
                   src={currentGalleryItem.url}
                   alt={`${product.name} — ${currentGalleryItem.label}`}
+                  fallbackLabel={product.name}
                   priority={true}
                   containerClassName="w-full h-full"
-                  className={`w-full h-full object-cover transition-transform duration-700 ${
+                  className={`w-full h-full object-cover transition-transform duration-500 ${
                     currentGalleryItem.focalClass || 'object-center'
                   }`}
                 />
@@ -313,21 +352,51 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </p>
           </div>
 
-          {/* Shade & Textile Provenance */}
-          <div className="py-5 border-y border-[#ECE6DD] flex items-center justify-between">
-            <div>
-              <span className="text-[11px] tracking-[0.14em] uppercase text-[#7C736A] block mb-1">
-                Textile & Shade
-              </span>
-              <span className="text-sm font-normal text-[#1E1B18]">
-                {product.colorName} · {product.fabric}
-              </span>
+          {/* Shade & Textile Provenance / Interactive Color Swatches */}
+          <div className="py-5 border-y border-[#ECE6DD] space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] tracking-[0.14em] uppercase text-[#7C736A] block mb-0.5">
+                  Color / Shade
+                </span>
+                <span className="text-sm font-medium text-[#1E1B18]">
+                  {selectedColor} <span className="font-light text-[#7C736A]">· {product.fabric}</span>
+                </span>
+              </div>
+              {(!product.colors || product.colors.length === 0) && (
+                <span
+                  className="w-7 h-7 rounded-full border border-[#1E1B18]/15 shrink-0 shadow-xs"
+                  style={{ backgroundColor: product.colorHex }}
+                  title={product.colorName}
+                />
+              )}
             </div>
-            <span
-              className="w-6 h-6 rounded-full border border-[#1E1B18]/15 shrink-0"
-              style={{ backgroundColor: product.colorHex }}
-              title={product.colorName}
-            />
+
+            {product.colors && product.colors.length > 0 && (
+              <div className="flex items-center gap-3 pt-1">
+                {product.colors.map((c) => {
+                  const isSelected = selectedColor === c.name;
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => handleColorClick(c)}
+                      title={`${c.name}${isSelected ? ' (Selected)' : ''}`}
+                      className={`relative p-0.5 rounded-full transition-all cursor-pointer ${
+                        isSelected
+                          ? 'ring-2 ring-[#1E1B18] ring-offset-2 ring-offset-[#FAF8F5]'
+                          : 'hover:opacity-80'
+                      }`}
+                    >
+                      <span
+                        className="w-7 h-7 rounded-full border border-[#1E1B18]/20 block shadow-xs"
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Size Selector & Size Guide Trigger */}
@@ -437,7 +506,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               disabled={!product.inStock}
               onClick={() => {
                 if (!product.inStock) return;
-                onBuyNow(product, selectedSize, quantity);
+                onBuyNow(product, selectedSize, quantity, selectedColor);
               }}
               className="w-full py-4 px-6 border border-[#231F1D] bg-transparent text-[#1E1B18] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -751,29 +820,31 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       </section>
 
       {/* Related Products Section — Clean 2-Column Mobile Grid */}
-      <section className="mt-24 sm:mt-32 pt-16 sm:pt-20 border-t border-[#ECE6DD]">
-        <div className="mb-10 sm:mb-14">
-          <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
-            Complete The Wardrobe
-          </p>
-          <h2 className="font-serif text-3xl sm:text-4xl text-[#1E1B18] font-normal">
-            Related Products
-          </h2>
-        </div>
+      {relatedProducts.length > 0 && (
+        <section className="mt-24 sm:mt-32 pt-16 sm:pt-20 border-t border-[#ECE6DD]">
+          <div className="mb-10 sm:mb-14">
+            <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
+              Complete The Wardrobe
+            </p>
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#1E1B18] font-normal">
+              Related Products
+            </h2>
+          </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 sm:gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-14">
-          {relatedProducts.map((rel) => (
-            <ProductCard
-              key={rel.id}
-              product={rel}
-              isWishlisted={wishlistIds.includes(rel.id)}
-              onSelectProduct={onSelectProduct}
-              onToggleWishlist={onToggleWishlist}
-              onQuickAdd={onQuickAdd}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 sm:gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-14">
+            {relatedProducts.map((rel) => (
+              <ProductCard
+                key={rel.id}
+                product={rel}
+                isWishlisted={wishlistIds.includes(rel.id)}
+                onSelectProduct={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                onQuickAdd={onQuickAdd}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Interactive Size Guide Modal */}
       {sizeGuideOpen && (

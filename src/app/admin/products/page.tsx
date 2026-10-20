@@ -68,15 +68,6 @@ interface ProductItem {
   sizes: string[];
 }
 
-const PRESET_IMAGES = [
-  { label: 'Ivory Kurta', url: '/images/product_kurta_ivory_1791119105107.jpg' },
-  { label: 'Sand Kurta Set', url: '/images/product_kurtaset_sand_1791119136277.jpg' },
-  { label: 'Ochre Dress', url: '/images/product_dress_ochre_1791119165890.jpg' },
-  { label: 'Charcoal Co-ords', url: '/images/product_coords_charcoal_1791119178003.jpg' },
-  { label: 'Olive Kurta', url: '/images/product_kurta_olive_1791119121380.jpg' },
-  { label: 'Rosewood Set', url: '/images/product_kurtaset_rosewood_1791119152298.jpg' },
-];
-
 const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
 const PRODUCTS_PER_PAGE = 8;
 
@@ -117,8 +108,8 @@ export default function AdminProductsPage() {
   const [category, setCategory] = useState('Anarkali');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
-  const [primaryImage, setPrimaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
-  const [secondaryImage, setSecondaryImage] = useState('/images/hero_editorial_banner_1791119088652.jpg');
+  const [primaryImage, setPrimaryImage] = useState('');
+  const [secondaryImage, setSecondaryImage] = useState('');
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [newGalleryUrl, setNewGalleryUrl] = useState('');
   const [newGalleryLabel, setNewGalleryLabel] = useState('');
@@ -152,11 +143,12 @@ export default function AdminProductsPage() {
   const getCurrentValues = (overrides?: Partial<ProductFormValues>): ProductFormValues => ({
     name,
     category,
+    sku: editingProduct?.sku || 'AB-NEW-001',
     price,
     originalPrice,
     fabric,
     description,
-    selectedSizes,
+    sizes: selectedSizes,
     primaryImage,
     gallery,
     ...overrides,
@@ -322,7 +314,7 @@ export default function AdminProductsPage() {
       let added = 0;
       const runtimeErrors: string[] = [...batchResult.errors];
       for (let i = 0; i < batchResult.validFiles.length; i++) {
-        const file = batchResult.validFiles[i];
+        const file = batchResult.validFiles[i] as File;
         const data = await uploadAdminImage(file, getUploadHeaders());
         if (data.success && data.imageUrl) {
           const uploadedUrl = data.imageUrl;
@@ -411,14 +403,10 @@ export default function AdminProductsPage() {
   };
 
   const handleRemoveGalleryItem = (index: number) => {
-    if (gallery.length <= 1) {
-      showToast('A garment must retain at least one photo.');
-      return;
-    }
     setGallery((prev) => {
       const updated = prev.filter((_, idx) => idx !== index);
-      if (index === 0 && updated[0]) {
-        setPrimaryImage(updated[0].url);
+      if (index === 0) {
+        setPrimaryImage(updated[0]?.url || '');
       }
       return updated;
     });
@@ -463,12 +451,9 @@ export default function AdminProductsPage() {
     setCategory('Anarkali');
     setPrice('');
     setOriginalPrice('');
-    const defaultLead = '/images/product_kurta_ivory_1791119105107.jpg';
-    setPrimaryImage(defaultLead);
-    setSecondaryImage(defaultLead);
-    setGallery([
-      { url: defaultLead, label: 'Full Studio Silhouette', focalClass: 'object-center' },
-    ]);
+    setPrimaryImage('');
+    setSecondaryImage('');
+    setGallery([]);
     setFabric('Pure Handloom Chanderi Silk');
     setDescription('');
     setSelectedSizes(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
@@ -537,7 +522,7 @@ export default function AdminProductsPage() {
   const toggleSize = (size: string) => {
     setSelectedSizes((prev) => {
       const next = prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size];
-      revalidateField('selectedSizes', { selectedSizes: next });
+      revalidateField('sizes', { sizes: next });
       return next;
     });
   };
@@ -548,7 +533,7 @@ export default function AdminProductsPage() {
     if (!selectedSizes.includes(cleaned)) {
       setSelectedSizes((prev) => {
         const next = [...prev, cleaned];
-        revalidateField('selectedSizes', { selectedSizes: next });
+        revalidateField('sizes', { sizes: next });
         return next;
       });
     }
@@ -1274,7 +1259,7 @@ export default function AdminProductsPage() {
               {/* SIZE INVENTORY ORGANIZER */}
               <div
                 className={`p-4 bg-[#F3EFEA] border space-y-3 ${
-                  errors.selectedSizes ? 'border-[#C62828]' : 'border-[#E0D8CE]'
+                  errors.sizes ? 'border-[#C62828]' : 'border-[#E0D8CE]'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -1295,10 +1280,10 @@ export default function AdminProductsPage() {
                   </span>
                 </div>
 
-                {errors.selectedSizes && (
+                {errors.sizes && (
                   <p className="text-[11px] text-[#C62828] font-medium flex items-center gap-1 bg-[#FFF5F5] border border-[#FFCDD2] p-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    {errors.selectedSizes}
+                    {errors.sizes}
                   </p>
                 )}
 
@@ -1476,15 +1461,24 @@ export default function AdminProductsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-[#FAF8F5] border border-[#E0D8CE]">
                   {/* Primary Cover Role */}
                   <div className="flex items-center gap-3">
-                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
-                      <img
-                        src={gallery[0]?.url || primaryImage}
-                        alt="Primary Cover"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-0 inset-x-0 bg-[#231F1D]/85 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
-                        COVER
-                      </span>
+                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden flex items-center justify-center">
+                      {(gallery[0]?.url || primaryImage) ? (
+                        <>
+                          <img
+                            src={gallery[0]?.url || primaryImage}
+                            alt="Primary Cover"
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-0 inset-x-0 bg-[#231F1D]/85 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
+                            COVER
+                          </span>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-[#ECE6DD]">
+                          <Camera className="w-4 h-4 text-[#A89F91]" />
+                          <span className="text-[8px] text-[#7C736A] mt-0.5">No Cover</span>
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-1.5">
@@ -1492,7 +1486,7 @@ export default function AdminProductsPage() {
                         <span className="text-xs font-medium text-[#1E1B18]">Catalog Cover Photo</span>
                       </div>
                       <p className="text-[10px] text-[#7C736A] truncate">
-                        Position #1 in gallery: {gallery[0]?.label || 'Full Studio Silhouette'}
+                        {gallery[0]?.label || (gallery[0]?.url ? 'Position #1 in gallery' : 'No photo uploaded yet')}
                       </p>
                       <button
                         type="button"
@@ -1501,22 +1495,31 @@ export default function AdminProductsPage() {
                         className="text-[10px] text-[#6E5043] font-medium hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Upload className="w-2.5 h-2.5" />
-                        {uploadingImage ? 'Uploading...' : 'Replace Cover Image'}
+                        {uploadingImage ? 'Uploading...' : (gallery[0]?.url ? 'Replace Cover Image' : 'Upload Cover Image')}
                       </button>
                     </div>
                   </div>
 
                   {/* Secondary Hover Drape Role */}
                   <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-[#E0D8CE] pt-2 sm:pt-0 sm:pl-3">
-                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
-                      <img
-                        src={secondaryImage}
-                        alt="Hover Drape"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-0 inset-x-0 bg-[#6E5043]/90 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
-                        HOVER
-                      </span>
+                    <div className="relative aspect-[3/4] w-14 shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden flex items-center justify-center">
+                      {secondaryImage ? (
+                        <>
+                          <img
+                            src={secondaryImage}
+                            alt="Hover Drape"
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-0 inset-x-0 bg-[#6E5043]/90 text-[#FAF8F5] text-[8px] font-mono text-center py-0.5">
+                            HOVER
+                          </span>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-[#ECE6DD]">
+                          <Sparkles className="w-4 h-4 text-[#A89F91]" />
+                          <span className="text-[8px] text-[#7C736A] mt-0.5">No Drape</span>
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-1.5">
@@ -1533,7 +1536,7 @@ export default function AdminProductsPage() {
                         className="text-[10px] text-[#6E5043] font-medium hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Upload className="w-2.5 h-2.5" />
-                        {uploadingSecondary ? 'Uploading...' : 'Replace Hover Drape'}
+                        {uploadingSecondary ? 'Uploading...' : (secondaryImage ? 'Replace Hover Drape' : 'Upload Hover Drape')}
                       </button>
                     </div>
                   </div>
@@ -1549,8 +1552,10 @@ export default function AdminProductsPage() {
                   </div>
 
                   {gallery.length === 0 ? (
-                    <div className="py-8 text-center bg-[#FAF8F5] border border-dashed border-[#D5CCC0]">
-                      <p className="text-xs text-[#7C736A]">No gallery photos yet. Upload photos above.</p>
+                    <div className="py-10 text-center bg-[#FAF8F5] border border-dashed border-[#D5CCC0] p-6 space-y-1">
+                      <Camera className="w-6 h-6 text-[#A89F91] mx-auto mb-1" />
+                      <p className="text-xs font-medium text-[#1E1B18]">No photos uploaded yet</p>
+                      <p className="text-[11px] text-[#7C736A]">Upload high-resolution photography using the button above.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto p-1">
@@ -1695,38 +1700,6 @@ export default function AdminProductsPage() {
                       })}
                     </div>
                   )}
-                </div>
-
-                {/* Preset Editorial Asset Library */}
-                <div className="pt-2 border-t border-[#E0D8CE]">
-                  <p className="text-[11px] text-[#7C736A] mb-1.5">
-                    Or quickly add angles from high-resolution editorial asset library:
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {PRESET_IMAGES.map((preset) => (
-                      <button
-                        key={preset.url}
-                        type="button"
-                        onClick={() =>
-                          setGallery((prev) => [
-                            ...prev,
-                            { url: preset.url, label: preset.label, focalClass: 'object-center' },
-                          ])
-                        }
-                        title={`Click to add ${preset.label} to gallery`}
-                        className="group aspect-[3/4] overflow-hidden border border-[#D5CCC0] relative cursor-pointer hover:border-[#1E1B18] transition-colors"
-                      >
-                        <img
-                          src={preset.url}
-                          alt={preset.label}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className="absolute bottom-0 inset-x-0 bg-[#1E1B18]/85 text-[#FAF8F5] text-[8px] truncate px-1 py-0.5 text-center">
-                          + {preset.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 

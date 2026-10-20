@@ -36,10 +36,10 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => 
         </div>
         <div className="lg:col-span-5 space-y-6">
           <h2 className="font-serif text-3xl text-[#1E1B18] font-normal">
-            Seventeen Foundational Silhouettes.
+            Handcrafted Foundational Silhouettes.
           </h2>
           <p className="text-sm sm:text-base text-[#4A433D] font-light leading-relaxed">
-            Instead of producing hundreds of fleeting styles each month, our inaugural edition consists of strictly seventeen considered garments across four categories: Anarkali (2), 3-Piece Dresses (5), Co-ord Sets (9), and Chikankari Suit (1).
+            Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.
           </p>
           <div className="space-y-4 pt-4 border-t border-[#ECE6DD] text-xs sm:text-sm">
             <div>

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getUploadedImage } from '../../../../lib/image-store';
 
+const CACHE_CONTROL_HEADER =
+  'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable';
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -24,12 +27,31 @@ export async function GET(
       );
     }
 
+    const ifNoneMatch = request.headers.get('if-none-match');
+    if (
+      ifNoneMatch &&
+      (ifNoneMatch === '*' ||
+        ifNoneMatch === img.etag ||
+        ifNoneMatch.includes(img.etag) ||
+        ifNoneMatch.replace(/^W\//, '') === img.etag ||
+        ifNoneMatch.replace(/"/g, '') === img.etag.replace(/"/g, ''))
+    ) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: img.etag,
+          'Cache-Control': CACHE_CONTROL_HEADER,
+        },
+      });
+    }
+
     return new NextResponse(new Uint8Array(img.buffer), {
       status: 200,
       headers: {
         'Content-Type': img.mimeType,
         'Content-Length': String(img.buffer.length),
-        'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable',
+        ETag: img.etag,
+        'Cache-Control': CACHE_CONTROL_HEADER,
       },
     });
   } catch (err) {

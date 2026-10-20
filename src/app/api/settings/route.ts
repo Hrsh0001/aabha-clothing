@@ -8,17 +8,38 @@ import { persistImageUrlForCloud } from '../../../lib/image-store';
 export interface SiteSettings {
   logoUrl: string;
   heroBanner: string;
+  heroBannerMobile?: string;
   heroCoords: string;
+  heroCoordsMobile?: string;
   heroEthnic: string;
+  heroEthnicMobile?: string;
+  whatsappNumber?: string;
   brandStory: string;
   igPhotos: string[];
+  announcementText?: string;
+  heroSlide1Eyebrow?: string;
+  heroSlide1Heading?: string;
+  heroSlide1Subheading?: string;
+  heroSlide2Eyebrow?: string;
+  heroSlide2Heading?: string;
+  heroSlide2Subheading?: string;
+  heroSlide3Eyebrow?: string;
+  heroSlide3Heading?: string;
+  heroSlide3Subheading?: string;
+  brandStoryTitle?: string;
+  brandStoryParagraph1?: string;
+  brandStoryParagraph2?: string;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
   logoUrl: '/logo.svg',
   heroBanner: '/images/hero_editorial_banner_1791119088652.jpg',
+  heroBannerMobile: '',
   heroCoords: '/images/hero_slide_coords_1791228726563.jpg',
+  heroCoordsMobile: '',
   heroEthnic: '/images/hero_slide_ethnic_1791228741882.jpg',
+  heroEthnicMobile: '',
+  whatsappNumber: '919876543210',
   brandStory: '/images/brand_story_editorial_1791119191742.jpg',
   igPhotos: [
     '/images/product_kurta_ivory_1791119105107.jpg',
@@ -28,34 +49,25 @@ const DEFAULT_SETTINGS: SiteSettings = {
     '/images/product_kurta_olive_1791119121380.jpg',
     '/images/product_kurtaset_rosewood_1791119152298.jpg',
   ],
+  announcementText: 'Complimentary express shipping across India on orders above ₹1,999 · Artisan Handcrafted',
+  heroSlide1Eyebrow: 'INAUGURAL EDIT · HANDLOOM',
+  heroSlide1Heading: 'EFFORTLESSLY INDIAN.',
+  heroSlide1Subheading: 'Modern silhouettes. Timeless elegance.',
+  heroSlide2Eyebrow: 'THE CO-ORD EDIT',
+  heroSlide2Heading: 'MODERN. EFFORTLESS. YOURS.',
+  heroSlide2Subheading: 'Contemporary silhouettes designed for everyday elegance.',
+  heroSlide3Eyebrow: 'TIMELESS INDIAN',
+  heroSlide3Heading: 'MADE FOR EVERY MOMENT.',
+  heroSlide3Subheading: 'Refined Indian silhouettes for celebrations and everyday occasions.',
+  brandStoryTitle: 'MADE FOR YOUR EVERYDAY ELEGANCE',
+  brandStoryParagraph1: 'Born from a desire to move beyond heavy occasion-only ornamentation, AABHA reimagines Indian textile heritage for the rhythm of modern life. Our collection brings together panelled Anarkalis, three-piece Chanderi ensembles, tailored Khadi co-ord sets, and authentic hand-embroidered Chikankari.',
+  brandStoryParagraph2: 'Every garment is tailored with French seams, deep concealed pockets, and soft cotton mulmul linings—silhouettes that feel as natural in morning light as they do at an intimate evening gathering.',
 };
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemorySettingsCache: SiteSettings | null = null;
-let isSettingsTableInitialized = false;
-
-async function ensureSettingsTable(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isSettingsTableInitialized) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "SiteSetting" (
-          "id" TEXT NOT NULL,
-          "data" JSONB NOT NULL,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      isSettingsTableInitialized = true;
-    }
-    return true;
-  } catch (err) {
-    console.warn('SiteSetting table init notice:', err);
-    return true;
-  }
-}
 
 function ensureSettingsFile(): void {
   try {
@@ -101,15 +113,14 @@ function saveLocalSettings(settings: SiteSettings): void {
 // GET /api/settings — Fetch active branding & section images
 export async function GET() {
   try {
-    const dbReady = await ensureSettingsTable();
-    if (dbReady && prisma) {
+    if (prisma) {
       try {
-        const rows = await prisma.$queryRawUnsafe<{ data: any }[]>(
-          `SELECT "data" FROM "SiteSetting" WHERE "id" = 'site_branding' LIMIT 1`
-        );
-        if (rows && rows.length > 0 && rows[0].data) {
+        const row = await prisma.siteSetting.findUnique({
+          where: { id: 'site_branding' },
+        });
+        if (row && row.data) {
           const parsed =
-            typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+            typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
           const merged: SiteSettings = { ...DEFAULT_SETTINGS, ...parsed };
           inMemorySettingsCache = merged;
           return NextResponse.json({ success: true, settings: merged });
@@ -156,24 +167,48 @@ export async function POST(request: Request) {
       logoUrl: (await persistImageUrlForCloud(rawUpdated.logoUrl)) || DEFAULT_SETTINGS.logoUrl,
       heroBanner:
         (await persistImageUrlForCloud(rawUpdated.heroBanner)) || DEFAULT_SETTINGS.heroBanner,
+      heroBannerMobile: rawUpdated.heroBannerMobile
+        ? (await persistImageUrlForCloud(rawUpdated.heroBannerMobile)) || rawUpdated.heroBannerMobile
+        : '',
       heroCoords:
         (await persistImageUrlForCloud(rawUpdated.heroCoords)) || DEFAULT_SETTINGS.heroCoords,
+      heroCoordsMobile: rawUpdated.heroCoordsMobile
+        ? (await persistImageUrlForCloud(rawUpdated.heroCoordsMobile)) || rawUpdated.heroCoordsMobile
+        : '',
       heroEthnic:
         (await persistImageUrlForCloud(rawUpdated.heroEthnic)) || DEFAULT_SETTINGS.heroEthnic,
+      heroEthnicMobile: rawUpdated.heroEthnicMobile
+        ? (await persistImageUrlForCloud(rawUpdated.heroEthnicMobile)) || rawUpdated.heroEthnicMobile
+        : '',
+      whatsappNumber:
+        rawUpdated.whatsappNumber !== undefined
+          ? rawUpdated.whatsappNumber
+          : DEFAULT_SETTINGS.whatsappNumber,
       brandStory:
         (await persistImageUrlForCloud(rawUpdated.brandStory)) || DEFAULT_SETTINGS.brandStory,
       igPhotos: igPhotos.length > 0 ? igPhotos : DEFAULT_SETTINGS.igPhotos,
+      announcementText: rawUpdated.announcementText !== undefined ? rawUpdated.announcementText : DEFAULT_SETTINGS.announcementText,
+      heroSlide1Eyebrow: rawUpdated.heroSlide1Eyebrow !== undefined ? rawUpdated.heroSlide1Eyebrow : DEFAULT_SETTINGS.heroSlide1Eyebrow,
+      heroSlide1Heading: rawUpdated.heroSlide1Heading !== undefined ? rawUpdated.heroSlide1Heading : DEFAULT_SETTINGS.heroSlide1Heading,
+      heroSlide1Subheading: rawUpdated.heroSlide1Subheading !== undefined ? rawUpdated.heroSlide1Subheading : DEFAULT_SETTINGS.heroSlide1Subheading,
+      heroSlide2Eyebrow: rawUpdated.heroSlide2Eyebrow !== undefined ? rawUpdated.heroSlide2Eyebrow : DEFAULT_SETTINGS.heroSlide2Eyebrow,
+      heroSlide2Heading: rawUpdated.heroSlide2Heading !== undefined ? rawUpdated.heroSlide2Heading : DEFAULT_SETTINGS.heroSlide2Heading,
+      heroSlide2Subheading: rawUpdated.heroSlide2Subheading !== undefined ? rawUpdated.heroSlide2Subheading : DEFAULT_SETTINGS.heroSlide2Subheading,
+      heroSlide3Eyebrow: rawUpdated.heroSlide3Eyebrow !== undefined ? rawUpdated.heroSlide3Eyebrow : DEFAULT_SETTINGS.heroSlide3Eyebrow,
+      heroSlide3Heading: rawUpdated.heroSlide3Heading !== undefined ? rawUpdated.heroSlide3Heading : DEFAULT_SETTINGS.heroSlide3Heading,
+      heroSlide3Subheading: rawUpdated.heroSlide3Subheading !== undefined ? rawUpdated.heroSlide3Subheading : DEFAULT_SETTINGS.heroSlide3Subheading,
+      brandStoryTitle: rawUpdated.brandStoryTitle !== undefined ? rawUpdated.brandStoryTitle : DEFAULT_SETTINGS.brandStoryTitle,
+      brandStoryParagraph1: rawUpdated.brandStoryParagraph1 !== undefined ? rawUpdated.brandStoryParagraph1 : DEFAULT_SETTINGS.brandStoryParagraph1,
+      brandStoryParagraph2: rawUpdated.brandStoryParagraph2 !== undefined ? rawUpdated.brandStoryParagraph2 : DEFAULT_SETTINGS.brandStoryParagraph2,
     };
 
-    const dbReady = await ensureSettingsTable();
-    if (dbReady && prisma) {
+    if (prisma) {
       try {
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-           VALUES ('site_branding', $1::jsonb, CURRENT_TIMESTAMP)
-           ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-          JSON.stringify(updated)
-        );
+        await prisma.siteSetting.upsert({
+          where: { id: 'site_branding' },
+          update: { data: updated as any },
+          create: { id: 'site_branding', data: updated as any },
+        });
       } catch (dbErr) {
         console.warn('Database settings write notice:', dbErr);
       }

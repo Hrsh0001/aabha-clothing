@@ -7,6 +7,7 @@ import { EditorialImage } from './EditorialImage';
 interface ProductCardProps {
   product: Product;
   isWishlisted: boolean;
+  priority?: boolean;
   onSelectProduct: (product: Product) => void;
   onToggleWishlist: (productId: string, e: React.MouseEvent) => void;
   onQuickAdd: (product: Product, size: GarmentSize, e: React.MouseEvent) => void;
@@ -15,6 +16,7 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   isWishlisted,
+  priority = false,
   onSelectProduct,
   onToggleWishlist,
   onQuickAdd,
@@ -60,8 +62,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           src={product.primaryImage}
           alt={product.name}
           fallbackLabel={product.name}
+          priority={priority}
           containerClassName="w-full h-full"
-          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${
+          className={`w-full h-full object-cover transition-transform duration-500 ease-out ${
             isHovered ? 'scale-[1.03]' : 'scale-100'
           }`}
         />
@@ -153,6 +156,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <h3 className="font-serif text-[17px] sm:text-xl font-normal text-[#1E1B18] group-hover:text-[#6E5043] transition-colors leading-snug">
           {product.name}
         </h3>
+
+        {/* Mini Color Dots */}
+        {product.colors && product.colors.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-1.5 mb-0.5">
+            {product.colors.map((c, i) => (
+              <span
+                key={`${c.name}-${i}`}
+                title={c.name}
+                className="w-2.5 h-2.5 rounded-full border border-[#1E1B18]/20 shrink-0 inline-block shadow-2xs"
+                style={{ backgroundColor: c.hex }}
+              />
+            ))}
+            <span className="text-[10px] text-[#7C736A] ml-1 font-mono">
+              {product.colors.length} {product.colors.length === 1 ? 'color' : 'colors'}
+            </span>
+          </div>
+        )}
 
         {/* Price Row */}
         <div className="mt-1.5 sm:mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[14px] sm:text-[15px] tabular-nums">

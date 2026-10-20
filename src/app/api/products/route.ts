@@ -2,12 +2,30 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { prisma } from '../../../lib/db';
-import { PRODUCTS } from '../../../data/products';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
 import { persistImageUrlForCloud } from '../../../lib/image-store';
 
 const PRODUCTS_FILE_PATH = path.join(process.cwd(), 'data', 'products.json');
-const DEFAULT_HERO_PLACEHOLDER = '/images/hero_editorial_banner_1791119088652.jpg';
+
+const LEGACY_STATIC_PRODUCT_IDS = [
+  'anarkali-01',
+  'anarkali-02',
+  'dress-01',
+  'dress-02',
+  'dress-03',
+  'dress-04',
+  'dress-05',
+  'coord-01',
+  'coord-02',
+  'coord-03',
+  'coord-04',
+  'coord-05',
+  'coord-06',
+  'coord-07',
+  'coord-08',
+  'coord-09',
+  'chikankari-01',
+];
 
 function ensureProductsFile(): void {
   try {
@@ -16,7 +34,7 @@ function ensureProductsFile(): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(PRODUCTS_FILE_PATH)) {
-      fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(PRODUCTS, null, 2), 'utf-8');
+      fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     }
   } catch {
     // Read-only filesystem in cloud deployment
@@ -25,24 +43,26 @@ function ensureProductsFile(): void {
 
 // In-memory fallback cache for environments where local filesystem is read-only and DB is absent
 let inMemoryProductsCache: any[] | null = null;
-let isDbSeededThisInstance = false;
-let deletedDefaultProductIdsCache: Set<string> = new Set();
+let isDbInitializedThisInstance = false;
 
 function readLocalProducts(): any[] {
-  if (inMemoryProductsCache && inMemoryProductsCache.length > 0) {
+  if (inMemoryProductsCache !== null) {
     return inMemoryProductsCache;
   }
   try {
     ensureProductsFile();
     if (fs.existsSync(PRODUCTS_FILE_PATH)) {
       const data = fs.readFileSync(PRODUCTS_FILE_PATH, 'utf-8');
-      inMemoryProductsCache = JSON.parse(data);
-      return inMemoryProductsCache || [...PRODUCTS];
+      const parsed = JSON.parse(data);
+      inMemoryProductsCache = Array.isArray(parsed)
+        ? parsed.filter((p: any) => !LEGACY_STATIC_PRODUCT_IDS.includes(p?.id))
+        : [];
+      return inMemoryProductsCache;
     }
-    inMemoryProductsCache = [...PRODUCTS];
+    inMemoryProductsCache = [];
     return inMemoryProductsCache;
   } catch {
-    return inMemoryProductsCache || [...PRODUCTS];
+    return inMemoryProductsCache || [];
   }
 }
 
@@ -59,8 +79,9 @@ function saveLocalProducts(products: any[]): void {
 /**
  * Validates an image URL and rejects truncated/corrupted test Data URLs (< 64 chars),
  * while routing any legacy localhost `/images/garment_*` paths through `/api/images/*`.
+ * Never substitutes a static placeholder image when URL is empty.
  */
-function sanitizeImageUrl(url: any, fallback: string): string {
+function sanitizeImageUrl(url: any, fallback: string = ''): string {
   if (!url || typeof url !== 'string') return fallback;
   const trimmed = url.trim();
   if (!trimmed) return fallback;
@@ -82,8 +103,9 @@ function parseGalleryArray(
   primaryImage: string,
   secondaryImage?: string | null
 ): { url: string; label: string; focalClass: string }[] {
-  const lead = sanitizeImageUrl(primaryImage, DEFAULT_HERO_PLACEHOLDER);
+  const lead = sanitizeImageUrl(primaryImage, '');
   if (!Array.isArray(rawGallery) || rawGallery.length === 0) {
+    if (!lead) return [];
     const fallback = [
       { url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' },
     ];
@@ -102,6 +124,7 @@ function parseGalleryArray(
     .map((item: any, idx: number) => {
       if (typeof item === 'object' && item !== null) {
         const cleanUrl = sanitizeImageUrl(item.url, lead);
+        if (!cleanUrl) return null;
         return {
           url: cleanUrl,
           label:
@@ -117,6 +140,7 @@ function parseGalleryArray(
             const obj = JSON.parse(trimmed);
             if (obj && obj.url) {
               const cleanUrl = sanitizeImageUrl(String(obj.url), lead);
+              if (!cleanUrl) return null;
               return {
                 url: cleanUrl,
                 label:
@@ -131,6 +155,7 @@ function parseGalleryArray(
         }
         if (trimmed) {
           const cleanUrl = sanitizeImageUrl(trimmed, lead);
+          if (!cleanUrl) return null;
           return {
             url: cleanUrl,
             label: idx === 0 ? 'Full Studio Silhouette' : `Studio Angle ${idx + 1}`,
@@ -142,9 +167,8 @@ function parseGalleryArray(
     })
     .filter(Boolean) as { url: string; label: string; focalClass: string }[];
 
-  return parsed.length > 0
-    ? parsed
-    : [{ url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' }];
+  if (parsed.length > 0) return parsed;
+  return lead ? [{ url: lead, label: 'Full Studio Silhouette', focalClass: 'object-center' }] : [];
 }
 
 function serializeGalleryForDb(
@@ -163,34 +187,46 @@ function serializeGalleryForDb(
 }
 
 function normalizeProduct(raw: any): any {
-  const staticMatch = PRODUCTS.find((p) => p.id === raw.id || p.sku === raw.sku);
-  const fallbackLead = staticMatch?.primaryImage || DEFAULT_HERO_PLACEHOLDER;
-  const lead = sanitizeImageUrl(raw.primaryImage, fallbackLead);
-  const rawSec = sanitizeImageUrl(
-    raw.secondaryImage,
-    staticMatch?.secondaryImage || lead
-  );
-  const gallery = parseGalleryArray(
-    raw.gallery && raw.gallery.length > 0 ? raw.gallery : staticMatch?.gallery,
-    lead,
-    rawSec
-  );
+  const lead = sanitizeImageUrl(raw.primaryImage, '');
+  const rawSec = sanitizeImageUrl(raw.secondaryImage, lead);
+  const gallery = parseGalleryArray(raw.gallery, lead, rawSec);
   const primaryImage = sanitizeImageUrl(gallery[0]?.url, lead);
   const secondaryImage = sanitizeImageUrl(
     raw.secondaryImage,
-    gallery[1]?.url || staticMatch?.secondaryImage || primaryImage
+    gallery[1]?.url || primaryImage
   );
-  const fabric = raw.fabric || staticMatch?.fabric || 'Pure Handloom Chanderi Silk';
-  const category = raw.category || staticMatch?.category || 'Anarkali';
+  const fabric = raw.fabric || 'Pure Handloom Chanderi Silk';
+  const category = raw.category || 'Anarkali';
+
+  let colors: Array<{ name: string; hex: string; imageUrl?: string }> | undefined = undefined;
+  if (Array.isArray(raw.colors) && raw.colors.length > 0) {
+    colors = raw.colors;
+  } else if (Array.isArray(raw.highlights)) {
+    const colorMarker = raw.highlights.find(
+      (h: any) => typeof h === 'string' && h.startsWith('__COLORS__:')
+    );
+    if (colorMarker) {
+      try {
+        colors = JSON.parse(colorMarker.slice('__COLORS__:'.length));
+      } catch {}
+    }
+  }
+
+  const highlights = Array.isArray(raw.highlights)
+    ? raw.highlights.filter(
+        (h: any) => typeof h === 'string' && !h.startsWith('__COLORS__:')
+      )
+    : [
+        'Handcrafted artisan detailing',
+        'Breathable natural luxury weave',
+        'Deep concealed side-seam pockets',
+      ];
 
   return {
     id: raw.id,
-    sku: raw.sku || staticMatch?.sku || `AB-${String(raw.id).toUpperCase().slice(0, 8)}`,
-    name: raw.name || staticMatch?.name || 'Handcrafted Silhouette',
-    subtitle:
-      raw.subtitle ||
-      staticMatch?.subtitle ||
-      `${fabric} ${category} silhouette`,
+    sku: raw.sku || `AB-${String(raw.id).toUpperCase().slice(0, 8)}`,
+    name: raw.name || 'Handcrafted Silhouette',
+    subtitle: raw.subtitle || `${fabric} ${category} silhouette`,
     category,
     price: Number(raw.price) || 0,
     originalPrice:
@@ -199,209 +235,69 @@ function normalizeProduct(raw: any): any {
         : undefined,
     colorName:
       raw.colorName ||
-      staticMatch?.colorName ||
       fabric.split(' ').slice(0, 2).join(' ') ||
       'Artisan Handloom',
-    colorHex: raw.colorHex || staticMatch?.colorHex || '#6E5043',
+    colorHex: raw.colorHex || '#6E5043',
+    colors: colors && colors.length > 0 ? colors : undefined,
     fabric,
-    isNewArrival:
-      typeof raw.isNewArrival === 'boolean'
-        ? raw.isNewArrival
-        : staticMatch?.isNewArrival ?? true,
-    isCurated:
-      typeof raw.isCurated === 'boolean' ? raw.isCurated : staticMatch?.isCurated ?? false,
+    isNewArrival: typeof raw.isNewArrival === 'boolean' ? raw.isNewArrival : true,
+    isCurated: typeof raw.isCurated === 'boolean' ? raw.isCurated : false,
     inStock: typeof raw.inStock === 'boolean' ? raw.inStock : true,
     sizes:
       Array.isArray(raw.sizes) && raw.sizes.length > 0
         ? raw.sizes
-        : staticMatch?.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+        : ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
     primaryImage,
     secondaryImage,
     gallery,
     description:
       raw.description ||
-      staticMatch?.description ||
       'Exquisite handcrafted Indian silhouette tailored in breathable natural fibers.',
-    highlights:
-      Array.isArray(raw.highlights) && raw.highlights.length > 0
-        ? raw.highlights
-        : staticMatch?.highlights || [
-            'Handcrafted artisan detailing',
-            'Breathable natural luxury weave',
-            'Deep concealed side-seam pockets',
-          ],
+    highlights: highlights.length > 0 ? highlights : ['Handcrafted artisan detailing'],
     fabricAndCare:
       Array.isArray(raw.fabricAndCare) && raw.fabricAndCare.length > 0
         ? raw.fabricAndCare
-        : staticMatch?.fabricAndCare || [
+        : [
             'Dry clean recommended to preserve natural sheen',
             'Store in breathable cotton muslin bag',
           ],
     sizeAndFit:
-      raw.sizeAndFit ||
-      staticMatch?.sizeAndFit || [
+      raw.sizeAndFit || [
         'Relaxed tailored silhouette',
         'Model is 5\'8" (173 cm) and wears size S',
       ],
     deliveryInfo:
       raw.deliveryInfo ||
-      staticMatch?.deliveryInfo ||
       'Complimentary insured express shipping across India. Dispatched within 24–48 business hours.',
     returnsInfo:
       raw.returnsInfo ||
-      staticMatch?.returnsInfo ||
       'Complimentary 14-day easy returns and doorstep size exchanges.',
-    reviews: Array.isArray(raw.reviews) ? raw.reviews : staticMatch?.reviews || [],
+    reviews: Array.isArray(raw.reviews) ? raw.reviews : [],
   };
 }
 
 /**
- * Ensures the PostgreSQL Product table exists and seeds the 17 default catalog products
- * into Supabase PostgreSQL so the storefront never loses its launch catalog on Vercel production.
- * Isolated try/catch blocks ensure DDL or SiteSetting notices never block Product CRUD operations.
+ * Ensures the PostgreSQL Product table is accessible and purges any legacy auto-seeded static products.
+ * Does not run DDL statements directly to protect PgBouncer connection stability.
  */
-async function ensureProductsDatabaseReady(seedIfNeeded: boolean = true): Promise<boolean> {
+async function ensureProductsDatabaseReady(): Promise<boolean> {
   if (!process.env.DATABASE_URL || !prisma) return false;
-  if (!seedIfNeeded) return true;
+  if (isDbInitializedThisInstance) return true;
 
   try {
-    let count = 0;
-    try {
-      count = await prisma.product.count();
-    } catch {
-      // Table does not exist yet — create it
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "Product" (
-          "id" TEXT NOT NULL,
-          "sku" TEXT NOT NULL,
-          "name" TEXT NOT NULL,
-          "category" TEXT NOT NULL,
-          "price" DOUBLE PRECISION NOT NULL,
-          "originalPrice" DOUBLE PRECISION,
-          "inStock" BOOLEAN NOT NULL DEFAULT true,
-          "isNewArrival" BOOLEAN NOT NULL DEFAULT false,
-          "isCurated" BOOLEAN NOT NULL DEFAULT false,
-          "primaryImage" TEXT NOT NULL,
-          "secondaryImage" TEXT,
-          "gallery" TEXT[] DEFAULT ARRAY[]::TEXT[],
-          "sizes" TEXT[] DEFAULT ARRAY['XS', 'S', 'M', 'L', 'XL', 'XXL']::TEXT[],
-          "description" TEXT NOT NULL DEFAULT '',
-          "fabric" TEXT NOT NULL DEFAULT '',
-          "colorName" TEXT NOT NULL DEFAULT '',
-          "highlights" TEXT[] DEFAULT ARRAY[]::TEXT[],
-          "fabricAndCare" TEXT[] DEFAULT ARRAY[]::TEXT[],
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "Product_sku_key" ON "Product"("sku");
-      `);
-      count = await prisma.product.count();
-    }
-
-    if (!isDbSeededThisInstance) {
-      let needsSeed = count === 0;
-
-      try {
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS "SiteSetting" (
-            "id" TEXT NOT NULL,
-            "data" JSONB NOT NULL,
-            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-          );
-        `);
-
-        const seedMarker = await prisma.$queryRawUnsafe<{ id: string }[]>(
-          `SELECT "id" FROM "SiteSetting" WHERE "id" = 'catalog_seed_v2' LIMIT 1`
-        );
-        if (!seedMarker || seedMarker.length === 0) {
-          needsSeed = true;
-        }
-
-        const deletedRows = await prisma.$queryRawUnsafe<{ data: any }[]>(
-          `SELECT "data" FROM "SiteSetting" WHERE "id" = 'deleted_product_ids' LIMIT 1`
-        );
-        if (deletedRows && deletedRows.length > 0 && Array.isArray(deletedRows[0].data)) {
-          deletedDefaultProductIdsCache = new Set(deletedRows[0].data);
-        }
-      } catch {
-        // Non-fatal if SiteSetting query fails
-      }
-
-      if (needsSeed) {
-        try {
-          const seedRows = PRODUCTS.filter((p) => !deletedDefaultProductIdsCache.has(p.id)).map(
-            (p, index) => ({
-              id: p.id,
-              sku: p.sku,
-              name: p.name,
-              category: p.category,
-              price: p.price,
-              originalPrice: p.originalPrice ?? null,
-              inStock: p.inStock,
-              isNewArrival: p.isNewArrival,
-              isCurated: p.isCurated,
-              primaryImage: p.primaryImage,
-              secondaryImage: p.secondaryImage || p.primaryImage,
-              gallery: serializeGalleryForDb(p.gallery, p.primaryImage, p.secondaryImage),
-              sizes: p.sizes as string[],
-              description: p.description,
-              fabric: p.fabric,
-              colorName: p.colorName || '',
-              highlights: p.highlights || [],
-              fabricAndCare: p.fabricAndCare || [],
-              createdAt: new Date(Date.now() - index * 60_000),
-            })
-          );
-
-          await prisma.product.createMany({
-            data: seedRows,
-            skipDuplicates: true,
-          });
-
-          // Repair anarkali-01 if it was mutated by earlier test scripts with a 36-char dummy base64 string
-          const anarkali01 = await prisma.product.findUnique({ where: { id: 'anarkali-01' } });
-          if (
-            anarkali01 &&
-            anarkali01.primaryImage.startsWith('data:image/') &&
-            anarkali01.primaryImage.length < 200
-          ) {
-            const p0 = PRODUCTS[0];
-            await prisma.product.update({
-              where: { id: 'anarkali-01' },
-              data: {
-                inStock: true,
-                primaryImage: p0.primaryImage,
-                secondaryImage: p0.secondaryImage,
-                gallery: serializeGalleryForDb(p0.gallery, p0.primaryImage, p0.secondaryImage),
-              },
-            });
-          }
-
-          await prisma.$executeRawUnsafe(
-            `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-             VALUES ('catalog_seed_v2', '{"seeded":true}'::jsonb, CURRENT_TIMESTAMP)
-             ON CONFLICT ("id") DO UPDATE SET "updatedAt" = CURRENT_TIMESTAMP`
-          );
-        } catch (seedErr) {
-          console.warn('Catalog seed notice:', seedErr);
-        }
-      }
-
-      isDbSeededThisInstance = true;
-    }
-
+    await prisma.product.deleteMany({
+      where: { id: { in: LEGACY_STATIC_PRODUCT_IDS } },
+    });
+    isDbInitializedThisInstance = true;
     return true;
   } catch (err) {
     console.warn('Database initialization notice:', err);
-    return true; // Allow Prisma operations to attempt execution
+    isDbInitializedThisInstance = true;
+    return true;
   }
 }
 
-// GET /api/products — List all products or query single product by ?id= (Storefront & Admin)
+// GET /api/products — List all dynamic database products or query single product by ?id=
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -423,31 +319,15 @@ export async function GET(request: Request) {
               product: normalizeProduct(single),
             });
           }
+          return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
         } else {
           const dbProducts = await prisma.product.findMany({
             orderBy: { createdAt: 'desc' },
           });
-          if (dbProducts.length > 0) {
-            const normalizedDb = dbProducts.map(normalizeProduct);
-            const existingIds = new Set(normalizedDb.map((p) => p.id));
-            const existingSkus = new Set(normalizedDb.map((p) => p.sku));
-
-            // Ensure all non-deleted default catalog products are always present
-            for (const defaultProd of PRODUCTS) {
-              if (
-                !existingIds.has(defaultProd.id) &&
-                !existingSkus.has(defaultProd.sku) &&
-                !deletedDefaultProductIdsCache.has(defaultProd.id)
-              ) {
-                normalizedDb.push(normalizeProduct(defaultProd));
-              }
-            }
-
-            return NextResponse.json({
-              success: true,
-              products: normalizedDb,
-            });
-          }
+          return NextResponse.json({
+            success: true,
+            products: dbProducts.map(normalizeProduct),
+          });
         }
       } catch (e) {
         console.warn('Prisma fetch notice, falling back to local cache:', e);
@@ -498,6 +378,7 @@ export async function POST(request: Request) {
       description,
       fabric,
       colorName,
+      colors,
       sizes,
     } = body;
 
@@ -547,29 +428,27 @@ export async function POST(request: Request) {
     }
 
     // Persist any inline Data URLs or local garment paths into cloud PostgreSQL image store
-    const rawLead = (await persistImageUrlForCloud(primaryImage)) || DEFAULT_HERO_PLACEHOLDER;
+    const rawLead = (await persistImageUrlForCloud(primaryImage)) || '';
     const parsedGallery = parseGalleryArray(gallery, rawLead, secondaryImage);
     const cloudGallery: { url: string; label: string; focalClass: string }[] = [];
     for (const item of parsedGallery) {
       const cloudUrl = (await persistImageUrlForCloud(item.url)) || rawLead;
-      cloudGallery.push({
-        url: cloudUrl,
-        label: item.label,
-        focalClass: item.focalClass || 'object-center',
-      });
+      if (cloudUrl) {
+        cloudGallery.push({
+          url: cloudUrl,
+          label: item.label,
+          focalClass: item.focalClass || 'object-center',
+        });
+      }
     }
 
     const leadImg = cloudGallery[0]?.url || rawLead;
-    if (cloudGallery.length > 0 && cloudGallery[0].url !== leadImg) {
+    if (cloudGallery.length > 0 && leadImg && cloudGallery[0].url !== leadImg) {
       cloudGallery[0] = { ...cloudGallery[0], url: leadImg };
     }
 
     const persistedSecondary = await persistImageUrlForCloud(secondaryImage);
-    const drapeImg =
-      persistedSecondary &&
-      !(persistedSecondary === DEFAULT_HERO_PLACEHOLDER && leadImg !== DEFAULT_HERO_PLACEHOLDER)
-        ? persistedSecondary
-        : cloudGallery[1]?.url || leadImg;
+    const drapeImg = persistedSecondary || cloudGallery[1]?.url || leadImg;
 
     const cleanCategoryCode =
       category
@@ -592,6 +471,16 @@ export async function POST(request: Request) {
         ? sizes.map((s: any) => String(s).trim().toUpperCase()).filter(Boolean)
         : ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
+    const resolvedColors = Array.isArray(colors)
+      ? colors
+          .filter((c: any) => c && typeof c.name === 'string' && c.name.trim().length > 0)
+          .map((c: any) => ({
+            name: String(c.name).trim(),
+            hex: String(c.hex || '#6E5043').trim(),
+            ...(c.imageUrl ? { imageUrl: String(c.imageUrl).trim() } : {}),
+          }))
+      : undefined;
+
     const newProduct = {
       id: `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       sku: baseSku,
@@ -613,6 +502,7 @@ export async function POST(request: Request) {
       description: description?.trim() || 'Exquisite handcrafted Indian silhouette.',
       fabric: resolvedFabric,
       colorName: resolvedColorName,
+      colors: resolvedColors,
       highlights: ['Handcrafted detailing', 'Breathable luxury weave', 'Side seam pockets'],
       fabricAndCare: ['Dry clean only', 'Store in cotton muslin bag'],
       sizeAndFit: ['Relaxed tailored silhouette', 'Model is 5ft 8in wearing Size S'],
@@ -621,7 +511,7 @@ export async function POST(request: Request) {
       reviews: [],
     };
 
-    const dbReady = await ensureProductsDatabaseReady(false);
+    const dbReady = await ensureProductsDatabaseReady();
 
     if (dbReady && prisma) {
       try {
@@ -641,6 +531,10 @@ export async function POST(request: Request) {
           newProduct.secondaryImage
         );
 
+        const dbHighlights = resolvedColors && resolvedColors.length > 0
+          ? [...newProduct.highlights, `__COLORS__:${JSON.stringify(resolvedColors)}`]
+          : newProduct.highlights;
+
         const created = await prisma.product.create({
           data: {
             id: newProduct.id,
@@ -659,7 +553,7 @@ export async function POST(request: Request) {
             fabric: newProduct.fabric,
             colorName: newProduct.colorName,
             sizes: newProduct.sizes,
-            highlights: newProduct.highlights,
+            highlights: dbHighlights,
             fabricAndCare: newProduct.fabricAndCare,
           },
         });
@@ -766,17 +660,12 @@ export async function PUT(request: Request) {
       updates.gallery = processedGallery;
     }
 
-    const dbReady = await ensureProductsDatabaseReady(false);
+    const dbReady = await ensureProductsDatabaseReady();
 
     if (dbReady && prisma) {
       try {
         const existingDb = await prisma.product.findUnique({ where: { id } });
-        const staticFallback = PRODUCTS.find((p) => p.id === id);
-        const base = existingDb
-          ? normalizeProduct(existingDb)
-          : staticFallback
-          ? normalizeProduct(staticFallback)
-          : null;
+        const base = existingDb ? normalizeProduct(existingDb) : null;
 
         const mergedName =
           updates.name !== undefined ? String(updates.name).trim() : base?.name || 'Garment';
@@ -795,7 +684,7 @@ export async function PUT(request: Request) {
         const mergedPrimaryImage =
           updates.primaryImage !== undefined
             ? updates.primaryImage
-            : base?.primaryImage || DEFAULT_HERO_PLACEHOLDER;
+            : base?.primaryImage || '';
         const mergedSecondaryImage =
           updates.secondaryImage !== undefined
             ? updates.secondaryImage
@@ -836,6 +725,23 @@ export async function PUT(request: Request) {
           mergedSecondaryImage
         );
 
+        const incomingColors = Array.isArray(updates.colors)
+          ? updates.colors
+              .filter((c: any) => c && typeof c.name === 'string' && c.name.trim().length > 0)
+              .map((c: any) => ({
+                name: String(c.name).trim(),
+                hex: String(c.hex || '#6E5043').trim(),
+                ...(c.imageUrl ? { imageUrl: String(c.imageUrl).trim() } : {}),
+              }))
+          : base?.colors;
+
+        const baseHighlights = (base?.highlights || ['Handcrafted detailing', 'Breathable luxury weave'])
+          .filter((h: any) => typeof h === 'string' && !h.startsWith('__COLORS__:'));
+
+        const highlightsWithColors = incomingColors && incomingColors.length > 0
+          ? [...baseHighlights, `__COLORS__:${JSON.stringify(incomingColors)}`]
+          : baseHighlights;
+
         const prismaData = {
           sku: mergedSku,
           name: mergedName,
@@ -850,6 +756,7 @@ export async function PUT(request: Request) {
           description: mergedDescription,
           fabric: mergedFabric,
           colorName: mergedColorName,
+          highlights: highlightsWithColors,
         };
 
         const updated = await prisma.product.upsert({
@@ -858,7 +765,7 @@ export async function PUT(request: Request) {
           create: {
             id,
             ...prismaData,
-            highlights: base?.highlights || ['Handcrafted detailing', 'Breathable luxury weave'],
+            highlights: highlightsWithColors,
             fabricAndCare: base?.fabricAndCare || ['Dry clean recommended'],
           },
         });
@@ -908,6 +815,7 @@ export async function PUT(request: Request) {
       ...existing,
       ...updates,
       gallery: nextGallery,
+      ...(updates.colors !== undefined ? { colors: updates.colors } : {}),
     });
     saveLocalProducts(localProducts);
 
@@ -942,22 +850,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Product ID required' }, { status: 400 });
     }
 
-    deletedDefaultProductIdsCache.add(id);
-
-    const dbReady = await ensureProductsDatabaseReady(false);
+    const dbReady = await ensureProductsDatabaseReady();
 
     if (dbReady && prisma) {
       try {
         await prisma.product.deleteMany({ where: { id } });
-
-        if (PRODUCTS.some((p) => p.id === id)) {
-          await prisma.$executeRawUnsafe(
-            `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-             VALUES ('deleted_product_ids', $1::jsonb, CURRENT_TIMESTAMP)
-             ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-            JSON.stringify(Array.from(deletedDefaultProductIdsCache))
-          );
-        }
       } catch (dbErr) {
         console.warn('Prisma delete fallback notice:', dbErr);
       }

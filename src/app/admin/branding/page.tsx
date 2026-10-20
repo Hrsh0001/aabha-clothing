@@ -175,10 +175,33 @@ export default function AdminBrandingPage() {
       const payload: SiteSettings = {
         logoUrl: await compressDataUrlIfNeeded(settings.logoUrl),
         heroBanner: await compressDataUrlIfNeeded(settings.heroBanner),
+        heroBannerMobile: settings.heroBannerMobile
+          ? await compressDataUrlIfNeeded(settings.heroBannerMobile)
+          : '',
         heroCoords: await compressDataUrlIfNeeded(settings.heroCoords),
+        heroCoordsMobile: settings.heroCoordsMobile
+          ? await compressDataUrlIfNeeded(settings.heroCoordsMobile)
+          : '',
         heroEthnic: await compressDataUrlIfNeeded(settings.heroEthnic),
+        heroEthnicMobile: settings.heroEthnicMobile
+          ? await compressDataUrlIfNeeded(settings.heroEthnicMobile)
+          : '',
+        whatsappNumber: settings.whatsappNumber || '',
         brandStory: await compressDataUrlIfNeeded(settings.brandStory),
         igPhotos: compressedIg,
+        announcementText: settings.announcementText || '',
+        heroSlide1Eyebrow: settings.heroSlide1Eyebrow || '',
+        heroSlide1Heading: settings.heroSlide1Heading || '',
+        heroSlide1Subheading: settings.heroSlide1Subheading || '',
+        heroSlide2Eyebrow: settings.heroSlide2Eyebrow || '',
+        heroSlide2Heading: settings.heroSlide2Heading || '',
+        heroSlide2Subheading: settings.heroSlide2Subheading || '',
+        heroSlide3Eyebrow: settings.heroSlide3Eyebrow || '',
+        heroSlide3Heading: settings.heroSlide3Heading || '',
+        heroSlide3Subheading: settings.heroSlide3Subheading || '',
+        brandStoryTitle: settings.brandStoryTitle || '',
+        brandStoryParagraph1: settings.brandStoryParagraph1 || '',
+        brandStoryParagraph2: settings.brandStoryParagraph2 || '',
       };
 
       const payloadCheck = validateJsonPayloadSize(payload);
@@ -316,6 +339,56 @@ export default function AdminBrandingPage() {
             </div>
           )}
 
+          {/* Section 0: Top Storefront Announcement Bar */}
+          <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-[#7C736A]">Storefront Notice</p>
+              <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
+                Announcement Bar Banner
+              </h2>
+              <p className="text-xs text-[#5C544D] mt-1">
+                The promotional or shipping notice banner displayed across the top of your boutique storefront.
+              </p>
+            </div>
+            <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4">
+              <label className="block text-xs font-medium text-[#1E1B18] mb-1.5">
+                Announcement Bar Text:
+              </label>
+              <input
+                type="text"
+                value={settings.announcementText ?? 'Complimentary express shipping across India on orders above ₹1,999 · Artisan Handcrafted'}
+                onChange={(e) => setSettings({ ...settings, announcementText: e.target.value })}
+                placeholder="e.g. Complimentary express shipping across India on orders above ₹1,999"
+                className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+              />
+            </div>
+          </section>
+
+          {/* Section 0.5: Customer Care & WhatsApp Support */}
+          <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-[#7C736A]">Customer Communication</p>
+              <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
+                Store Customer Support WhatsApp Number
+              </h2>
+              <p className="text-xs text-[#5C544D] mt-1">
+                The official WhatsApp number used for checkout order confirmations, order status inquiries, and customer concierge. Include country code without any + or spaces (e.g. 919876543210).
+              </p>
+            </div>
+            <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4">
+              <label className="block text-xs font-medium text-[#1E1B18] mb-1.5">
+                WhatsApp Support Mobile Number:
+              </label>
+              <input
+                type="text"
+                value={settings.whatsappNumber ?? '919876543210'}
+                onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+                placeholder="e.g. 919876543210"
+                className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] font-mono focus:outline-none focus:border-[#1E1B18]"
+              />
+            </div>
+          </section>
+
           {/* Section 1: Brand Logo */}
           <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-6">
             <div>
@@ -378,15 +451,15 @@ export default function AdminBrandingPage() {
             </div>
           </section>
 
-          {/* Section 2: Hero Carousel Banner Slides */}
+          {/* Section 2: Hero Carousel Banner Slides & Storytelling Texts */}
           <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-6">
             <div>
               <p className="text-xs uppercase tracking-wider text-[#7C736A]">Homepage Top Hero</p>
               <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
-                Hero Slideshow Banners (3 Slides)
+                Hero Slideshow Banners & Headlines (3 Slides)
               </h2>
               <p className="text-xs text-[#5C544D] mt-1">
-                The full-bleed editorial slides rotating at the top of your homepage. Max {MAX_IMAGE_FILE_SIZE_MB} MB per slide.
+                The full-bleed editorial slides and typography rotating at the top of your homepage. Max {MAX_IMAGE_FILE_SIZE_MB} MB per slide.
               </p>
             </div>
 
@@ -413,7 +486,7 @@ export default function AdminBrandingPage() {
                   className="w-full py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {uploadingKey === 'heroBanner' ? 'Uploading...' : 'Change Slide 1'}
+                  {uploadingKey === 'heroBanner' ? 'Uploading...' : 'Change Desktop Photo'}
                 </button>
                 {(errors.heroBanner || fieldUploadErrors.heroBanner) && (
                   <p className="text-xs text-[#C62828] flex items-center gap-1 font-medium" role="alert">
@@ -421,6 +494,74 @@ export default function AdminBrandingPage() {
                     <span>{fieldUploadErrors.heroBanner || errors.heroBanner}</span>
                   </p>
                 )}
+
+                {/* Mobile Phone Banner */}
+                <div className="pt-2 border-t border-[#E0D8CE] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#1E1B18]">📱 Mobile Phone Banner</span>
+                    <span className="text-[10px] text-[#7C736A]">Portrait / Phones</span>
+                  </div>
+                  {settings.heroBannerMobile ? (
+                    <div className="relative aspect-[9/16] max-h-36 w-20 mx-auto bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                      <img src={settings.heroBannerMobile} alt="Mobile Slide 1" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-[#F3EFEA] border border-dashed border-[#D5CCC0] text-center text-[10px] text-[#7C736A]">
+                      No mobile photo uploaded (auto-falls back to desktop banner with responsive auto-framing).
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerFileUpload('heroBannerMobile')}
+                      disabled={uploadingKey === 'heroBannerMobile'}
+                      className="flex-1 py-1.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[#1E1B18] hover:bg-[#ECE6DD] text-[11px] font-medium uppercase tracking-wider transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3 h-3" />
+                      {uploadingKey === 'heroBannerMobile' ? 'Uploading...' : 'Upload Mobile Banner'}
+                    </button>
+                    {settings.heroBannerMobile && (
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, heroBannerMobile: '' })}
+                        className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
+                        title="Remove mobile banner"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-[#E0D8CE]">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Eyebrow Tag:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide1Eyebrow ?? 'INAUGURAL EDIT · HANDLOOM'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide1Eyebrow: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Headline:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide1Heading ?? 'EFFORTLESSLY INDIAN.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide1Heading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Subheading:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide1Subheading ?? 'Modern silhouettes. Timeless elegance.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide1Subheading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Slide 2 */}
@@ -445,7 +586,7 @@ export default function AdminBrandingPage() {
                   className="w-full py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {uploadingKey === 'heroCoords' ? 'Uploading...' : 'Change Slide 2'}
+                  {uploadingKey === 'heroCoords' ? 'Uploading...' : 'Change Desktop Photo'}
                 </button>
                 {(errors.heroCoords || fieldUploadErrors.heroCoords) && (
                   <p className="text-xs text-[#C62828] flex items-center gap-1 font-medium" role="alert">
@@ -453,6 +594,74 @@ export default function AdminBrandingPage() {
                     <span>{fieldUploadErrors.heroCoords || errors.heroCoords}</span>
                   </p>
                 )}
+
+                {/* Mobile Phone Banner */}
+                <div className="pt-2 border-t border-[#E0D8CE] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#1E1B18]">📱 Mobile Phone Banner</span>
+                    <span className="text-[10px] text-[#7C736A]">Portrait / Phones</span>
+                  </div>
+                  {settings.heroCoordsMobile ? (
+                    <div className="relative aspect-[9/16] max-h-36 w-20 mx-auto bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                      <img src={settings.heroCoordsMobile} alt="Mobile Slide 2" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-[#F3EFEA] border border-dashed border-[#D5CCC0] text-center text-[10px] text-[#7C736A]">
+                      No mobile photo uploaded (auto-falls back to desktop banner with responsive auto-framing).
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerFileUpload('heroCoordsMobile')}
+                      disabled={uploadingKey === 'heroCoordsMobile'}
+                      className="flex-1 py-1.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[#1E1B18] hover:bg-[#ECE6DD] text-[11px] font-medium uppercase tracking-wider transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3 h-3" />
+                      {uploadingKey === 'heroCoordsMobile' ? 'Uploading...' : 'Upload Mobile Banner'}
+                    </button>
+                    {settings.heroCoordsMobile && (
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, heroCoordsMobile: '' })}
+                        className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
+                        title="Remove mobile banner"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-[#E0D8CE]">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Eyebrow Tag:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide2Eyebrow ?? 'THE CO-ORD EDIT'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide2Eyebrow: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Headline:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide2Heading ?? 'MODERN. EFFORTLESS. YOURS.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide2Heading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Subheading:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide2Subheading ?? 'Contemporary silhouettes designed for everyday elegance.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide2Subheading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Slide 3 */}
@@ -477,7 +686,7 @@ export default function AdminBrandingPage() {
                   className="w-full py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {uploadingKey === 'heroEthnic' ? 'Uploading...' : 'Change Slide 3'}
+                  {uploadingKey === 'heroEthnic' ? 'Uploading...' : 'Change Desktop Photo'}
                 </button>
                 {(errors.heroEthnic || fieldUploadErrors.heroEthnic) && (
                   <p className="text-xs text-[#C62828] flex items-center gap-1 font-medium" role="alert">
@@ -485,42 +694,105 @@ export default function AdminBrandingPage() {
                     <span>{fieldUploadErrors.heroEthnic || errors.heroEthnic}</span>
                   </p>
                 )}
+
+                {/* Mobile Phone Banner */}
+                <div className="pt-2 border-t border-[#E0D8CE] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#1E1B18]">📱 Mobile Phone Banner</span>
+                    <span className="text-[10px] text-[#7C736A]">Portrait / Phones</span>
+                  </div>
+                  {settings.heroEthnicMobile ? (
+                    <div className="relative aspect-[9/16] max-h-36 w-20 mx-auto bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                      <img src={settings.heroEthnicMobile} alt="Mobile Slide 3" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-[#F3EFEA] border border-dashed border-[#D5CCC0] text-center text-[10px] text-[#7C736A]">
+                      No mobile photo uploaded (auto-falls back to desktop banner with responsive auto-framing).
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerFileUpload('heroEthnicMobile')}
+                      disabled={uploadingKey === 'heroEthnicMobile'}
+                      className="flex-1 py-1.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[#1E1B18] hover:bg-[#ECE6DD] text-[11px] font-medium uppercase tracking-wider transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Upload className="w-3 h-3" />
+                      {uploadingKey === 'heroEthnicMobile' ? 'Uploading...' : 'Upload Mobile Banner'}
+                    </button>
+                    {settings.heroEthnicMobile && (
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, heroEthnicMobile: '' })}
+                        className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
+                        title="Remove mobile banner"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2 pt-2 border-t border-[#E0D8CE]">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Eyebrow Tag:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide3Eyebrow ?? 'TIMELESS INDIAN'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide3Eyebrow: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Headline:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide3Heading ?? 'MADE FOR EVERY MOMENT.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide3Heading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Subheading:</label>
+                    <input
+                      type="text"
+                      value={settings.heroSlide3Subheading ?? 'Refined Indian silhouettes for celebrations and everyday occasions.'}
+                      onChange={(e) => setSettings({ ...settings, heroSlide3Subheading: e.target.value })}
+                      className="w-full bg-white border border-[#E0D8CE] px-2 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Section 3: Brand Story Editorial Image */}
+          {/* Section 3: Brand Story Editorial Image & Copy */}
           <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-6">
             <div>
               <p className="text-xs uppercase tracking-wider text-[#7C736A]">Craftsmanship Section</p>
               <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
-                Brand Story Editorial Image
+                Brand Story & Philosophy Section
               </h2>
               <p className="text-xs text-[#5C544D] mt-1">
-                The large wide editorial image displayed next to the "Quiet Indian Luxury" and artisan story section (Max {MAX_IMAGE_FILE_SIZE_MB} MB).
+                The large wide editorial image and storytelling copy displayed on your homepage. Max {MAX_IMAGE_FILE_SIZE_MB} MB.
               </p>
             </div>
 
             <div
-              className={`grid grid-cols-1 md:grid-cols-12 gap-6 items-center bg-[#FAF8F5] border p-4 ${
+              className={`grid grid-cols-1 md:grid-cols-12 gap-6 items-start bg-[#FAF8F5] border p-4 ${
                 errors.brandStory || fieldUploadErrors.brandStory
                   ? 'border-[#C62828]'
                   : 'border-[#E0D8CE]'
               }`}
             >
-              <div className="md:col-span-7 aspect-[16/10] bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
-                <img src={settings.brandStory} alt="Brand Story" className="w-full h-full object-cover" />
-              </div>
               <div className="md:col-span-5 space-y-3">
-                <span className="text-xs font-medium text-[#1E1B18] block">Artisan & Loom Editorial</span>
-                <p className="text-xs text-[#7C736A] leading-relaxed">
-                  Showcase your weaving techniques, natural fibers, or atelier process.
-                </p>
+                <div className="aspect-[16/10] bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                  <img src={settings.brandStory} alt="Brand Story" className="w-full h-full object-cover" />
+                </div>
                 <button
                   type="button"
                   onClick={() => triggerFileUpload('brandStory')}
                   disabled={uploadingKey === 'brandStory'}
-                  className="px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="w-full py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   {uploadingKey === 'brandStory' ? 'Uploading...' : 'Upload Brand Story Image'}
@@ -531,6 +803,36 @@ export default function AdminBrandingPage() {
                     <span>{fieldUploadErrors.brandStory || errors.brandStory}</span>
                   </p>
                 )}
+              </div>
+
+              <div className="md:col-span-7 space-y-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">Story Section Title:</label>
+                  <input
+                    type="text"
+                    value={settings.brandStoryTitle ?? 'MADE FOR YOUR EVERYDAY ELEGANCE'}
+                    onChange={(e) => setSettings({ ...settings, brandStoryTitle: e.target.value })}
+                    className="w-full bg-white border border-[#E0D8CE] px-3 py-1.5 text-xs text-[#1E1B18] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">Philosophy Paragraph 1:</label>
+                  <textarea
+                    rows={3}
+                    value={settings.brandStoryParagraph1 ?? 'Born from a desire to move beyond heavy occasion-only ornamentation, AABHA reimagines Indian textile heritage for the rhythm of modern life.'}
+                    onChange={(e) => setSettings({ ...settings, brandStoryParagraph1: e.target.value })}
+                    className="w-full bg-white border border-[#E0D8CE] px-3 py-1.5 text-xs text-[#1E1B18] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">Philosophy Paragraph 2:</label>
+                  <textarea
+                    rows={3}
+                    value={settings.brandStoryParagraph2 ?? 'Every garment is tailored with French seams, deep concealed pockets, and soft cotton mulmul linings—silhouettes that feel as natural in morning light as they do at an intimate evening gathering.'}
+                    onChange={(e) => setSettings({ ...settings, brandStoryParagraph2: e.target.value })}
+                    className="w-full bg-white border border-[#E0D8CE] px-3 py-1.5 text-xs text-[#1E1B18] focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
           </section>
