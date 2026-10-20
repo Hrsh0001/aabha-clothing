@@ -21,25 +21,7 @@ const INQUIRIES_FILE_PATH = path.join(process.cwd(), 'data', 'inquiries.json');
 let inMemoryInquiriesCache: CustomerInquiry[] | null = null;
 let isInquiriesTableReady = false;
 
-async function ensureInquiriesStorage(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isInquiriesTableReady) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "SiteSetting" (
-          "id" TEXT NOT NULL,
-          "data" JSONB NOT NULL,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      isInquiriesTableReady = true;
-    }
-    return true;
-  } catch {
-    return true;
-  }
-}
+async function ensureInquiriesStorage(): Promise<boolean> { return true; }
 
 function ensureInquiriesFile(): void {
   try {
@@ -91,16 +73,15 @@ async function saveInquiries(inquiries: CustomerInquiry[]): Promise<void> {
   inMemoryInquiriesCache = inquiries;
 
   const dbReady = await ensureInquiriesStorage();
-  if (dbReady && prisma) {
+  if (prisma) {
     try {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-         VALUES ('site_inquiries', $1::jsonb, CURRENT_TIMESTAMP)
-         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-        JSON.stringify(inquiries)
-      );
+      await prisma.siteSetting.upsert({
+        where: { id: 'site_inquiries' },
+        update: { data: inquiries as any },
+        create: { id: 'site_inquiries', data: inquiries as any },
+      });
     } catch (err) {
-      console.warn('Database inquiries save notice:', err);
+      console.warn('Prisma site_inquiries save notice:', err);
     }
   }
 

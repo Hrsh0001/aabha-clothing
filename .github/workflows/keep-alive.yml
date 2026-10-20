@@ -1,0 +1,16 @@
+name: Keep Supabase Awake (Anti-Inactivity Heartbeat)
+
+on:
+  schedule:
+    # Runs every 2 days at 05:00 UTC (10:30 AM IST)
+    - cron: '0 5 */2 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Keep-Alive API Endpoint
+        run: |
+          curl -sS -f --max-time 30 "https://aabhaclothing.in/api/cron/keep-alive" || \
+          curl -sS -f --max-time 30 "https://aabhaclothing.in/api/products"

@@ -21,25 +21,7 @@ const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'orders.json');
 let inMemoryCustomersCache: any[] | null = null;
 let isCustomersTableReady = false;
 
-async function ensureCustomersStorage(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isCustomersTableReady) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "SiteSetting" (
-          "id" TEXT NOT NULL,
-          "data" JSONB NOT NULL,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      isCustomersTableReady = true;
-    }
-    return true;
-  } catch {
-    return true;
-  }
-}
+async function ensureCustomersStorage(): Promise<boolean> { return true; }
 
 function ensureUsersFile(): void {
   try {
@@ -91,16 +73,15 @@ async function saveUsers(users: any[]): Promise<void> {
   inMemoryCustomersCache = users;
 
   const dbReady = await ensureCustomersStorage();
-  if (dbReady && prisma) {
+  if (prisma) {
     try {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-         VALUES ('site_users', $1::jsonb, CURRENT_TIMESTAMP)
-         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-        JSON.stringify(users)
-      );
+      await prisma.siteSetting.upsert({
+        where: { id: 'site_users' },
+        update: { data: users as any },
+        create: { id: 'site_users', data: users as any },
+      });
     } catch (err) {
-      console.warn('Database customers save notice:', err);
+      console.warn('Prisma site_users save notice:', err);
     }
   }
 
