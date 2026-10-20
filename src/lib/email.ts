@@ -98,21 +98,39 @@ export function generateOrderConfirmationHtml(order: {
   city: string;
   state: string;
   pincode: string;
-  items: Array<{ name: string; size: string; quantity: number; price: number }>;
+  items: any;
   total: number;
 }): string {
-  const itemsHtml = order.items
+  const rawItems = Array.isArray(order.items)
+    ? order.items
+    : typeof order.items === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(order.items);
+        } catch {
+          return [];
+        }
+      })()
+    : [];
+
+  const itemsHtml = (Array.isArray(rawItems) ? rawItems : [])
     .map(
-      (item) => `
+      (item: any) => {
+        const itemName = item?.name || item?.product?.name || 'Handcrafted Silhouette';
+        const itemSize = item?.size || 'Free Size';
+        const itemQty = Number(item?.quantity) || 1;
+        const itemPrice = Number(item?.price || item?.product?.price) || 0;
+        return `
       <tr style="border-bottom: 1px solid #ECE6DD;">
         <td style="padding: 12px 0; font-family: 'Plus Jakarta Sans', Arial, sans-serif; font-size: 13px; color: #1E1B18;">
-          <strong>${item.name}</strong><br>
-          <span style="font-size: 11px; color: #7C736A;">Size: ${item.size} · Qty: ${item.quantity}</span>
+          <strong>${itemName}</strong><br>
+          <span style="font-size: 11px; color: #7C736A;">Size: ${itemSize} · Qty: ${itemQty}</span>
         </td>
         <td style="padding: 12px 0; text-align: right; font-family: 'JetBrains Mono', Courier, monospace; font-size: 13px; color: #1E1B18;">
-          ₹${(item.price * item.quantity).toLocaleString('en-IN')}
+          ₹${(itemPrice * itemQty).toLocaleString('en-IN')}
         </td>
-      </tr>`
+      </tr>`;
+      }
     )
     .join('');
 
@@ -199,7 +217,7 @@ export function generateOrderConfirmationHtml(order: {
           <tr>
             <td style="padding: 25px 40px; background-color: #FAF8F5; border-top: 1px solid #ECE6DD; text-align: center;">
               <p style="margin: 0 0 6px; font-size: 12px; color: #7C736A;">
-                Questions about your bespoke order? Contact our Client Care Atelier via WhatsApp or phone at +91 98765 43210.
+                Questions about your bespoke order? Contact our Client Care Atelier via WhatsApp or phone at +${(process.env.NEXT_PUBLIC_STORE_WHATSAPP || '919876543210').replace(/[^0-9]/g, '')}.
               </p>
               <p style="margin: 0; font-size: 10px; color: #9E948A; text-transform: uppercase; letter-spacing: 1.5px;">
                 © 2026 AABHA CLOTHING · Made in India

@@ -80,7 +80,7 @@ export default function AdminOrdersPage() {
   }, []);
 
   const getItemImage = (item: any) => {
-    return item.image || productImages[item.productId] || '/images/hero_editorial_banner_1791119088652.jpg';
+    return item.image || productImages[item.productId] || '';
   };
 
   const fetchOrders = async () => {
@@ -128,7 +128,14 @@ export default function AdminOrdersPage() {
       const data = await res.json();
       if (data.success) {
         setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as any } : o))
+          prev.map((o) =>
+            o.id === orderId ||
+            o.orderNumber === orderId ||
+            o.id === data.order?.id ||
+            o.orderNumber === data.order?.orderNumber
+              ? { ...o, status: newStatus as any }
+              : o
+          )
         );
         showToast(`Order status updated to ${newStatus}`);
       } else {
@@ -579,11 +586,17 @@ export default function AdminOrdersPage() {
                           return (
                             <div key={idx} className="py-2 flex justify-between items-center gap-3">
                               <div className="flex items-center gap-3 min-w-0">
-                                <img
-                                  src={itemImg}
-                                  alt={item.name}
-                                  className="w-10 h-13 object-cover bg-[#ECE6DD] border border-[#E0D8CE] shrink-0"
-                                />
+                                {itemImg ? (
+                                  <img
+                                    src={itemImg}
+                                    alt={item.name}
+                                    className="w-10 h-13 object-cover bg-[#ECE6DD] border border-[#E0D8CE] shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-13 bg-[#ECE6DD] border border-[#E0D8CE] shrink-0 flex items-center justify-center text-[9px] text-[#7C736A] uppercase font-mono text-center p-0.5">
+                                    No Photo
+                                  </div>
+                                )}
                                 <div className="min-w-0">
                                   <a
                                     href={`/product/${item.productId}`}

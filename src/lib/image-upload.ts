@@ -3,13 +3,23 @@
 import {
   MAX_IMAGE_FILE_SIZE_MB,
   MAX_IMAGE_FILE_SIZE_BYTES,
+  MAX_GALLERY_PHOTOS,
+  IMAGE_UPLOAD_LIMIT_BADGE,
   validateImageFile,
   formatFileSize,
 } from './form-validation';
 
+export {
+  MAX_IMAGE_FILE_SIZE_MB,
+  MAX_IMAGE_FILE_SIZE_BYTES,
+  MAX_GALLERY_PHOTOS,
+  IMAGE_UPLOAD_LIMIT_BADGE,
+};
+
 const MAX_RAW_FILE_BYTES = MAX_IMAGE_FILE_SIZE_BYTES; // 5 MB per photo limit
-const TARGET_MAX_DIMENSION = 1200;
-const TARGET_MAX_BYTES = 135 * 1024; // Keep each compressed image under ~135KB so 10 photos stay well below Vercel's 4.5MB limit
+const TARGET_MAX_DIMENSION = 1080;
+const TARGET_QUALITY = 0.78;
+const TARGET_MAX_BYTES = 95 * 1024; // Ultra-lightweight ~40KB–90KB WebP for instant storefront loading
 
 export function fileToDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,12 +46,12 @@ function canvasToBlob(
 
 /**
  * Compresses and resizes an image File on the client using HTML5 Canvas.
- * Converts multi-megabyte studio/camera photos into crisp ~60KB-120KB WebP/JPEG files.
+ * Converts multi-megabyte studio/camera photos into crisp ~40KB-90KB WebP files.
  */
 export async function compressImageFile(
   file: File,
   maxDimension: number = TARGET_MAX_DIMENSION,
-  quality: number = 0.8
+  quality: number = TARGET_QUALITY
 ): Promise<File> {
   if (typeof window === 'undefined') return file;
 
@@ -50,11 +60,8 @@ export async function compressImageFile(
     return file;
   }
 
-  // If already a tiny WebP/JPEG under 90KB, no need to re-encode
-  if (
-    file.size <= 90 * 1024 &&
-    (file.type === 'image/webp' || file.type === 'image/jpeg')
-  ) {
+  // If already a tiny WebP under 75KB, no need to re-encode
+  if (file.size <= 75 * 1024 && file.type === 'image/webp') {
     return file;
   }
 
@@ -91,12 +98,12 @@ export async function compressImageFile(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // 1. Try WebP first (supports both transparency and high photo compression)
+        // 1. Encode as WebP first (max 1080px, quality 0.78 -> ~40KB–90KB)
         let blob = await canvasToBlob(canvas, 'image/webp', quality);
 
-        // 2. If browser fell back to PNG or blob is still too large, compress further
+        // 2. If browser fell back to PNG or blob exceeds target budget, compress further
         if (!blob || blob.size > TARGET_MAX_BYTES) {
-          const smallerDim = Math.min(960, maxDimension);
+          const smallerDim = Math.min(900, maxDimension);
           if (canvas.width > smallerDim || canvas.height > smallerDim) {
             const scale = smallerDim / Math.max(canvas.width, canvas.height);
             const c2 = document.createElement('canvas');
@@ -106,15 +113,14 @@ export async function compressImageFile(
             if (ctx2) {
               ctx2.imageSmoothingEnabled = true;
               ctx2.imageSmoothingQuality = 'high';
-              // Fill white background for JPEG fallback
               ctx2.fillStyle = '#FAF8F5';
               ctx2.fillRect(0, 0, c2.width, c2.height);
               ctx2.drawImage(canvas, 0, 0, c2.width, c2.height);
-              const webp2 = await canvasToBlob(c2, 'image/webp', 0.74);
+              const webp2 = await canvasToBlob(c2, 'image/webp', 0.72);
               if (webp2 && webp2.size <= TARGET_MAX_BYTES) {
                 blob = webp2;
               } else {
-                const jpg2 = await canvasToBlob(c2, 'image/jpeg', 0.74);
+                const jpg2 = await canvasToBlob(c2, 'image/jpeg', 0.72);
                 if (jpg2) blob = jpg2;
               }
             }
@@ -134,7 +140,7 @@ export async function compressImageFile(
         const ext = blob.type === 'image/webp' ? '.webp' : '.jpg';
         const baseName = file.name.replace(/\.[^/.]+$/, '') || 'garment';
         const compressedFile = new File([blob], `${baseName}${ext}`, {
-          type: blob.type || 'image/jpeg',
+          type: blob.type || 'image/webp',
           lastModified: Date.now(),
         });
 
@@ -154,7 +160,7 @@ export async function compressImageFile(
 }
 
 /**
- * Ensures any oversized data:image/... URL in state is compressed before sending in a JSON body.
+ * Ensures any oversized data:image/... URL in state is compressed to lightweight WebP before sending in a JSON body.
  */
 export async function compressDataUrlIfNeeded(url: string): Promise<string> {
   if (
@@ -162,7 +168,7 @@ export async function compressDataUrlIfNeeded(url: string): Promise<string> {
     !url ||
     !url.startsWith('data:image/') ||
     url.startsWith('data:image/svg') ||
-    url.length < 180_000
+    (url.startsWith('data:image/webp') && url.length < 130_000)
   ) {
     return url;
   }
@@ -171,7 +177,7 @@ export async function compressDataUrlIfNeeded(url: string): Promise<string> {
     const img = new Image();
     img.onload = () => {
       try {
-        const maxDim = 1000;
+        const maxDim = TARGET_MAX_DIMENSION;
         let width = img.naturalWidth || img.width || 800;
         let height = img.naturalHeight || img.height || 1000;
 
@@ -198,8 +204,8 @@ export async function compressDataUrlIfNeeded(url: string): Promise<string> {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        let compressed = canvas.toDataURL('image/webp', 0.75);
-        if (compressed.length > 180_000 || !compressed.startsWith('data:image/webp')) {
+        let compressed = canvas.toDataURL('image/webp', TARGET_QUALITY);
+        if (compressed.length > 150_000 || !compressed.startsWith('data:image/webp')) {
           compressed = canvas.toDataURL('image/jpeg', 0.72);
         }
         resolve(compressed);

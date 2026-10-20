@@ -32,6 +32,12 @@ export type CollectionFilter = 'All Collection' | ProductCategory;
 
 export type GarmentSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
 
+export interface ProductColorVariant {
+  name: string;
+  hex: string;
+  imageUrl?: string;
+}
+
 export interface ProductGalleryItem {
   url: string;
   label: string;
@@ -58,6 +64,7 @@ export interface Product {
   originalPrice?: number;
   colorName: string;
   colorHex: string;
+  colors?: ProductColorVariant[];
   fabric: string;
   isNewArrival: boolean;
   isCurated: boolean;
@@ -159,6 +166,11 @@ export const PRODUCTS: Product[] = [
     originalPrice: 10800,
     colorName: 'Earthen Ochre',
     colorHex: '#B87B44',
+    colors: [
+      { name: 'Earthen Ochre', hex: '#B87B44', imageUrl: EDITORIAL_ASSETS.dressOchre },
+      { name: 'Ivory Mulmul', hex: '#FAF6EE', imageUrl: EDITORIAL_ASSETS.kurtaIvory },
+      { name: 'Rosewood', hex: '#8C4343', imageUrl: EDITORIAL_ASSETS.kurtaSetRosewood },
+    ],
     fabric: 'Handwoven Kora Silk-Cotton',
     isNewArrival: true,
     isCurated: true,
@@ -215,6 +227,11 @@ export const PRODUCTS: Product[] = [
     price: 8990,
     colorName: 'Alabaster Ivory',
     colorHex: '#F3EFEA',
+    colors: [
+      { name: 'Alabaster Ivory', hex: '#F3EFEA', imageUrl: EDITORIAL_ASSETS.brandStory },
+      { name: 'Ivory Mulmul', hex: '#FAF6EE', imageUrl: EDITORIAL_ASSETS.kurtaIvory },
+      { name: 'Warm Sand', hex: '#D6C5B3', imageUrl: EDITORIAL_ASSETS.kurtaSetSand },
+    ],
     fabric: 'Handwoven Mulmul & Pure Silk Organza',
     isNewArrival: true,
     isCurated: false,

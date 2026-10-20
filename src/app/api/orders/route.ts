@@ -38,43 +38,6 @@ const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'orders.json');
 
 // In-memory fallback cache for serverless environments where local filesystem is read-only
 let inMemoryOrdersCache: CODOrder[] | null = null;
-let isOrdersTableInitialized = false;
-
-async function ensureOrdersTable(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isOrdersTableInitialized) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "Order" (
-          "id" TEXT NOT NULL,
-          "orderNumber" TEXT NOT NULL,
-          "customerName" TEXT NOT NULL,
-          "phone" TEXT NOT NULL,
-          "email" TEXT,
-          "address" TEXT NOT NULL,
-          "city" TEXT NOT NULL,
-          "state" TEXT NOT NULL,
-          "pincode" TEXT NOT NULL,
-          "total" DOUBLE PRECISION NOT NULL,
-          "status" TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION',
-          "paymentMethod" TEXT NOT NULL DEFAULT 'CASH_ON_DELIVERY',
-          "items" JSONB NOT NULL,
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "Order_orderNumber_key" ON "Order"("orderNumber");
-      `);
-      isOrdersTableInitialized = true;
-    }
-    return true;
-  } catch (err) {
-    console.warn('Order table init notice:', err);
-    return true;
-  }
-}
 
 function ensureDataDirectory(): void {
   try {
@@ -121,13 +84,12 @@ function saveOrders(orders: CODOrder[]): void {
 export async function GET() {
   try {
     const localOrders = [...readOrders()].reverse();
-    const dbReady = await ensureOrdersTable();
-    if (dbReady && prisma) {
+    if (prisma) {
       try {
         const dbOrders = await prisma.order.findMany({
           orderBy: { createdAt: 'desc' },
         });
-        if (dbOrders.length > 0) {
+        if (dbOrders && dbOrders.length > 0) {
           const seenIds = new Set(dbOrders.map((o: any) => o.id));
           const seenNums = new Set(dbOrders.map((o: any) => o.orderNumber));
           const merged = [...dbOrders];
@@ -220,7 +182,7 @@ export async function POST(request: Request) {
         size: i.size,
         quantity: i.quantity,
         price: i.product?.price || i.price,
-        image: i.product?.primaryImage || i.image || '/images/hero_editorial_banner_1791119088652.jpg',
+        image: i.product?.primaryImage || i.image || '',
       })),
       total: Number(total),
       paymentMethod: 'CASH_ON_DELIVERY',
@@ -228,8 +190,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    const dbReady = await ensureOrdersTable();
-    if (dbReady && prisma) {
+    if (prisma) {
       try {
         await prisma.order.create({
           data: {
@@ -310,19 +271,30 @@ export async function PATCH(request: Request) {
       );
     }
 
-    let updatedDbOrder: any = null;
-    const dbReady = await ensureOrdersTable();
-    if (dbReady && prisma) {
+    const cleanOrderId = typeof orderId === 'string' ? orderId.trim().replace(/^#/, '') : orderId;
+    const withHash = typeof orderId === 'string' ? (cleanOrderId.startsWith('#') ? cleanOrderId : `#${cleanOrderId}`) : orderId;
+
+    const orderOrConditions = [
+      { id: orderId },
+      { orderNumber: orderId },
+      { id: cleanOrderId },
+      { orderNumber: cleanOrderId },
+      { id: withHash },
+      { orderNumber: withHash },
+    ];
+
+    let targetOrder: any = null;
+    if (prisma) {
       try {
         await prisma.order.updateMany({
           where: {
-            OR: [{ id: orderId }, { orderNumber: orderId }],
+            OR: orderOrConditions,
           },
           data: { status },
         });
-        updatedDbOrder = await prisma.order.findFirst({
+        targetOrder = await prisma.order.findFirst({
           where: {
-            OR: [{ id: orderId }, { orderNumber: orderId }],
+            OR: orderOrConditions,
           },
         });
       } catch (dbErr) {
@@ -331,16 +303,35 @@ export async function PATCH(request: Request) {
     }
 
     const orders = readOrders();
-    const index = orders.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
+    const index = orders.findIndex(
+      (o) =>
+        o.id === orderId ||
+        o.orderNumber === orderId ||
+        o.orderNumber === cleanOrderId ||
+        o.id === cleanOrderId ||
+        o.orderNumber === withHash ||
+        o.id === withHash
+    );
 
     if (index !== -1) {
       orders[index].status = status;
       saveOrders(orders);
-      return NextResponse.json({ success: true, order: orders[index] });
+      if (!targetOrder) {
+        targetOrder = orders[index];
+      }
     }
 
-    if (updatedDbOrder) {
-      return NextResponse.json({ success: true, order: updatedDbOrder });
+    if (targetOrder) {
+      // When status changes to 'CONFIRMED', automatically trigger sendEmail with order confirmation details to customer
+      if (status === 'CONFIRMED' && targetOrder.email) {
+        sendEmail({
+          to: targetOrder.email,
+          subject: `Namaste ${targetOrder.customerName} — Your AABHA Order #${targetOrder.orderNumber} is Confirmed`,
+          html: generateOrderConfirmationHtml(targetOrder),
+        }).catch((err) => console.warn('Order confirmation email notice on status update:', err));
+      }
+
+      return NextResponse.json({ success: true, order: targetOrder });
     }
 
     return NextResponse.json(
@@ -375,12 +366,21 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const dbReady = await ensureOrdersTable();
-    if (dbReady && prisma) {
+    const cleanId = typeof id === 'string' ? id.trim().replace(/^#/, '') : id;
+    const withHash = typeof id === 'string' ? (cleanId.startsWith('#') ? cleanId : `#${cleanId}`) : id;
+
+    if (prisma) {
       try {
         await prisma.order.deleteMany({
           where: {
-            OR: [{ id }, { orderNumber: id }],
+            OR: [
+              { id },
+              { orderNumber: id },
+              { id: cleanId },
+              { orderNumber: cleanId },
+              { id: withHash },
+              { orderNumber: withHash },
+            ],
           },
         });
       } catch (dbErr) {
@@ -389,7 +389,15 @@ export async function DELETE(request: Request) {
     }
 
     const orders = readOrders();
-    const filtered = orders.filter((o) => o.id !== id && o.orderNumber !== id);
+    const filtered = orders.filter(
+      (o) =>
+        o.id !== id &&
+        o.orderNumber !== id &&
+        o.id !== cleanId &&
+        o.orderNumber !== cleanId &&
+        o.id !== withHash &&
+        o.orderNumber !== withHash
+    );
     saveOrders(filtered);
 
     return NextResponse.json({

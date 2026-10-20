@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Product, PRODUCTS, CollectionFilter, GarmentSize, ProductReview } from '@/src/data/products';
+import { Product, CollectionFilter, GarmentSize, ProductReview } from '@/src/data/products';
 import { Header, ActivePage } from '@/src/components/Header';
 import { ProductDetailPage } from '@/src/components/ProductDetailPage';
 import { Footer } from '@/src/components/Footer';
@@ -21,7 +21,7 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
   const resolvedParams = use(params);
   const productId = resolvedParams.id;
 
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
@@ -73,32 +73,18 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+        if (data.success && Array.isArray(data.products)) {
           setProducts(data.products);
           const found = data.products.find(
-            (p: Product) => p.id === productId || p.sku.toLowerCase() === productId.toLowerCase()
+            (p: Product) => p.id === productId || p.sku?.toLowerCase() === productId.toLowerCase()
           );
-          if (found) {
-            setProduct(found);
-          } else {
-            // Fallback to static PRODUCTS
-            const fallback = PRODUCTS.find(
-              (p) => p.id === productId || p.sku.toLowerCase() === productId.toLowerCase()
-            );
-            setProduct(fallback || null);
-          }
+          setProduct(found || null);
         } else {
-          const fallback = PRODUCTS.find(
-            (p) => p.id === productId || p.sku.toLowerCase() === productId.toLowerCase()
-          );
-          setProduct(fallback || null);
+          setProduct(null);
         }
       })
       .catch(() => {
-        const fallback = PRODUCTS.find(
-          (p) => p.id === productId || p.sku.toLowerCase() === productId.toLowerCase()
-        );
-        setProduct(fallback || null);
+        setProduct(null);
       })
       .finally(() => {
         setLoading(false);
@@ -242,6 +228,7 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
         onOpenCart={() => setCartDrawerOpen(true)}
         onOpenAccount={() => setAuthModalOpen(true)}
         logoUrl={siteSettings?.logoUrl}
+        announcementText={siteSettings?.announcementText}
       />
 
       <main className="flex-1">

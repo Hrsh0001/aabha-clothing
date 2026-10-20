@@ -17,25 +17,7 @@ const NEWSLETTER_FILE_PATH = path.join(process.cwd(), 'data', 'newsletter.json')
 let inMemoryNewsletterCache: Subscriber[] | null = null;
 let isNewsletterTableReady = false;
 
-async function ensureNewsletterStorage(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isNewsletterTableReady) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "SiteSetting" (
-          "id" TEXT NOT NULL,
-          "data" JSONB NOT NULL,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      isNewsletterTableReady = true;
-    }
-    return true;
-  } catch {
-    return true;
-  }
-}
+async function ensureNewsletterStorage(): Promise<boolean> { return true; }
 
 function ensureNewsletterFile(): void {
   try {
@@ -87,16 +69,15 @@ async function saveSubscribers(subscribers: Subscriber[]): Promise<void> {
   inMemoryNewsletterCache = subscribers;
 
   const dbReady = await ensureNewsletterStorage();
-  if (dbReady && prisma) {
+  if (prisma) {
     try {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-         VALUES ('site_newsletter', $1::jsonb, CURRENT_TIMESTAMP)
-         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-        JSON.stringify(subscribers)
-      );
+      await prisma.siteSetting.upsert({
+        where: { id: 'site_newsletter' },
+        update: { data: subscribers as any },
+        create: { id: 'site_newsletter', data: subscribers as any },
+      });
     } catch (err) {
-      console.warn('Database newsletter save notice:', err);
+      console.warn('Prisma site_newsletter save notice:', err);
     }
   }
 

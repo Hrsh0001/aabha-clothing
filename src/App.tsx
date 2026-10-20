@@ -7,12 +7,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
-  PRODUCTS,
   Product,
   CollectionFilter,
   GarmentSize,
   ProductReview,
 } from './data/products';
+import { PRODUCTS } from './data/products';
 import { Header, ActivePage } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { ShopPage } from './components/ShopPage';
@@ -21,21 +21,55 @@ import { CartDrawer, WishlistDrawer, SearchModal, CartItem } from './components/
 import { CheckoutPage } from './components/CheckoutPage';
 import { AboutPage, ContactPage, PolicyPage, PolicyTopic } from './components/InfoPages';
 import { Footer } from './components/Footer';
+import { AtelierSkeleton } from './components/AtelierSkeleton';
 import { useAuth } from './context/AuthContext';
 import type { SiteSettings } from './app/api/settings/route';
 
+const getInitialProducts = (): Product[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const cp = sessionStorage.getItem('aabha_products_cache');
+    if (cp) {
+      const p = JSON.parse(cp);
+      if (Array.isArray(p) && p.length > 0) return p;
+    }
+  } catch {}
+  return [];
+};
+
+const getInitialSettings = (): SiteSettings | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cs = sessionStorage.getItem('aabha_settings_cache');
+    if (cs) {
+      const s = JSON.parse(cs);
+      if (s) return s;
+    }
+  } catch {}
+  return null;
+};
+
 export default function App() {
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>(getInitialProducts);
+  const [productsLoading, setProductsLoading] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const cp = sessionStorage.getItem('aabha_products_cache');
+      return !cp;
+    } catch {
+      return true;
+    }
+  });
   const [activePage, setActivePage] = useState<ActivePage>('home');
   const [selectedCategory, setSelectedCategory] = useState<CollectionFilter>('All Collection');
-  const [selectedProductId, setSelectedProductId] = useState<string>(PRODUCTS[0].id);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [policyTopic, setPolicyTopic] = useState<PolicyTopic>('shipping');
 
   // Hydration-safe Persistent Wishlist & Cart
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(getInitialSettings);
 
   const { setAuthModalOpen } = useAuth();
 
@@ -94,20 +128,52 @@ export default function App() {
   }, [cartItems, isHydrated]);
 
   useEffect(() => {
+    // Try sessionStorage cache for instant load (eliminates 1-2s blink on revisit)
+    let hasCachedProducts = false;
+    try {
+      const cp = sessionStorage.getItem('aabha_products_cache');
+      const cs = sessionStorage.getItem('aabha_settings_cache');
+      if (cp) {
+        const p = JSON.parse(cp);
+        if (Array.isArray(p) && p.length > 0) {
+          setProducts(p);
+          setProductsLoading(false);
+          hasCachedProducts = true;
+        }
+      }
+      if (cs) {
+        const s = JSON.parse(cs);
+        if (s) setSiteSettings(s);
+      }
+    } catch {}
+
+    if (!hasCachedProducts) {
+      setProductsLoading(true);
+    }
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.products && data.products.length > 0) {
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(data.products);
+          try { sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products)); } catch {}
+        } else if (!hasCachedProducts) {
+          setProducts(PRODUCTS);
         }
       })
-      .catch((err) => console.warn('Live products sync notice:', err));
+      .catch((err) => {
+        console.warn('Live products sync notice:', err);
+        if (!hasCachedProducts) {
+          setProducts(PRODUCTS);
+        }
+      })
+      .finally(() => setProductsLoading(false));
 
     fetch('/api/settings')
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.settings) {
           setSiteSettings(data.settings);
+          try { sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings)); } catch {}
         }
       })
       .catch((err) => console.warn('Live settings sync notice:', err));
@@ -173,7 +239,8 @@ export default function App() {
     product: Product,
     size: GarmentSize,
     quantity: number = 1,
-    openDrawer: boolean = true
+    openDrawer: boolean = true,
+    selectedColor?: string
   ) => {
     if (!product.inStock) {
       showToast(`${product.name} is currently out of stock`);
@@ -182,7 +249,10 @@ export default function App() {
 
     setCartItems((prev) => {
       const existingIndex = prev.findIndex(
-        (item) => item.product.id === product.id && item.size === size
+        (item) =>
+          item.product.id === product.id &&
+          item.size === size &&
+          (item.selectedColor || '') === (selectedColor || '')
       );
       if (existingIndex > -1) {
         const updated = [...prev];
@@ -192,33 +262,50 @@ export default function App() {
         };
         return updated;
       }
-      return [...prev, { product, size, quantity }];
+      return [...prev, { product, size, quantity, selectedColor }];
     });
 
     if (openDrawer) {
       setCartDrawerOpen(true);
     } else {
-      showToast(`Added ${product.name} (Size ${size}) to Shopping Bag`);
+      showToast(
+        `Added ${product.name} (Size ${size}${selectedColor ? `, ${selectedColor}` : ''}) to Shopping Bag`
+      );
     }
   };
 
   const handleQuickAdd = (product: Product, size: GarmentSize, e: React.MouseEvent) => {
     e.stopPropagation();
-    handleAddToCart(product, size, 1, false);
+    const defaultColor = product.colors && product.colors.length > 0 ? product.colors[0].name : undefined;
+    handleAddToCart(product, size, 1, false, defaultColor);
   };
 
-  const handleBuyNow = (product: Product, size: GarmentSize, quantity: number) => {
-    handleAddToCart(product, size, quantity, false);
+  const handleBuyNow = (
+    product: Product,
+    size: GarmentSize,
+    quantity: number,
+    selectedColor?: string
+  ) => {
+    handleAddToCart(product, size, quantity, false, selectedColor);
     setCartDrawerOpen(false);
     setActivePage('checkout');
     scrollToTop();
   };
 
-  const handleUpdateCartQuantity = (productId: string, size: GarmentSize, delta: number) => {
+  const handleUpdateCartQuantity = (
+    productId: string,
+    size: GarmentSize,
+    delta: number,
+    color?: string
+  ) => {
     setCartItems((prev) =>
       prev
         .map((item) => {
-          if (item.product.id === productId && item.size === size) {
+          if (
+            item.product.id === productId &&
+            item.size === size &&
+            (color === undefined || (item.selectedColor || '') === (color || ''))
+          ) {
             const nextQty = item.quantity + delta;
             return nextQty > 0 ? { ...item, quantity: nextQty } : null;
           }
@@ -228,9 +315,16 @@ export default function App() {
     );
   };
 
-  const handleRemoveCartItem = (productId: string, size: GarmentSize) => {
+  const handleRemoveCartItem = (productId: string, size: GarmentSize, color?: string) => {
     setCartItems((prev) =>
-      prev.filter((item) => !(item.product.id === productId && item.size === size))
+      prev.filter(
+        (item) =>
+          !(
+            item.product.id === productId &&
+            item.size === size &&
+            (color === undefined || (item.selectedColor || '') === (color || ''))
+          )
+      )
     );
   };
 
@@ -284,16 +378,20 @@ export default function App() {
   };
 
   const selectedProduct =
-    products.find((p) => p.id === selectedProductId) || products[0];
+    products.find((p) => p.id === selectedProductId) || products[0] || null;
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const pageTransitionKey =
     activePage === 'product'
-      ? `product-${selectedProduct.id}`
+      ? `product-${selectedProduct?.id || 'none'}`
       : activePage === 'policy'
       ? `policy-${policyTopic}`
       : activePage;
+
+  if (!isHydrated || (productsLoading && products.length === 0)) {
+    return <AtelierSkeleton />;
+  }
 
   return (
     <div id="top" className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1E1B18]">
@@ -320,6 +418,7 @@ export default function App() {
         onOpenCart={() => setCartDrawerOpen(true)}
         onOpenAccount={() => setAuthModalOpen(true)}
         logoUrl={siteSettings?.logoUrl}
+        announcementText={siteSettings?.announcementText}
       />
 
       {/* Main Content View Router with Subtle Editorial Fade-In Transition */}
@@ -334,6 +433,7 @@ export default function App() {
           {activePage === 'home' && (
             <HomePage
               products={products}
+              productsLoading={productsLoading}
               wishlistIds={wishlistIds}
               siteSettings={siteSettings}
               onShopCollection={handleNavigateShopCategory}
@@ -359,7 +459,7 @@ export default function App() {
             />
           )}
 
-          {activePage === 'product' && (
+          {activePage === 'product' && selectedProduct && (
             <ProductDetailPage
               product={selectedProduct}
               allProducts={products}
@@ -370,17 +470,34 @@ export default function App() {
               }}
               onSelectCategory={(cat) => handleNavigateShopCategory(cat)}
               onSelectProduct={handleSelectProduct}
-              onAddToCart={(prod, size, qty) => handleAddToCart(prod, size, qty, true)}
-              onBuyNow={handleBuyNow}
+              onAddToCart={(prod, size, qty, color) => handleAddToCart(prod, size, qty, true, color)}
+              onBuyNow={(prod, size, qty, color) => handleBuyNow(prod, size, qty, color)}
               onToggleWishlist={handleToggleWishlist}
               onQuickAdd={handleQuickAdd}
               onAddReview={handleAddReview}
             />
           )}
 
+          {activePage === 'product' && !selectedProduct && (
+            <div className="py-24 px-4 text-center space-y-4">
+              <p className="font-serif text-3xl text-[#1E1B18]">Garment Not Found</p>
+              <p className="text-xs text-[#7C736A]">
+                No garment is currently selected or available in the catalog.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleNavigateShopCategory('All Collection')}
+                className="px-6 py-3 bg-[#231F1D] text-[#FAF8F5] text-xs uppercase tracking-wider font-medium hover:bg-[#14110E] transition-colors cursor-pointer"
+              >
+                Return to Collection
+              </button>
+            </div>
+          )}
+
           {activePage === 'checkout' && (
             <CheckoutPage
               items={cartItems}
+              siteSettings={siteSettings}
               onBackToShopping={() => handleNavigateShopCategory('All Collection')}
               onClearCart={() => setCartItems([])}
             />

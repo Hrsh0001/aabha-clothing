@@ -25,6 +25,7 @@ import type { SiteSettings } from '../app/api/settings/route';
 interface HeroSlide {
   id: string;
   image: string;
+  mobileImage?: string;
   alt: string;
   eyebrow: string;
   heading: string;
@@ -35,6 +36,7 @@ interface HeroSlide {
 
 interface HomePageProps {
   products: Product[];
+  productsLoading?: boolean;
   wishlistIds: string[];
   siteSettings?: SiteSettings | null;
   onShopCollection: (category?: CollectionFilter) => void;
@@ -46,6 +48,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({
   products,
+  productsLoading = false,
   wishlistIds,
   siteSettings,
   onShopCollection,
@@ -63,30 +66,33 @@ export const HomePage: React.FC<HomePageProps> = ({
       {
         id: 'slide-1',
         image: siteSettings?.heroBanner || EDITORIAL_ASSETS.heroBanner,
-        alt: 'Graceful Indian models in AABHA CLOTHING contemporary ivory and sand Chanderi silk ensembles',
-        eyebrow: 'INAUGURAL 17-PIECE EDIT · HANDLOOM',
-        heading: 'EFFORTLESSLY INDIAN.',
-        subheading: 'Modern silhouettes. Timeless elegance.',
+        mobileImage: siteSettings?.heroBannerMobile,
+        alt: 'Graceful Indian models in contemporary ivory and sand Chanderi silk ensembles',
+        eyebrow: siteSettings?.heroSlide1Eyebrow || 'INAUGURAL EDIT · HANDLOOM',
+        heading: siteSettings?.heroSlide1Heading || 'EFFORTLESSLY INDIAN.',
+        subheading: siteSettings?.heroSlide1Subheading || 'Modern silhouettes. Timeless elegance.',
         buttonLabel: 'SHOP THE COLLECTION',
         targetCategory: 'All Collection',
       },
       {
         id: 'slide-2',
         image: siteSettings?.heroCoords || EDITORIAL_ASSETS.heroCoords,
-        alt: 'Indian female model in AABHA CLOTHING contemporary tailored khadi-silk co-ord outfit',
-        eyebrow: 'THE CO-ORD EDIT',
-        heading: 'MODERN. EFFORTLESS. YOURS.',
-        subheading: 'Contemporary silhouettes designed for everyday elegance.',
+        mobileImage: siteSettings?.heroCoordsMobile,
+        alt: 'Indian female model in contemporary tailored khadi-silk co-ord outfit',
+        eyebrow: siteSettings?.heroSlide2Eyebrow || 'THE CO-ORD EDIT',
+        heading: siteSettings?.heroSlide2Heading || 'MODERN. EFFORTLESS. YOURS.',
+        subheading: siteSettings?.heroSlide2Subheading || 'Contemporary silhouettes designed for everyday elegance.',
         buttonLabel: 'SHOP CO-ORDS',
         targetCategory: 'Co-ord Sets',
       },
       {
         id: 'slide-3',
         image: siteSettings?.heroEthnic || EDITORIAL_ASSETS.heroEthnic,
-        alt: 'Indian female model in AABHA CLOTHING flowing earthen ochre and champagne Chanderi ethnic silhouette',
-        eyebrow: 'TIMELESS INDIAN',
-        heading: 'MADE FOR EVERY MOMENT.',
-        subheading: 'Refined Indian silhouettes for celebrations and everyday occasions.',
+        mobileImage: siteSettings?.heroEthnicMobile,
+        alt: 'Indian female model in flowing earthen ochre and champagne Chanderi ethnic silhouette',
+        eyebrow: siteSettings?.heroSlide3Eyebrow || 'TIMELESS INDIAN',
+        heading: siteSettings?.heroSlide3Heading || 'MADE FOR EVERY MOMENT.',
+        subheading: siteSettings?.heroSlide3Subheading || 'Refined Indian silhouettes for celebrations and everyday occasions.',
         buttonLabel: 'EXPLORE THE COLLECTION',
         targetCategory: 'All Collection',
       },
@@ -181,11 +187,14 @@ export const HomePage: React.FC<HomePageProps> = ({
     }, 50);
   };
 
+  const newArrivalsSource = products.filter((p) => p.isNewArrival);
+  const baseNewArrivals = newArrivalsSource.length > 0 ? newArrivalsSource : products;
   const newArrivals = showAllInNewArrivals
     ? products
-    : products.filter((p) => p.isNewArrival).slice(0, 8);
+    : baseNewArrivals.slice(0, 8);
 
-  const curatedProducts = products.filter((p) => p.isCurated).slice(0, 4);
+  const curatedSource = products.filter((p) => p.isCurated);
+  const curatedProducts = (curatedSource.length > 0 ? curatedSource : products).slice(0, 4);
 
   const handleLookbookClick = (productId: string) => {
     const found = products.find((p) => p.id === productId);
@@ -213,7 +222,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        className="relative w-full h-[84vh] min-h-[560px] sm:h-[88vh] max-h-[880px] overflow-hidden bg-[#181512] select-none touch-pan-y"
+        className="relative w-full h-[70vh] sm:h-[80vh] md:h-[85vh] min-h-[460px] max-h-[880px] overflow-hidden bg-[#181512] select-none touch-pan-y"
       >
         {heroSlides.map((slide, index) => {
           const isActive = index === activeSlide;
@@ -225,15 +234,42 @@ export const HomePage: React.FC<HomePageProps> = ({
                 isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
-              <EditorialImage
-                src={slide.image}
-                alt={slide.alt}
-                priority={index === 0}
-                containerClassName="w-full h-full"
-                className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
-                  isActive ? 'scale-100' : 'scale-[1.03]'
-                }`}
-              />
+              {slide.mobileImage ? (
+                <>
+                  <div className="block md:hidden w-full h-full">
+                    <EditorialImage
+                      src={slide.mobileImage}
+                      alt={slide.alt}
+                      priority={index === 0}
+                      containerClassName="w-full h-full"
+                      className={`w-full h-full object-cover object-top transition-transform duration-1000 ease-out ${
+                        isActive ? 'scale-100' : 'scale-[1.03]'
+                      }`}
+                    />
+                  </div>
+                  <div className="hidden md:block w-full h-full">
+                    <EditorialImage
+                      src={slide.image}
+                      alt={slide.alt}
+                      priority={index === 0}
+                      containerClassName="w-full h-full"
+                      className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
+                        isActive ? 'scale-100' : 'scale-[1.03]'
+                      }`}
+                    />
+                  </div>
+                </>
+              ) : (
+                <EditorialImage
+                  src={slide.image}
+                  alt={slide.alt}
+                  priority={index === 0}
+                  containerClassName="w-full h-full"
+                  className={`w-full h-full object-cover object-top sm:object-center transition-transform duration-1000 ease-out ${
+                    isActive ? 'scale-100' : 'scale-[1.03]'
+                  }`}
+                />
+              )}
 
               {/* Subtle Dark Overlay Scrim for Readability on Desktop & Mobile */}
               <div
@@ -334,7 +370,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* 2. Shop By Category — Exact 4 Categories */}
+      {/* 2. Shop By Category — Exact 4 Categories with Dynamic Product Thumbnails & Counts */}
       <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14">
           <div>
@@ -357,8 +393,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-7">
           {CATEGORIES.map((category) => {
-            const dynamicCount = products.filter((p) => p.category === category.id).length;
-            const pieceCount = dynamicCount > 0 ? dynamicCount : category.pieceCount;
+            const categoryProducts = products.filter((p) => p.category === category.id);
+            const pieceCount = categoryProducts.length;
+            const dynamicCover = categoryProducts[0]?.primaryImage || '';
             return (
               <button
                 key={category.id}
@@ -369,10 +406,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                 {/* Reduced-Height Editorial Frame (4:3 on mobile, 5:4 on desktop) */}
                 <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full bg-[#F3EFEA] overflow-hidden mb-3.5 sm:mb-4">
                   <EditorialImage
-                    src={category.image}
+                    src={dynamicCover}
                     alt={`${category.name} — ${category.tagline}`}
+                    fallbackLabel={pieceCount === 0 ? `${category.name} · No Garments Yet` : category.name}
                     containerClassName="w-full h-full"
-                    className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                    className="w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
                   />
                 </div>
 
@@ -393,7 +431,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* 3. New Arrivals (From the Launch Collection) */}
+      {/* 3. New Arrivals (Dynamic Database Catalog) */}
       <section
         id="new-arrivals"
         className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 scroll-mt-24"
@@ -407,29 +445,51 @@ export const HomePage: React.FC<HomePageProps> = ({
               New Arrivals
             </h2>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setShowAllInNewArrivals((prev) => !prev)}
-              className="text-xs tracking-[0.14em] uppercase text-[#4A433D] hover:text-[#1E1B18] pb-1 border-b border-[#D5CCC0] hover:border-[#1E1B18] transition-colors cursor-pointer"
-            >
-              {showAllInNewArrivals ? 'Show Featured 8' : `Show All ${products.length} Products`}
-            </button>
-          </div>
+          {products.length > 8 && (
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowAllInNewArrivals((prev) => !prev)}
+                className="text-xs tracking-[0.14em] uppercase text-[#4A433D] hover:text-[#1E1B18] pb-1 border-b border-[#D5CCC0] hover:border-[#1E1B18] transition-colors cursor-pointer"
+              >
+                {showAllInNewArrivals ? 'Show Featured 8' : `Show All ${products.length} Products`}
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-16">
-          {newArrivals.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              isWishlisted={wishlistIds.includes(product.id)}
-              onSelectProduct={onSelectProduct}
-              onToggleWishlist={onToggleWishlist}
-              onQuickAdd={onQuickAdd}
-            />
-          ))}
-        </div>
+        {productsLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-16">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="space-y-3">
+                <div className="aspect-[3/4] w-full bg-[#ECE6DD] animate-pulse" />
+                <div className="h-3 w-24 bg-[#ECE6DD] animate-pulse" />
+                <div className="h-5 w-40 bg-[#ECE6DD] animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : newArrivals.length === 0 ? (
+          <div className="py-16 px-6 text-center bg-[#F3EFEA] border border-dashed border-[#D5CCC0] space-y-2">
+            <p className="font-serif text-2xl text-[#1E1B18]">No Garments Published Yet</p>
+            <p className="text-xs text-[#7C736A] max-w-md mx-auto">
+              New silhouettes added from the Admin Atelier will appear here automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-16">
+            {newArrivals.map((product, index) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                priority={index < 4}
+                isWishlisted={wishlistIds.includes(product.id)}
+                onSelectProduct={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                onQuickAdd={onQuickAdd}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-14 sm:mt-20 text-center">
           <button
@@ -464,15 +524,17 @@ export const HomePage: React.FC<HomePageProps> = ({
               </p>
 
               <h2 className="font-serif text-3xl sm:text-4xl lg:text-[44px] leading-[1.14] text-[#1E1B18] font-normal">
-                MADE FOR YOUR EVERYDAY ELEGANCE
+                {siteSettings?.brandStoryTitle || 'MADE FOR YOUR EVERYDAY ELEGANCE'}
               </h2>
 
               <p className="text-[15px] sm:text-base text-[#4A433D] font-light leading-[1.75]">
-                Born from a desire to move beyond heavy occasion-only ornamentation, AABHA reimagines Indian textile heritage for the rhythm of modern life. Our inaugural 17-piece launch collection brings together panelled Anarkalis, three-piece Chanderi ensembles, tailored Khadi co-ord sets, and authentic hand-embroidered Chikankari.
+                {siteSettings?.brandStoryParagraph1 ||
+                  'Born from a desire to move beyond heavy occasion-only ornamentation, AABHA reimagines Indian textile heritage for the rhythm of modern life. Our collection brings together panelled Anarkalis, three-piece Chanderi ensembles, tailored Khadi co-ord sets, and authentic hand-embroidered Chikankari.'}
               </p>
 
               <p className="text-[15px] sm:text-base text-[#4A433D] font-light leading-[1.75]">
-                Every garment is tailored with French seams, deep concealed pockets, and soft cotton mulmul linings—silhouettes that feel as natural in morning light as they do at an intimate evening gathering.
+                {siteSettings?.brandStoryParagraph2 ||
+                  'Every garment is tailored with French seams, deep concealed pockets, and soft cotton mulmul linings—silhouettes that feel as natural in morning light as they do at an intimate evening gathering.'}
               </p>
 
               <div className="pt-3">
@@ -490,35 +552,37 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* 5. Curated Collection (4 Selected Products from the 17 Products) */}
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
-          <div>
-            <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
-              House Signatures
+      {/* 5. Curated Collection */}
+      {curatedProducts.length > 0 && (
+        <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
+            <div>
+              <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
+                House Signatures
+              </p>
+              <h2 className="font-serif text-3xl sm:text-[42px] text-[#1E1B18] font-normal leading-tight">
+                Curated Collection
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-[#7C736A] mt-2 sm:mt-0 font-light">
+              Signature silhouettes selected from our collection
             </p>
-            <h2 className="font-serif text-3xl sm:text-[42px] text-[#1E1B18] font-normal leading-tight">
-              Curated Collection
-            </h2>
           </div>
-          <p className="text-xs sm:text-sm text-[#7C736A] mt-2 sm:mt-0 font-light">
-            Four signature silhouettes selected from our launch collection
-          </p>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-14">
-          {curatedProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              isWishlisted={wishlistIds.includes(product.id)}
-              onSelectProduct={onSelectProduct}
-              onToggleWishlist={onToggleWishlist}
-              onQuickAdd={onQuickAdd}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3.5 sm:gap-x-7 lg:gap-x-8 gap-y-10 sm:gap-y-14">
+            {curatedProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isWishlisted={wishlistIds.includes(product.id)}
+                onSelectProduct={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                onQuickAdd={onQuickAdd}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 6. Instagram-Style Fashion Gallery & 7. Minimal Trust Section */}
       <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 space-y-16 sm:space-y-24 lg:space-y-28">

@@ -120,7 +120,7 @@ export function validateImageFile(
 /**
  * Validates a batch of image files simultaneously, returning all valid files and accumulating all error messages at once.
  */
-export function validateImageFilesBatch<T extends FileLike>(
+export function validateImageFilesBatch<T extends FileLike = File>(
   files: T[] | FileList | null | undefined,
   currentGalleryCount: number = 0,
   maxGalleryCount: number = MAX_GALLERY_PHOTOS,
@@ -206,6 +206,8 @@ export interface ProductFormValues {
   originalPrice?: string | number;
   fabric: string;
   sizes: string[];
+  selectedSizes?: string[];
+  primaryImage?: string;
   description: string;
   gallery: ProductGalleryInputItem[];
 }
@@ -286,12 +288,15 @@ export function validateProductForm(values: ProductFormValues): {
   }
 
   // 7. Sizes Inventory
-  const validSizes = Array.isArray(values.sizes)
-    ? values.sizes.map((s) => String(s ?? '').trim().toUpperCase()).filter(Boolean)
-    : [];
+  const rawSizes = (Array.isArray(values.sizes) && values.sizes.length > 0)
+    ? values.sizes
+    : (Array.isArray(values.selectedSizes) ? values.selectedSizes : []);
+  const validSizes = rawSizes
+    .map((s) => String(s ?? '').trim().toUpperCase())
+    .filter(Boolean);
   if (validSizes.length === 0) {
     errors.sizes = 'Please select at least one available size (e.g. M, L, XL).';
-  }
+      }
 
   // 8. Garment Description & Cut Notes
   const cleanDesc = (values.description ?? '').toString().trim();
@@ -422,8 +427,12 @@ export function validateCheckoutForm(values: CheckoutFormValues): {
 export interface BrandingFormValues {
   logoUrl: string;
   heroBanner: string;
+  heroBannerMobile?: string;
   heroCoords: string;
+  heroCoordsMobile?: string;
   heroEthnic: string;
+  heroEthnicMobile?: string;
+  whatsappNumber?: string;
   brandStory: string;
   igPhotos: string[];
 }
@@ -431,8 +440,12 @@ export interface BrandingFormValues {
 export type BrandingFormField =
   | 'logoUrl'
   | 'heroBanner'
+  | 'heroBannerMobile'
   | 'heroCoords'
+  | 'heroCoordsMobile'
   | 'heroEthnic'
+  | 'heroEthnicMobile'
+  | 'whatsappNumber'
   | 'brandStory'
   | 'igPhotos';
 
@@ -457,10 +470,20 @@ export function validateBrandingForm(values: BrandingFormValues): {
     }
   };
 
+  const checkOptionalUrlField = (field: BrandingFormField, label: string, val?: string) => {
+    const clean = (val ?? '').trim();
+    if (clean && clean.startsWith('data:image/') && clean.length > maxDataUrlLength) {
+      errors[field] = `${label} exceeds the ${MAX_IMAGE_FILE_SIZE_MB} MB image size limit.`;
+    }
+  };
+
   checkUrlField('logoUrl', 'Brand logo', values.logoUrl);
   checkUrlField('heroBanner', 'Hero Slide 01 (Main Banner)', values.heroBanner);
   checkUrlField('heroCoords', 'Hero Slide 02 (Co-ord Edit)', values.heroCoords);
   checkUrlField('heroEthnic', 'Hero Slide 03 (Ethnic Edit)', values.heroEthnic);
+  checkOptionalUrlField('heroBannerMobile', 'Slide 01 Mobile Banner', values.heroBannerMobile);
+  checkOptionalUrlField('heroCoordsMobile', 'Slide 02 Mobile Banner', values.heroCoordsMobile);
+  checkOptionalUrlField('heroEthnicMobile', 'Slide 03 Mobile Banner', values.heroEthnicMobile);
   checkUrlField('brandStory', 'Brand Story Editorial', values.brandStory);
 
   if (!Array.isArray(values.igPhotos) || values.igPhotos.length === 0) {

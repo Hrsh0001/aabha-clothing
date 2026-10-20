@@ -3,21 +3,33 @@ import path from 'path';
 import crypto from 'crypto';
 import { prisma } from './db';
 
-interface CachedImage {
+export interface CachedImage {
   mimeType: string;
   buffer: Buffer;
+  etag: string;
 }
 
 const imageMemoryCache = new Map<string, CachedImage>();
-const MAX_CACHE_ENTRIES = 120;
+const MAX_CACHE_ENTRIES = 200;
 let isImageTableInitialized = false;
 
-function setCacheEntry(id: string, entry: CachedImage): void {
+function computeEtag(buffer: Buffer): string {
+  const hash = crypto.createHash('sha1').update(buffer).digest('hex').slice(0, 24);
+  return `"${hash}"`;
+}
+
+function setCacheEntry(id: string, mimeType: string, buffer: Buffer): CachedImage {
   if (imageMemoryCache.size >= MAX_CACHE_ENTRIES) {
     const oldestKey = imageMemoryCache.keys().next().value;
     if (oldestKey) imageMemoryCache.delete(oldestKey);
   }
+  const entry: CachedImage = {
+    mimeType,
+    buffer,
+    etag: computeEtag(buffer),
+  };
   imageMemoryCache.set(id, entry);
+  return entry;
 }
 
 export async function ensureUploadedImageTable(): Promise<boolean> {
@@ -73,7 +85,7 @@ export async function saveUploadedImage(
   const cleanId = path.basename(id).replace(/[^a-zA-Z0-9._-]/g, '_');
   const base64Data = buffer.toString('base64');
 
-  setCacheEntry(cleanId, { mimeType, buffer });
+  setCacheEntry(cleanId, mimeType, buffer);
 
   if (process.env.DATABASE_URL && prisma) {
     try {
@@ -175,6 +187,7 @@ export async function persistImageUrlForCloud(rawUrl: string | undefined | null)
 
 /**
  * Retrieves an uploaded image binary by ID from memory cache, Supabase PostgreSQL, or local disk.
+ * Never runs CREATE TABLE DDL on normal reads — queries findUnique directly for fast response.
  */
 export async function getUploadedImage(id: string): Promise<CachedImage | null> {
   const cleanId = path.basename(id).replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -190,9 +203,7 @@ export async function getUploadedImage(id: string): Promise<CachedImage | null> 
       if (record && record.data) {
         const buffer = Buffer.from(record.data, 'base64');
         const mimeType = record.mimeType || getMimeFromFilename(cleanId);
-        const entry = { mimeType, buffer };
-        setCacheEntry(cleanId, entry);
-        return entry;
+        return setCacheEntry(cleanId, mimeType, buffer);
       }
     } catch {
       try {
@@ -204,9 +215,7 @@ export async function getUploadedImage(id: string): Promise<CachedImage | null> 
         if (rows && rows.length > 0 && rows[0].data) {
           const buffer = Buffer.from(rows[0].data, 'base64');
           const mimeType = rows[0].mimeType || getMimeFromFilename(cleanId);
-          const entry = { mimeType, buffer };
-          setCacheEntry(cleanId, entry);
-          return entry;
+          return setCacheEntry(cleanId, mimeType, buffer);
         }
       } catch (err) {
         console.warn('PostgreSQL image read notice:', err);
@@ -220,9 +229,7 @@ export async function getUploadedImage(id: string): Promise<CachedImage | null> 
     if (fs.existsSync(localPath)) {
       const buffer = fs.readFileSync(localPath);
       const mimeType = getMimeFromFilename(cleanId);
-      const entry = { mimeType, buffer };
-      setCacheEntry(cleanId, entry);
-      return entry;
+      return setCacheEntry(cleanId, mimeType, buffer);
     }
   } catch {
     // Ignore

@@ -24,25 +24,7 @@ const PRODUCTS_FILE_PATH = path.join(process.cwd(), 'data', 'products.json');
 let inMemoryReviewsCache: StoredReview[] | null = null;
 let isReviewsTableReady = false;
 
-async function ensureReviewsStorage(): Promise<boolean> {
-  if (!process.env.DATABASE_URL || !prisma) return false;
-  try {
-    if (!isReviewsTableReady) {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "SiteSetting" (
-          "id" TEXT NOT NULL,
-          "data" JSONB NOT NULL,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("id")
-        );
-      `);
-      isReviewsTableReady = true;
-    }
-    return true;
-  } catch {
-    return true;
-  }
-}
+async function ensureReviewsStorage(): Promise<boolean> { return true; }
 
 function ensureReviewsFile(): void {
   try {
@@ -94,16 +76,15 @@ async function saveReviews(reviews: StoredReview[]): Promise<void> {
   inMemoryReviewsCache = reviews;
 
   const dbReady = await ensureReviewsStorage();
-  if (dbReady && prisma) {
+  if (prisma) {
     try {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "SiteSetting" ("id", "data", "updatedAt")
-         VALUES ('site_reviews', $1::jsonb, CURRENT_TIMESTAMP)
-         ON CONFLICT ("id") DO UPDATE SET "data" = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP`,
-        JSON.stringify(reviews)
-      );
+      await prisma.siteSetting.upsert({
+        where: { id: 'site_reviews' },
+        update: { data: reviews as any },
+        create: { id: 'site_reviews', data: reviews as any },
+      });
     } catch (err) {
-      console.warn('Database reviews save notice:', err);
+      console.warn('Prisma site_reviews save notice:', err);
     }
   }
 

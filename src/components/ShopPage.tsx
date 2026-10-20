@@ -271,10 +271,11 @@ export const ShopPage: React.FC<ShopPageProps> = ({
             key={`${selectedCategory}-${sortBy}`}
             className="mt-8 sm:mt-12 lg:mt-14 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 sm:gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-16 animate-page-fade"
           >
-            {displayedProducts.map((product) => (
+            {displayedProducts.map((product, idx) => (
               <ProductCard
                 key={product.id}
                 product={product}
+                priority={idx < 4}
                 isWishlisted={wishlistIds.includes(product.id)}
                 onSelectProduct={onSelectProduct}
                 onToggleWishlist={onToggleWishlist}
