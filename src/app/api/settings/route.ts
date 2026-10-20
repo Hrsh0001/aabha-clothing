@@ -14,6 +14,12 @@ export interface SiteSettings {
   heroEthnic: string;
   heroEthnicMobile?: string;
   whatsappNumber?: string;
+  supportEmail?: string;
+  supportPhone?: string;
+  instagramUrl?: string;
+  instagramHandle?: string;
+  storeAddress?: string;
+  storeHours?: string;
   brandStory: string;
   igPhotos: string[];
   announcementText?: string;
@@ -40,6 +46,12 @@ const DEFAULT_SETTINGS: SiteSettings = {
   heroEthnic: '/images/hero_slide_ethnic_1791228741882.jpg',
   heroEthnicMobile: '',
   whatsappNumber: '919876543210',
+  supportEmail: 'care@aabhaclothing.com',
+  supportPhone: '+91 98765 43210',
+  instagramUrl: 'https://instagram.com/aabhaclothing',
+  instagramHandle: '@aabhaclothing',
+  storeAddress: 'AABHA Atelier, Mumbai, Maharashtra 400001',
+  storeHours: 'Monday to Saturday · 10:00 AM – 7:00 PM IST',
   brandStory: '/images/brand_story_editorial_1791119191742.jpg',
   igPhotos: [
     '/images/product_kurta_ivory_1791119105107.jpg',
@@ -184,6 +196,30 @@ export async function POST(request: Request) {
         rawUpdated.whatsappNumber !== undefined
           ? rawUpdated.whatsappNumber
           : DEFAULT_SETTINGS.whatsappNumber,
+      supportEmail:
+        rawUpdated.supportEmail !== undefined
+          ? rawUpdated.supportEmail
+          : DEFAULT_SETTINGS.supportEmail,
+      supportPhone:
+        rawUpdated.supportPhone !== undefined
+          ? rawUpdated.supportPhone
+          : DEFAULT_SETTINGS.supportPhone,
+      instagramUrl:
+        rawUpdated.instagramUrl !== undefined
+          ? rawUpdated.instagramUrl
+          : DEFAULT_SETTINGS.instagramUrl,
+      instagramHandle:
+        rawUpdated.instagramHandle !== undefined
+          ? rawUpdated.instagramHandle
+          : DEFAULT_SETTINGS.instagramHandle,
+      storeAddress:
+        rawUpdated.storeAddress !== undefined
+          ? rawUpdated.storeAddress
+          : DEFAULT_SETTINGS.storeAddress,
+      storeHours:
+        rawUpdated.storeHours !== undefined
+          ? rawUpdated.storeHours
+          : DEFAULT_SETTINGS.storeHours,
       brandStory:
         (await persistImageUrlForCloud(rawUpdated.brandStory)) || DEFAULT_SETTINGS.brandStory,
       igPhotos: igPhotos.length > 0 ? igPhotos : DEFAULT_SETTINGS.igPhotos,

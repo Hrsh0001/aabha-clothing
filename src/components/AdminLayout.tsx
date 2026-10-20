@@ -69,7 +69,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Workspace Top Bar */}
         {title && (
-          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <header className="sticky top-[53px] lg:top-0 z-30 bg-[#FAF8F5]/95 shadow-xs backdrop-blur-md border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h1 className="font-serif text-2xl sm:text-3xl text-[#1E1B18] font-normal tracking-tight">
                 {title}
@@ -93,7 +93,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           className={
             noPadding
               ? 'flex-1 w-full flex flex-col min-h-0'
-              : 'flex-1 p-4 sm:p-8 lg:p-10 max-w-[1700px] w-full mx-auto'
+              : 'flex-1 p-3.5 sm:p-6 lg:p-10 max-w-[1700px] w-full mx-auto overflow-x-hidden min-w-0'
           }
         >
           {children}

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import {
+  MessageCircle,
   ArrowLeft,
   Heart,
   Ruler,
@@ -33,6 +34,7 @@ interface ProductDetailPageProps {
   onToggleWishlist: (productId: string, e: React.MouseEvent) => void;
   onQuickAdd: (product: Product, size: GarmentSize, e: React.MouseEvent) => void;
   onAddReview: (productId: string, review: Omit<ProductReview, 'id' | 'date'>) => void;
+  siteSettings?: any;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
@@ -47,6 +49,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onToggleWishlist,
   onQuickAdd,
   onAddReview,
+  siteSettings,
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<GarmentSize>('S');
@@ -512,6 +515,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             >
               {product.inStock ? 'Buy Now' : 'Currently Unavailable'}
             </button>
+
+            {/* Direct WhatsApp Stylist Inquiry */}
+            <a
+              href={`https://wa.me/${(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                `Namaste AABHA, I have a styling and sizing inquiry about "${product.name}" (SKU: ${product.sku}, Size: ${selectedSize}, Price: ₹${product.price.toLocaleString('en-IN')}). Could you assist me?`
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-3.5 px-4 border border-[#E0D8CE] bg-[#FAF8F5] text-[#2E7D32] hover:bg-[#E8F5E9] hover:border-[#C8E6C9] text-xs font-medium tracking-[0.14em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 text-[#25D366]" />
+              <span>Inquire With Stylist on WhatsApp</span>
+            </a>
           </div>
 
           {/* Subtle PIN Code Delivery Estimator */}

@@ -127,7 +127,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     window.location.href = '/admin/login';
   };
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ isMobile }: { isMobile?: boolean }) => (
     <div className="flex flex-col h-full bg-[#1E1B18] text-[#FAF8F5]">
       {/* Brand Header */}
       <div className="p-6 border-b border-[#2E2925]">
@@ -273,7 +273,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             aria-hidden="true"
           />
           <div className="relative w-72 max-w-[85vw] h-full z-10 shadow-2xl">
-            <SidebarContent />
+            <SidebarContent isMobile />
           </div>
         </div>
       )}

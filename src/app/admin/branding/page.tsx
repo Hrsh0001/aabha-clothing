@@ -8,6 +8,7 @@ import {
   Save,
   RefreshCw,
   Info,
+  ExternalLink,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -187,6 +188,12 @@ export default function AdminBrandingPage() {
           ? await compressDataUrlIfNeeded(settings.heroEthnicMobile)
           : '',
         whatsappNumber: settings.whatsappNumber || '',
+        supportEmail: settings.supportEmail || '',
+        supportPhone: settings.supportPhone || '',
+        instagramUrl: settings.instagramUrl || '',
+        instagramHandle: settings.instagramHandle || '',
+        storeAddress: settings.storeAddress || '',
+        storeHours: settings.storeHours || '',
         brandStory: await compressDataUrlIfNeeded(settings.brandStory),
         igPhotos: compressedIg,
         announcementText: settings.announcementText || '',
@@ -364,28 +371,135 @@ export default function AdminBrandingPage() {
             </div>
           </section>
 
-          {/* Section 0.5: Customer Care & WhatsApp Support */}
-          <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-4">
+          {/* Section 0.5: Complete Store Concierge, Contact & Social Settings */}
+          <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-6">
             <div>
-              <p className="text-xs uppercase tracking-wider text-[#7C736A]">Customer Communication</p>
+              <p className="text-xs uppercase tracking-wider text-[#7C736A]">Customer Concierge & Touchpoints</p>
               <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-1">
-                Store Customer Support WhatsApp Number
+                Store Contact, WhatsApp & Social Channels
               </h2>
               <p className="text-xs text-[#5C544D] mt-1">
-                The official WhatsApp number used for checkout order confirmations, order status inquiries, and customer concierge. Include country code without any + or spaces (e.g. 919876543210).
+                Manage all customer contact channels displayed across Checkout, Order Tracking, Contact page, and Website Footer.
               </p>
             </div>
-            <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4">
-              <label className="block text-xs font-medium text-[#1E1B18] mb-1.5">
-                WhatsApp Support Mobile Number:
-              </label>
-              <input
-                type="text"
-                value={settings.whatsappNumber ?? '919876543210'}
-                onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
-                placeholder="e.g. 919876543210"
-                className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] font-mono focus:outline-none focus:border-[#1E1B18]"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* WhatsApp Concierge Number */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-[#1E1B18]">
+                    Official WhatsApp Concierge Number:
+                  </label>
+                  {settings.whatsappNumber && (
+                    <a
+                      href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-[#2E7D32] hover:underline font-mono inline-flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Test Link
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={settings.whatsappNumber ?? '919876543210'}
+                  onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                  placeholder="e.g. 919876543210 (Country code + 10 digits)"
+                  className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] font-mono focus:outline-none focus:border-[#1E1B18]"
+                />
+                <p className="text-[10px] text-[#7C736A]">
+                  Used for instant COD confirmation button, order status chat, and footer concierge.
+                </p>
+              </div>
+
+              {/* Client Care Email */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <label className="block text-xs font-medium text-[#1E1B18]">
+                  Client Care Email Address:
+                </label>
+                <input
+                  type="email"
+                  value={settings.supportEmail ?? 'care@aabhaclothing.com'}
+                  onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                  placeholder="e.g. care@aabhaclothing.com"
+                  className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                />
+                <p className="text-[10px] text-[#7C736A]">
+                  Displayed in Contact Us and Website Footer.
+                </p>
+              </div>
+
+              {/* Calling Helpline Phone */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <label className="block text-xs font-medium text-[#1E1B18]">
+                  Store Calling Helpline Phone:
+                </label>
+                <input
+                  type="text"
+                  value={settings.supportPhone ?? '+91 98765 43210'}
+                  onChange={(e) => setSettings({ ...settings, supportPhone: e.target.value })}
+                  placeholder="e.g. +91 98765 43210"
+                  className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                />
+                <p className="text-[10px] text-[#7C736A]">
+                  Displayed for voice customer support.
+                </p>
+              </div>
+
+              {/* Instagram Profile URL */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <label className="block text-xs font-medium text-[#1E1B18]">
+                  Instagram Profile URL & Handle:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="url"
+                    value={settings.instagramUrl ?? 'https://instagram.com/aabhaclothing'}
+                    onChange={(e) => setSettings({ ...settings, instagramUrl: e.target.value })}
+                    placeholder="https://instagram.com/..."
+                    className="w-full bg-white border border-[#E0D8CE] px-3 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  />
+                  <input
+                    type="text"
+                    value={settings.instagramHandle ?? '@aabhaclothing'}
+                    onChange={(e) => setSettings({ ...settings, instagramHandle: e.target.value })}
+                    placeholder="@aabhaclothing"
+                    className="w-full bg-white border border-[#E0D8CE] px-3 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                  />
+                </div>
+                <p className="text-[10px] text-[#7C736A]">
+                  Powers the Instagram grid section and footer link.
+                </p>
+              </div>
+
+              {/* Atelier Physical Address */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <label className="block text-xs font-medium text-[#1E1B18]">
+                  Boutique / Atelier Studio Address:
+                </label>
+                <input
+                  type="text"
+                  value={settings.storeAddress ?? 'AABHA Atelier, Mumbai, Maharashtra 400001'}
+                  onChange={(e) => setSettings({ ...settings, storeAddress: e.target.value })}
+                  placeholder="e.g. AABHA Atelier, Mumbai, Maharashtra 400001"
+                  className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                />
+              </div>
+
+              {/* Assistance Hours */}
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-2">
+                <label className="block text-xs font-medium text-[#1E1B18]">
+                  Customer Assistance Hours:
+                </label>
+                <input
+                  type="text"
+                  value={settings.storeHours ?? 'Monday to Saturday · 10:00 AM – 7:00 PM IST'}
+                  onChange={(e) => setSettings({ ...settings, storeHours: e.target.value })}
+                  placeholder="e.g. Monday to Saturday · 10:00 AM – 7:00 PM IST"
+                  className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                />
+              </div>
             </div>
           </section>
 

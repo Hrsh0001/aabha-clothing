@@ -507,7 +507,7 @@ export default function App() {
             <AboutPage onExploreCollection={() => handleNavigateShopCategory('All Collection')} />
           )}
 
-          {activePage === 'contact' && <ContactPage />}
+          {activePage === 'contact' && <ContactPage siteSettings={siteSettings} />}
 
           {activePage === 'policy' && (
             <PolicyPage

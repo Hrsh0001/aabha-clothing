@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { ArrowRight, Mail, Clock, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Mail, Clock, CheckCircle2, MessageCircle, Phone, MapPin } from 'lucide-react';
 import { EDITORIAL_ASSETS } from '../data/products';
 import { EditorialImage } from './EditorialImage';
 
@@ -82,7 +82,11 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => 
   );
 };
 
-export const ContactPage: React.FC = () => {
+interface ContactPageProps {
+  siteSettings?: any;
+}
+
+export const ContactPage: React.FC<ContactPageProps> = ({ siteSettings }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -140,22 +144,74 @@ export const ContactPage: React.FC = () => {
           </div>
 
           <div className="space-y-6 pt-6 border-t border-[#ECE6DD] text-sm">
+            {/* WhatsApp Concierge */}
+            <div className="flex items-start gap-3.5">
+              <MessageCircle className="w-4 h-4 text-[#2E7D32] shrink-0 mt-1 stroke-[1.35]" />
+              <div>
+                <h2 className="font-medium text-[#1E1B18]">Instant WhatsApp Concierge</h2>
+                <a
+                  href={`https://wa.me/${(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                    'Namaste AABHA, I would like to inquire about your silhouettes and bespoke sizing.'
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-[#2E7D32] hover:underline font-mono mt-0.5"
+                >
+                  Chat with Concierge (+{(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')})
+                </a>
+              </div>
+            </div>
+
+            {/* Email */}
             <div className="flex items-start gap-3.5">
               <Mail className="w-4 h-4 text-[#6E5043] shrink-0 mt-1 stroke-[1.35]" />
               <div>
                 <h2 className="font-medium text-[#1E1B18]">Client Care Email</h2>
-                <p className="text-[#7C736A] font-light text-xs sm:text-sm mt-0.5">
-                  care@aabhaclothing.com
-                </p>
+                <a
+                  href={`mailto:${siteSettings?.supportEmail || 'care@aabhaclothing.com'}`}
+                  className="text-[#7C736A] font-light text-xs sm:text-sm mt-0.5 block hover:text-[#1E1B18]"
+                >
+                  {siteSettings?.supportEmail || 'care@aabhaclothing.com'}
+                </a>
               </div>
             </div>
 
+            {/* Phone Helpline */}
+            {siteSettings?.supportPhone && (
+              <div className="flex items-start gap-3.5">
+                <Phone className="w-4 h-4 text-[#6E5043] shrink-0 mt-1 stroke-[1.35]" />
+                <div>
+                  <h2 className="font-medium text-[#1E1B18]">Telephone Helpline</h2>
+                  <a
+                    href={`tel:${siteSettings.supportPhone.replace(/[^0-9+]/g, '')}`}
+                    className="text-[#7C736A] font-light text-xs sm:text-sm mt-0.5 block hover:text-[#1E1B18]"
+                  >
+                    {siteSettings.supportPhone}
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Studio Address */}
+            {siteSettings?.storeAddress && (
+              <div className="flex items-start gap-3.5">
+                <MapPin className="w-4 h-4 text-[#6E5043] shrink-0 mt-1 stroke-[1.35]" />
+                <div>
+                  <h2 className="font-medium text-[#1E1B18]">Atelier Studio</h2>
+                  <p className="text-[#7C736A] font-light text-xs sm:text-sm mt-0.5">
+                    {siteSettings.storeAddress}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Assistance Hours */}
             <div className="flex items-start gap-3.5">
               <Clock className="w-4 h-4 text-[#6E5043] shrink-0 mt-1 stroke-[1.35]" />
               <div>
                 <h2 className="font-medium text-[#1E1B18]">Assistance Hours</h2>
                 <p className="text-[#7C736A] font-light text-xs sm:text-sm mt-0.5">
-                  Monday to Saturday · 10:00 AM – 7:00 PM IST
+                  {siteSettings?.storeHours || 'Monday to Saturday · 10:00 AM – 7:00 PM IST'}
                 </p>
               </div>
             </div>
