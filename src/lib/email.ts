@@ -14,12 +14,17 @@ export async function sendEmail({
   html,
   from,
 }: SendEmailOptions): Promise<{ success: boolean; error?: string; messageId?: string }> {
-  const senderEmail =
+  let senderEmail =
     from ||
     process.env.EMAIL_FROM ||
     process.env.RESEND_FROM ||
     process.env.SMTP_FROM ||
     'AABHA CLOTHING <orders@aabhaclothing.in>';
+
+  // Since aabhaclothing.in domain is verified in Resend, automatically upgrade from testing sandbox
+  if (senderEmail.includes('onboarding@resend.dev')) {
+    senderEmail = 'AABHA CLOTHING <orders@aabhaclothing.in>';
+  }
 
   const fromHeader = senderEmail.includes('<') ? senderEmail : `AABHA CLOTHING <${senderEmail}>`;
 
