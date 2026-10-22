@@ -44,7 +44,7 @@ export const AdminNav: React.FC<AdminNavProps> = ({ activeTab, extraAction }) =>
   ];
 
   return (
-    <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
+    <header className="sticky top-0 z-30 bg-[#FAF8F5] sm:bg-[#FAF8F5]/95 sm:backdrop-blur-sm border-b border-[#ECE6DD]">
       <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-3.5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
           {/* Top Row: Storefront Return + Portal Brand */}

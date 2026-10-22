@@ -87,5 +87,10 @@
   "showAboutHero": true,
   "showAboutFoundational": true,
   "showContactChannels": true,
-  "showContactForm": true
+  "showContactForm": true,
+  "showProductReviews": true,
+  "showRelatedProducts": true,
+  "showPinCodeChecker": true,
+  "showShopHeader": true,
+  "showShopFilters": true
 }

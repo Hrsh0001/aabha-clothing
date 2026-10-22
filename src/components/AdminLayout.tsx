@@ -69,7 +69,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Workspace Top Bar */}
         {title && (
-          <header className="sticky top-[53px] lg:top-0 z-30 bg-[#FAF8F5]/95 shadow-xs backdrop-blur-md border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <header className="sticky top-[53px] lg:top-0 z-30 bg-[#FAF8F5] sm:bg-[#FAF8F5]/95 shadow-xs sm:backdrop-blur-sm border-b border-[#ECE6DD] px-4 sm:px-8 lg:px-10 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h1 className="font-serif text-2xl sm:text-3xl text-[#1E1B18] font-normal tracking-tight">
                 {title}

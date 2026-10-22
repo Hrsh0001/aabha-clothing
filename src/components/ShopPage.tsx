@@ -155,20 +155,23 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   return (
     <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 sm:py-14 lg:py-20">
       {/* Editorial Category Header */}
-      <div className="pb-8 sm:pb-12 px-0.5 sm:px-0">
-        <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-3">
-          AABHA CLOTHING · {selectedCategory}
-        </p>
-        <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl text-[#1E1B18] font-normal leading-tight">
-          {activeCategoryMeta.title}
-        </h1>
-        <p className="text-sm sm:text-base text-[#5C544D] font-light mt-3 max-w-2xl leading-relaxed">
-          {activeCategoryMeta.subtitle}
-        </p>
-      </div>
+      {siteSettings?.showShopHeader !== false && (
+        <div className="pb-8 sm:pb-12 px-0.5 sm:px-0">
+          <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-3">
+            AABHA CLOTHING · {selectedCategory}
+          </p>
+          <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl text-[#1E1B18] font-normal leading-tight">
+            {activeCategoryMeta.title}
+          </h1>
+          <p className="text-sm sm:text-base text-[#5C544D] font-light mt-3 max-w-2xl leading-relaxed">
+            {activeCategoryMeta.subtitle}
+          </p>
+        </div>
+      )}
 
       {/* Minimal Editorial Filter & Custom Sort Bar */}
-      <div className="py-4 border-y border-[#ECE6DD] flex flex-col md:flex-row md:items-center justify-between gap-4 px-0.5 sm:px-0 relative z-20">
+      {siteSettings?.showShopFilters !== false && (
+        <div className="py-4 border-y border-[#ECE6DD] flex flex-col md:flex-row md:items-center justify-between gap-4 px-0.5 sm:px-0 relative z-20">
         {/* Clean Minimal Category Filter Tabs with Exact Counts */}
         <div className="flex items-center gap-4 sm:gap-6 md:gap-8 overflow-x-auto no-scrollbar py-1">
           {categoryTabs.map((tab) => {
@@ -259,6 +262,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
           </span>
         </div>
       </div>
+      )}
 
       {/* Clean 2-Column Mobile / 3-Column Tablet / 4-Column Desktop Product Grid */}
       {filteredProducts.length === 0 ? (

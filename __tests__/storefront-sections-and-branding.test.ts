@@ -116,6 +116,11 @@ describe('Storefront Sections & Dynamic Content Management', () => {
     expect(s.showContactChannels).toBe(true);
     expect(s.showContactForm).toBe(true);
     expect(s.showFooterNewsletter).toBe(true);
+    expect(s.showProductReviews).toBe(true);
+    expect(s.showRelatedProducts).toBe(true);
+    expect(s.showPinCodeChecker).toBe(true);
+    expect(s.showShopHeader).toBe(true);
+    expect(s.showShopFilters).toBe(true);
   });
 
   test('POST /api/settings allows admin to customize any section and toggle add/remove visibility flags', async () => {

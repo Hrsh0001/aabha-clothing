@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
           {announcementText}
         </div>
       )}
-      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
+      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5] sm:bg-[#FAF8F5]/95 sm:backdrop-blur-sm border-b border-[#ECE6DD]">
       <div className="relative max-w-[1920px] mx-auto w-full h-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
         {/* Mobile Left Hamburger Trigger (flex-1 on mobile so logo stays centered) */}
         <div className="flex-1 flex items-center justify-start md:hidden">

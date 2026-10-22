@@ -24,6 +24,7 @@ import {
   ShoppingBag,
   BookOpen,
   Award,
+  Sliders,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -42,7 +43,7 @@ import {
   type BrandingFormErrors,
 } from '@/src/lib/form-validation';
 
-type BrandingTab = 'hero' | 'categories' | 'arrivals_trust' | 'story_about' | 'contact_social';
+type BrandingTab = 'hero' | 'categories' | 'arrivals_trust' | 'story_about' | 'contact_social' | 'layout_manager';
 
 export default function AdminBrandingPage() {
   const { adminToken } = useAuth();
@@ -441,6 +442,7 @@ export default function AdminBrandingPage() {
               { id: 'arrivals_trust', label: '3. New Arrivals & Pillars', icon: Award },
               { id: 'story_about', label: '4. Brand Story & About Page', icon: BookOpen },
               { id: 'contact_social', label: '5. Concierge, Contact & Identity', icon: MessageCircle },
+              { id: 'layout_manager', label: '6. Page Sections Add/Remove', icon: Sliders },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1809,6 +1811,194 @@ export default function AdminBrandingPage() {
                   </button>
                 </div>
               </section>
+            </div>
+          )}
+
+          {/* TAB 6: ALL PAGES SECTION MANAGER */}
+          {activeTab === 'layout_manager' && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="bg-[#F3EFEA] p-6 border border-[#ECE6DD]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sliders className="w-5 h-5 text-[#6E5043]" />
+                  <h2 className="font-serif text-2xl text-[#1E1B18]">
+                    Master Page Sections &amp; Visibility Manager
+                  </h2>
+                </div>
+                <p className="text-xs text-[#5C544D] leading-relaxed max-w-2xl">
+                  Add, remove, or temporarily hide any section across all storefront pages with a single click. When a section is removed, the storefront smoothly collapses that section and adapts its layout. Click &ldquo;Save All Branding &amp; Media&rdquo; at the bottom to apply changes to the live site.
+                </p>
+              </div>
+
+              {/* Group by Page */}
+              {[
+                {
+                  pageTitle: 'Home Page (/)',
+                  pageDesc: 'Primary luxury brand showcase and editorial landing experience',
+                  sections: [
+                    {
+                      flag: 'showAnnouncementBar' as keyof SiteSettings,
+                      name: 'Top Announcement Bar',
+                      desc: 'Urgent notice or complimentary shipping bar displayed across the top header',
+                    },
+                    {
+                      flag: 'showHeroCarousel' as keyof SiteSettings,
+                      name: 'Editorial 3-Slide Hero Carousel',
+                      desc: 'Full-screen editorial imagery with typography and primary CTA shop buttons',
+                    },
+                    {
+                      flag: 'showCategorySection' as keyof SiteSettings,
+                      name: 'Shop By Category Grid',
+                      desc: 'Curated 4-column silhouette exploration with dynamic cover photography',
+                    },
+                    {
+                      flag: 'showNewArrivals' as keyof SiteSettings,
+                      name: 'New Arrivals Showcase',
+                      desc: 'Dynamic catalog of recently published silhouettes with quick-view controls',
+                    },
+                    {
+                      flag: 'showBrandStory' as keyof SiteSettings,
+                      name: 'Brand Story Philosophy Section',
+                      desc: 'Editorial craft narrative explaining handloom textiles, french seams, and mulmul linings',
+                    },
+                    {
+                      flag: 'showCuratedSection' as keyof SiteSettings,
+                      name: 'Curated Collection Signatures',
+                      desc: 'Handpicked spotlight garments with featured styling details',
+                    },
+                    {
+                      flag: 'showTrustBadges' as keyof SiteSettings,
+                      name: 'Heritage & Trust Badges (4 Pillars)',
+                      desc: 'Assurances for Free Insured Delivery, Easy Returns, COD Guarantee, and Made in India',
+                    },
+                    {
+                      flag: 'showInstagramSection' as keyof SiteSettings,
+                      name: 'Instagram Living Atelier Showcase',
+                      desc: '6 curated lookbook photos highlighting moments in quiet motion',
+                    },
+                    {
+                      flag: 'showFooterNewsletter' as keyof SiteSettings,
+                      name: 'Footer Newsletter Subscription',
+                      desc: 'Private previews and launch email subscription input in the website footer',
+                    },
+                  ],
+                },
+                {
+                  pageTitle: 'Shop Catalog Page (/shop)',
+                  pageDesc: 'Garment browsing, category filtering, and sorting experience',
+                  sections: [
+                    {
+                      flag: 'showShopHeader' as keyof SiteSettings,
+                      name: 'Category Title & Description Header',
+                      desc: 'Editorial title and craft description for currently active collection',
+                    },
+                    {
+                      flag: 'showShopFilters' as keyof SiteSettings,
+                      name: 'Category Tabs & Luxury Sort Dropdown',
+                      desc: 'Silhouette filter tabs (Anarkali, 3-Piece, Co-ord, Chikankari) and price sorting menu',
+                    },
+                  ],
+                },
+                {
+                  pageTitle: 'Product Detail Page',
+                  pageDesc: 'Single garment inspection, sizing, and styling showcase',
+                  sections: [
+                    {
+                      flag: 'showPinCodeChecker' as keyof SiteSettings,
+                      name: 'PIN Code Delivery Estimator',
+                      desc: 'Subtle 6-digit postal code check for complimentary courier serviceability',
+                    },
+                    {
+                      flag: 'showProductReviews' as keyof SiteSettings,
+                      name: 'Client Impressions & Review Form',
+                      desc: 'Customer star ratings, written reviews, verified buyer badges, and submission form',
+                    },
+                    {
+                      flag: 'showRelatedProducts' as keyof SiteSettings,
+                      name: 'Related Products / Complete The Look',
+                      desc: 'Curated companion garments from the same silhouette or fabric family',
+                    },
+                  ],
+                },
+                {
+                  pageTitle: 'About Page (/about)',
+                  pageDesc: 'Brand heritage, design philosophy, and handloom craft story',
+                  sections: [
+                    {
+                      flag: 'showAboutHero' as keyof SiteSettings,
+                      name: 'About Hero Narrative & Philosophy',
+                      desc: 'Brand inception header and quiet luxury conviction text',
+                    },
+                    {
+                      flag: 'showAboutFoundational' as keyof SiteSettings,
+                      name: 'Foundational Silhouettes Showcase',
+                      desc: '4 signature silhouette pillars: Anarkalis, 3-Piece, Co-ords, and Chikankari needlework',
+                    },
+                  ],
+                },
+                {
+                  pageTitle: 'Contact Concierge Page (/contact)',
+                  pageDesc: 'Direct atelier communication and client care channels',
+                  sections: [
+                    {
+                      flag: 'showContactChannels' as keyof SiteSettings,
+                      name: 'Direct Concierge Cards',
+                      desc: 'Official WhatsApp, Telephone, Email care cards, and studio address information',
+                    },
+                    {
+                      flag: 'showContactForm' as keyof SiteSettings,
+                      name: 'Patron Message Inquiry Form',
+                      desc: 'Direct customer message form for sizing assistance, custom orders, or order inquiries',
+                    },
+                  ],
+                },
+              ].map((group, gIdx) => (
+                <div key={gIdx} className="bg-white border border-[#ECE6DD] p-6 space-y-4 shadow-xs">
+                  <div className="border-b border-[#ECE6DD] pb-3">
+                    <h3 className="font-serif text-xl text-[#1E1B18] font-normal">{group.pageTitle}</h3>
+                    <p className="text-xs text-[#7C736A] mt-0.5">{group.pageDesc}</p>
+                  </div>
+                  <div className="divide-y divide-[#ECE6DD]">
+                    {group.sections.map((sec) => {
+                      const isVisible = settings[sec.flag] !== false;
+                      return (
+                        <div
+                          key={String(sec.flag)}
+                          className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-[#1E1B18]">{sec.name}</span>
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                                  isVisible
+                                    ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                    : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                                }`}
+                              >
+                                {isVisible ? 'Active' : 'Removed'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#7C736A] leading-relaxed max-w-xl">
+                              {sec.desc}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(sec.flag)}
+                            className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer border whitespace-nowrap shrink-0 ${
+                              isVisible
+                                ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                                : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                            }`}
+                          >
+                            {isVisible ? 'Remove Section' : '+ Add Section'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

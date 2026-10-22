@@ -485,6 +485,7 @@ export default function App() {
               onToggleWishlist={handleToggleWishlist}
               onQuickAdd={handleQuickAdd}
               onAddReview={handleAddReview}
+              siteSettings={siteSettings}
             />
           )}
 

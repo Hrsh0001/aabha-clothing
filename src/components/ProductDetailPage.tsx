@@ -531,26 +531,28 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
 
           {/* Subtle PIN Code Delivery Estimator */}
-          <div className="p-4 bg-[#F3EFEA] space-y-2">
-            <form onSubmit={handleCheckPin} className="flex items-center gap-2.5">
-              <MapPin className="w-4 h-4 text-[#6E5043] stroke-[1.35] shrink-0" />
-              <input
-                type="text"
-                maxLength={6}
-                value={pinCode}
-                onChange={(e) => setPinCode(e.target.value)}
-                placeholder="Enter 6-digit PIN code for delivery estimate"
-                className="flex-1 bg-transparent border-b border-[#D5CCC0] py-1.5 text-xs text-[#1E1B18] placeholder:text-[#948A80] focus:outline-none focus:border-[#1E1B18]"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1 text-xs tracking-[0.12em] uppercase text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap cursor-pointer"
-              >
-                Check
-              </button>
-            </form>
-            {pinStatus && <p className="text-xs text-[#5C544D] font-light">{pinStatus}</p>}
-          </div>
+          {siteSettings?.showPinCodeChecker !== false && (
+            <div className="p-4 bg-[#F3EFEA] space-y-2">
+              <form onSubmit={handleCheckPin} className="flex items-center gap-2.5">
+                <MapPin className="w-4 h-4 text-[#6E5043] stroke-[1.35] shrink-0" />
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value)}
+                  placeholder="Enter 6-digit PIN code for delivery estimate"
+                  className="flex-1 bg-transparent border-b border-[#D5CCC0] py-1.5 text-xs text-[#1E1B18] placeholder:text-[#948A80] focus:outline-none focus:border-[#1E1B18]"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1 text-xs tracking-[0.12em] uppercase text-[#1E1B18] hover:text-[#6E5043] transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  Check
+                </button>
+              </form>
+              {pinStatus && <p className="text-xs text-[#5C544D] font-light">{pinStatus}</p>}
+            </div>
+          )}
 
           {/* 5 Structured Specification Accordions */}
           <div className="border-t border-[#ECE6DD] divide-y divide-[#ECE6DD]">
@@ -681,6 +683,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       </div>
 
       {/* Customer Reviews Section */}
+      {siteSettings?.showProductReviews !== false && (
       <section className="mt-24 sm:mt-32 pt-16 sm:pt-20 border-t border-[#ECE6DD]">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-12 gap-4">
           <div>
@@ -834,9 +837,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         )}
       </section>
+      )}
 
       {/* Related Products Section — Clean 2-Column Mobile Grid */}
-      {relatedProducts.length > 0 && (
+      {siteSettings?.showRelatedProducts !== false && relatedProducts.length > 0 && (
         <section className="mt-24 sm:mt-32 pt-16 sm:pt-20 border-t border-[#ECE6DD]">
           <div className="mb-10 sm:mb-14">
             <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">

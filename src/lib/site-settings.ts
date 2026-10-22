@@ -99,6 +99,11 @@ export interface SiteSettings {
   showAboutFoundational?: boolean;
   showContactChannels?: boolean;
   showContactForm?: boolean;
+  showProductReviews?: boolean;
+  showRelatedProducts?: boolean;
+  showPinCodeChecker?: boolean;
+  showShopHeader?: boolean;
+  showShopFilters?: boolean;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -211,6 +216,11 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   showAboutFoundational: true,
   showContactChannels: true,
   showContactForm: true,
+  showProductReviews: true,
+  showRelatedProducts: true,
+  showPinCodeChecker: true,
+  showShopHeader: true,
+  showShopFilters: true,
 };
 
 export const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');
