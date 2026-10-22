@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../../../lib/db';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
+import { sendEmail } from '../../../lib/email';
 
 export interface CustomerInquiry {
   id: string;
@@ -139,6 +140,27 @@ export async function POST(request: Request) {
 
     inquiries.unshift(newInquiry);
     await saveInquiries(inquiries);
+
+    // Notify Store Owner via ADMIN_NOTIFICATION_EMAIL or ADMIN_EMAIL
+    const adminNotificationEmail = (process.env.ADMIN_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL || '').trim();
+    if (adminNotificationEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminNotificationEmail)) {
+      sendEmail({
+        to: adminNotificationEmail,
+        subject: `[NEW INQUIRY] From ${newInquiry.name} (${newInquiry.topic})`,
+        html: `
+          <div style="font-family: serif; color: #1E1B18; padding: 24px;">
+            <h2 style="margin-bottom: 16px;">New Customer Inquiry</h2>
+            <p><strong>Name:</strong> ${newInquiry.name}</p>
+            <p><strong>Email:</strong> ${newInquiry.email}</p>
+            ${newInquiry.phone ? `<p><strong>Phone:</strong> ${newInquiry.phone}</p>` : ''}
+            <p><strong>Topic:</strong> ${newInquiry.topic}</p>
+            <p style="background: #F3EFEA; padding: 16px; border-left: 3px solid #6E5043; margin-top: 12px; font-style: italic;">
+              ${newInquiry.message}
+            </p>
+          </div>
+        `,
+      }).catch((err) => console.warn('Inquiry admin email notice:', err));
+    }
 
     return NextResponse.json({
       success: true,

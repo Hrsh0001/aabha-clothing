@@ -250,11 +250,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Notify Store Owner if ADMIN_NOTIFICATION_EMAIL is configured
-    const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
-    if (adminNotificationEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminNotificationEmail.trim())) {
+    // Notify Store Owner if ADMIN_NOTIFICATION_EMAIL or ADMIN_EMAIL is configured
+    const adminNotificationEmail = (process.env.ADMIN_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL || '').trim();
+    if (adminNotificationEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminNotificationEmail)) {
       sendEmail({
-        to: adminNotificationEmail.trim(),
+        to: adminNotificationEmail,
         subject: `[NEW ORDER] #${newOrder.orderNumber} placed by ${newOrder.customerName} (₹${newOrder.total})`,
         html: generateOrderConfirmationHtml(newOrder),
       })

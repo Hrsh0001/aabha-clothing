@@ -19,11 +19,11 @@ export async function sendEmail({
     process.env.EMAIL_FROM ||
     process.env.RESEND_FROM ||
     process.env.SMTP_FROM ||
-    'AABHA CLOTHING <orders@aabhaclothing.in>';
+    'AABHA CLOTHING <info@aabhaclothing.in>';
 
-  // Since aabhaclothing.in domain is verified in Resend, automatically upgrade from testing sandbox
-  if (senderEmail.includes('onboarding@resend.dev')) {
-    senderEmail = 'AABHA CLOTHING <orders@aabhaclothing.in>';
+  // Ensure verified domain info@aabhaclothing.in is used when sandbox or legacy addresses are set
+  if (senderEmail.includes('onboarding@resend.dev') || senderEmail.includes('orders@aabhaclothing.in')) {
+    senderEmail = 'AABHA CLOTHING <info@aabhaclothing.in>';
   }
 
   const fromHeader = senderEmail.includes('<') ? senderEmail : `AABHA CLOTHING <${senderEmail}>`;
