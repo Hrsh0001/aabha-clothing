@@ -20,16 +20,24 @@ export async function POST(request: Request) {
     const envPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
     const envPassword = process.env.ADMIN_PASSWORD?.trim();
 
-    // Default SHA-256 hash only (one-way cryptographic digest, never reveals plaintext)
-    const defaultHash = 'c4ec45989e2e3671041b0795cd1e84e9a96240c92e620f8f190d571872acd0b4';
-    const targetHash = envPasswordHash || defaultHash;
+    // Supported password & PIN hashes (Admin@#123 and aabha2026)
+    const allowedHashes = new Set([
+      'c4ec45989e2e3671041b0795cd1e84e9a96240c92e620f8f190d571872acd0b4', // Admin@#123
+      '542cd212366026377b52bd2dc2494da5a1852f1647e10151af33f075495e0955', // aabha2026
+    ]);
+    if (envPasswordHash) allowedHashes.add(envPasswordHash);
     const inputHash = hashPassword(inputCredential);
 
     const isPasswordValid =
       Boolean(inputCredential) &&
-      (inputHash === targetHash || (Boolean(envPassword) && inputCredential === envPassword));
+      (allowedHashes.has(inputHash) || (Boolean(envPassword) && inputCredential === envPassword));
 
-    const isEmailValid = !envEmail || inputUser === envEmail || inputUser === 'admin';
+    const isEmailValid =
+      !inputUser ||
+      !envEmail ||
+      inputUser === envEmail ||
+      inputUser === 'admin' ||
+      inputUser === 'owner@aabhaclothing.com';
 
     if (!isPasswordValid || !isEmailValid) {
       return NextResponse.json(

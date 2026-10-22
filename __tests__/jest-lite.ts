@@ -20,7 +20,7 @@ interface TestSuite {
 const suites: TestSuite[] = [];
 let currentSuite: TestSuite | null = null;
 
-export function describe(name: string, fn: () => void): void {
+function customDescribe(name: string, fn: () => void): void {
   const suite: TestSuite = {
     name,
     beforeAllFns: [],
@@ -34,9 +34,9 @@ export function describe(name: string, fn: () => void): void {
   currentSuite = prevSuite;
 }
 
-export function test(name: string, fn: TestFn): void {
+function customTest(name: string, fn: TestFn): void {
   if (!currentSuite) {
-    describe('Default Suite', () => {
+    customDescribe('Default Suite', () => {
       currentSuite!.tests.push({ name, fn });
     });
     return;
@@ -44,19 +44,51 @@ export function test(name: string, fn: TestFn): void {
   currentSuite.tests.push({ name, fn });
 }
 
-export const it = test;
-
-export function beforeAll(fn: TestFn): void {
+function customBeforeAll(fn: TestFn): void {
   if (currentSuite) {
     currentSuite.beforeAllFns.push(fn);
   }
 }
 
-export function afterAll(fn: TestFn): void {
+function customAfterAll(fn: TestFn): void {
   if (currentSuite) {
     currentSuite.afterAllFns.push(fn);
   }
 }
+
+export const describe: (name: string, fn: () => void) => void = (name, fn) => {
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
+  if (typeof g.describe === 'function' && g.describe !== describe) {
+    return g.describe(name, fn);
+  }
+  return customDescribe(name, fn);
+};
+
+export const test: (name: string, fn: TestFn) => void = (name, fn) => {
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
+  if (typeof g.test === 'function' && g.test !== test) {
+    return g.test(name, fn);
+  }
+  return customTest(name, fn);
+};
+
+export const it: (name: string, fn: TestFn) => void = test;
+
+export const beforeAll: (fn: TestFn) => void = (fn) => {
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
+  if (typeof g.beforeAll === 'function' && g.beforeAll !== beforeAll) {
+    return g.beforeAll(fn);
+  }
+  return customBeforeAll(fn);
+};
+
+export const afterAll: (fn: TestFn) => void = (fn) => {
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
+  if (typeof g.afterAll === 'function' && g.afterAll !== afterAll) {
+    return g.afterAll(fn);
+  }
+  return customAfterAll(fn);
+};
 
 function deepEqual(a: any, b: any): boolean {
   if (Object.is(a, b)) return true;
@@ -191,12 +223,20 @@ function createMatchers(actual: any, isNot: boolean = false) {
   };
 }
 
-export function expect(actual: any) {
+function customExpect(actual: any) {
   return {
     ...createMatchers(actual, false),
     not: createMatchers(actual, true),
   };
 }
+
+export const expect: (actual: any) => any = (actual) => {
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
+  if (typeof g.expect === 'function' && g.expect !== expect) {
+    return g.expect(actual);
+  }
+  return customExpect(actual);
+};
 
 export async function runAllRegisteredSuites(): Promise<{
   passed: number;

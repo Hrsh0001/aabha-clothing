@@ -24,6 +24,8 @@ interface HeaderProps {
   onOpenAccount?: () => void;
   logoUrl?: string;
   announcementText?: string;
+  showAnnouncementBar?: boolean;
+  showNewArrivals?: boolean;
 }
 
 const SHOP_CATEGORIES: Array<{ label: CollectionFilter; count: number }> = [
@@ -51,34 +53,21 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAccount,
   logoUrl,
   announcementText,
+  showAnnouncementBar = true,
+  showNewArrivals = true,
 }) => {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, role, setAuthModalOpen, logout } = useAuth();
 
-  const shopCategories = useMemo(() => {
-    const list = products || [];
-    return [
-      { label: 'All Collection' as CollectionFilter, count: list.length },
-      {
-        label: 'Anarkali' as CollectionFilter,
-        count: list.filter((p) => p.category === 'Anarkali').length,
-      },
-      {
-        label: '3-Piece Dresses' as CollectionFilter,
-        count: list.filter((p) => p.category === '3-Piece Dresses').length,
-      },
-      {
-        label: 'Co-ord Sets' as CollectionFilter,
-        count: list.filter((p) => p.category === 'Co-ord Sets').length,
-      },
-      {
-        label: 'Chikankari Suit' as CollectionFilter,
-        count: list.filter((p) => p.category === 'Chikankari Suit').length,
-      },
-    ];
-  }, [products]);
+  const shopCategories = useMemo<{ label: CollectionFilter }[]>(() => [
+    { label: 'All Collection' },
+    { label: 'Anarkali' },
+    { label: '3-Piece Dresses' },
+    { label: 'Co-ord Sets' },
+    { label: 'Chikankari Suit' },
+  ], []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -98,12 +87,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      {announcementText && (
+      {showAnnouncementBar !== false && announcementText && (
         <div className="bg-[#231F1D] text-[#FAF8F5] text-[10px] sm:text-[11px] font-light tracking-[0.14em] uppercase py-1.5 px-4 text-center border-b border-[#3D3732]">
           {announcementText}
         </div>
       )}
-      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#ECE6DD]">
+      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5] sm:bg-[#FAF8F5]/95 sm:backdrop-blur-sm border-b border-[#ECE6DD]">
       <div className="relative max-w-[1920px] mx-auto w-full h-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
         {/* Mobile Left Hamburger Trigger (flex-1 on mobile so logo stays centered) */}
         <div className="flex-1 flex items-center justify-start md:hidden">
@@ -138,13 +127,15 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 2: Clean Text Navigation Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-9 lg:gap-11 text-[13px] tracking-[0.08em] font-normal text-[#4A433D]">
-          <button
-            type="button"
-            onClick={onNavigateNewArrivals}
-            className="hover:text-[#1E1B18] py-1 border-b border-transparent hover:border-[#1E1B18]/60 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            New Arrivals
-          </button>
+          {showNewArrivals !== false && (
+            <button
+              type="button"
+              onClick={onNavigateNewArrivals}
+              className="hover:text-[#1E1B18] py-1 border-b border-transparent hover:border-[#1E1B18]/60 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              New Arrivals
+            </button>
+          )}
 
           <div
             ref={dropdownRef}
@@ -172,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
             {shopMenuOpen && (
               <div className="absolute left-0 top-full pt-3 w-60 z-50">
                 <div className="bg-[#FAF8F5] border border-[#E8E1D7] py-2.5">
-                  {shopCategories.map(({ label, count }) => {
+                  {shopCategories.map(({ label }) => {
                     const isSelected = activePage === 'shop' && selectedCategory === label;
                     return (
                       <button
@@ -186,9 +177,6 @@ export const Header: React.FC<HeaderProps> = ({
                         }`}
                       >
                         <span>{label}</span>
-                        <span className="text-[11px] tabular-nums text-[#8C8278]">
-                          {count}
-                        </span>
                       </button>
                     );
                   })}
@@ -335,7 +323,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Shop Collection
               </p>
               <div className="flex flex-col space-y-2.5 pl-1">
-                {shopCategories.map(({ label, count }) => (
+                {shopCategories.map(({ label }) => (
                   <button
                     key={label}
                     type="button"
@@ -347,7 +335,6 @@ export const Header: React.FC<HeaderProps> = ({
                     }`}
                   >
                     <span>{label}</span>
-                    <span className="text-xs tabular-nums text-[#8C8278]">{count}</span>
                   </button>
                 ))}
               </div>

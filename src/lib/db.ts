@@ -24,7 +24,12 @@ export const prisma: PrismaClient =
   (normalizedUrl
     ? new PrismaClient({
         datasourceUrl: normalizedUrl,
-        log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+        log:
+          process.env.NODE_ENV === 'test'
+            ? []
+            : process.env.NODE_ENV === 'development'
+            ? ['error', 'warn']
+            : ['error'],
       })
     : (null as unknown as PrismaClient));
 

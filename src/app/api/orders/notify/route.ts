@@ -24,8 +24,16 @@ export async function POST(request: Request) {
     }
 
     if (order.email) {
+      const customerEmail = (order.email || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid customer email address: "${order.email}"` },
+          { status: 400 }
+        );
+      }
+
       const result = await sendEmail({
-        to: order.email,
+        to: customerEmail,
         subject: `Your AABHA CLOTHING Order #${order.orderNumber} is Dispatched & Out for Delivery`,
         html: generateDispatchNoticeHtml({
           orderNumber: order.orderNumber,
@@ -37,10 +45,19 @@ export async function POST(request: Request) {
         }),
       });
 
+      if (!result.success) {
+        console.error(`[DISPATCH NOTIFICATION FAILED] Could not send to ${customerEmail}: ${result.error}`);
+        return NextResponse.json({
+          success: false,
+          sentTo: customerEmail,
+          error: result.error || 'Failed to dispatch email via mail provider',
+        }, { status: 502 });
+      }
+
       return NextResponse.json({
         success: true,
-        sentTo: order.email,
-        message: `Dispatch email successfully sent to ${order.email}!`,
+        sentTo: customerEmail,
+        message: `Dispatch email successfully sent to ${customerEmail}!`,
         result,
       });
     }

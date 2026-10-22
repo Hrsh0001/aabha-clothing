@@ -1,3 +1,4 @@
+Object.assign(process.env, { NODE_ENV: 'test', TEST_EMAIL_SIMULATE: 'true' });
 import 'dotenv/config';
 import { runAllRegisteredSuites } from './jest-lite';
 import { prisma } from '../src/lib/db';
@@ -5,6 +6,8 @@ import { prisma } from '../src/lib/db';
 // Register all test suites
 import './form-and-image-validation.test';
 import './all-apis.test';
+import './storefront-fixes.test';
+import './storefront-sections-and-branding.test';
 
 async function main() {
   console.log('==============================================================');

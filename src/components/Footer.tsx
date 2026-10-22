@@ -12,6 +12,7 @@ interface FooterProps {
   onNavigateContact: () => void;
   onNavigatePolicy: (topic: PolicyTopic) => void;
   logoUrl?: string;
+  siteSettings?: any;
 }
 
 const FOOTER_CATEGORIES: CollectionFilter[] = [
@@ -29,6 +30,7 @@ export const Footer: React.FC<FooterProps> = ({
   onNavigateContact,
   onNavigatePolicy,
   logoUrl,
+  siteSettings,
 }) => {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +85,7 @@ export const Footer: React.FC<FooterProps> = ({
             </p>
 
             {/* Minimal Underlined Newsletter Subscription */}
+            {siteSettings?.showFooterNewsletter !== false && (
             <div className="pt-3 max-w-md">
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#D8CEC2] mb-3">
                 Newsletter & Private Previews
@@ -126,6 +129,7 @@ export const Footer: React.FC<FooterProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Shop Categories */}
@@ -174,12 +178,12 @@ export const Footer: React.FC<FooterProps> = ({
               </li>
               <li>
                 <a
-                  href="https://instagram.com/aabhaclothing"
+                  href={siteSettings?.instagramUrl || "https://instagram.com/aabhaclothing"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-[#FAF8F5] transition-colors inline-block"
                 >
-                  Instagram
+                  Instagram ({siteSettings?.instagramHandle || '@aabhaclothing'})
                 </a>
               </li>
             </ul>
@@ -197,6 +201,25 @@ export const Footer: React.FC<FooterProps> = ({
                   className="hover:text-[#FAF8F5] transition-colors inline-block text-[#D8CEC2] font-normal"
                 >
                   Track Orders & GST Bills
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`https://wa.me/${(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Namaste AABHA, I have an inquiry regarding garments and orders.')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#FAF8F5] transition-colors inline-flex items-center gap-1.5 text-[#A8E6CF]"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#A8E6CF] animate-pulse"></span>
+                  WhatsApp Concierge
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`mailto:${siteSettings?.supportEmail || 'care@aabhaclothing.com'}`}
+                  className="hover:text-[#FAF8F5] transition-colors inline-block text-xs"
+                >
+                  {siteSettings?.supportEmail || 'care@aabhaclothing.com'}
                 </a>
               </li>
               <li>

@@ -71,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Sold Out Badge */}
         {!product.inStock && (
-          <span className="absolute top-3 left-3 sm:top-4 sm:left-4 px-2.5 py-1 bg-[#231F1D]/90 backdrop-blur-xs text-[#FAF8F5] text-[10px] tracking-wider uppercase font-medium z-10">
+          <span className="absolute top-3 left-3 sm:top-4 sm:left-4 px-2.5 py-1 bg-[#231F1D] text-[#FAF8F5] text-[10px] tracking-wider uppercase font-medium z-10 shadow-xs">
             Sold Out
           </span>
         )}
@@ -85,7 +85,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               ? `Remove ${product.name} from wishlist`
               : `Save ${product.name} to wishlist`
           }
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 rounded-full flex items-center justify-center bg-[#FAF8F5]/85 backdrop-blur-xs hover:bg-[#FAF8F5] text-[#1E1B18] transition-colors z-10 cursor-pointer"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 rounded-full flex items-center justify-center bg-[#FAF8F5]/95 shadow-xs hover:bg-[#FAF8F5] text-[#1E1B18] transition-colors z-10 cursor-pointer"
         >
           <Heart
             className={`w-[17px] h-[17px] stroke-[1.35] transition-colors ${
@@ -103,7 +103,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               setMobileSizesOpen(true);
             }}
             aria-label={`Quick add ${product.name}`}
-            className="md:hidden absolute bottom-2.5 right-2.5 px-2.5 py-1.5 bg-[#FAF8F5]/90 backdrop-blur-xs text-[#1E1B18] text-[10px] tracking-[0.1em] uppercase flex items-center gap-1 z-10 cursor-pointer"
+            className="md:hidden absolute bottom-2.5 right-2.5 px-2.5 py-1.5 bg-[#FAF8F5] text-[#1E1B18] shadow-xs border border-[#ECE6DD] text-[10px] tracking-[0.1em] uppercase flex items-center gap-1 z-10 cursor-pointer"
           >
             <Plus className="w-3 h-3 stroke-[1.5]" />
             <span>Quick Add</span>
@@ -113,7 +113,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Quick-Add Size Bar (Only if in stock) */}
         {product.inStock && (
           <div
-            className={`absolute inset-x-0 bottom-0 bg-[#FAF8F5]/95 backdrop-blur-xs px-3 sm:px-4 py-2.5 sm:py-3 transition-opacity duration-200 z-20 ${
+            className={`absolute inset-x-0 bottom-0 bg-[#FAF8F5] border-t border-[#ECE6DD] px-3 sm:px-4 py-2.5 sm:py-3 transition-opacity duration-200 z-20 ${
               showSizeOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
             onClick={(e) => e.stopPropagation()}

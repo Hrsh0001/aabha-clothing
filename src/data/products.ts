@@ -101,7 +101,6 @@ export interface CategoryInfo {
   name: ProductCategory;
   tagline: string;
   image: string;
-  pieceCount: number;
 }
 
 export const CATEGORIES: CategoryInfo[] = [
@@ -111,7 +110,6 @@ export const CATEGORIES: CategoryInfo[] = [
     name: 'Anarkali',
     tagline: 'Fluid panelled silhouettes with understated heirloom grace',
     image: EDITORIAL_ASSETS.dressOchre,
-    pieceCount: 2,
   },
   {
     id: '3-Piece Dresses',
@@ -119,7 +117,6 @@ export const CATEGORIES: CategoryInfo[] = [
     name: '3-Piece Dresses',
     tagline: 'Complete Chanderi silk & organza three-piece ensembles',
     image: EDITORIAL_ASSETS.kurtaSetSand,
-    pieceCount: 5,
   },
   {
     id: 'Co-ord Sets',
@@ -127,7 +124,6 @@ export const CATEGORIES: CategoryInfo[] = [
     name: 'Co-ord Sets',
     tagline: 'Contemporary tailored khadi, linen & raw silk twin-sets',
     image: EDITORIAL_ASSETS.coordsCharcoal,
-    pieceCount: 9,
   },
   {
     id: 'Chikankari Suit',
@@ -135,7 +131,6 @@ export const CATEGORIES: CategoryInfo[] = [
     name: 'Chikankari Suit',
     tagline: 'Hand-embroidered heritage threadwork on fine mulmul',
     image: EDITORIAL_ASSETS.kurtaIvory,
-    pieceCount: 1,
   },
 ];
 

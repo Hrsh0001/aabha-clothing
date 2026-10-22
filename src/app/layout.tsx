@@ -41,6 +41,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap"
           rel="stylesheet"
         />
+        <link
+          rel="preload"
+          as="image"
+          href="/images/hero_editorial_banner_1791119088652.jpg"
+          fetchPriority="high"
+        />
       </head>
       <body className="bg-[#FAF8F5] text-[#1E1B18] antialiased selection:bg-[#231F1D] selection:text-[#FAF8F5] min-h-screen w-full max-w-full overflow-x-hidden">
         <ClientProviders>

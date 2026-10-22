@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../../../lib/db';
 import { isAuthorizedAdmin } from '../../../lib/auth-guard';
-import { sendEmail, generateOrderConfirmationHtml } from '../../../lib/email';
+import { sendEmail, generateOrderConfirmationHtml, generateDispatchNoticeHtml } from '../../../lib/email';
 
 export interface OrderItem {
   productId: string;
@@ -177,14 +177,23 @@ export async function POST(request: Request) {
       longitude: lngNum,
       mapUrl: resolvedMapUrl,
       items: items.map((i: any) => ({
-        productId: i.product?.id || i.productId,
-        name: i.product?.name || i.name,
-        size: i.size,
-        quantity: i.quantity,
-        price: i.product?.price || i.price,
-        image: i.product?.primaryImage || i.image || '',
+        productId: String(i.product?.id || i.productId || ''),
+        name: String(i.product?.name || i.name || 'Garment'),
+        size: i.size || 'M',
+        quantity: Math.max(1, Number(i.quantity) || 1),
+        price: Number(i.product?.price || i.price || 0),
+        image: String(i.product?.primaryImage || i.image || ''),
       })),
-      total: Number(total),
+      total:
+        typeof total === 'number' && !isNaN(total) && total > 0
+          ? total
+          : items.reduce(
+              (sum: number, i: any) =>
+                sum +
+                (Number(i.product?.price || i.price || 0) *
+                  Math.max(1, Number(i.quantity) || 1)),
+              0
+            ),
       paymentMethod: 'CASH_ON_DELIVERY',
       status: 'PENDING_VERIFICATION',
       createdAt: new Date().toISOString(),
@@ -218,23 +227,45 @@ export async function POST(request: Request) {
     existingOrders.push(newOrder);
     saveOrders(existingOrders);
 
-    // Asynchronously dispatch Order Confirmation Email (non-blocking)
+    // Asynchronously dispatch Order Confirmation Email to Customer ("same vara ne")
     if (newOrder.email) {
-      sendEmail({
-        to: newOrder.email,
-        subject: `Namaste ${newOrder.customerName} — Your AABHA Order #${newOrder.orderNumber} is Confirmed`,
-        html: generateOrderConfirmationHtml(newOrder),
-      }).catch((err) => console.warn('Customer confirmation email notice:', err));
+      const customerEmail = newOrder.email.trim();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+        console.log(`[ORDER DISPATCH] Initiating customer confirmation email to "${customerEmail}" for Order #${newOrder.orderNumber}`);
+        sendEmail({
+          to: customerEmail,
+          subject: `Namaste ${newOrder.customerName} — Your AABHA Order #${newOrder.orderNumber} is Confirmed`,
+          html: generateOrderConfirmationHtml(newOrder),
+        })
+          .then((res) => {
+            if (res.success) {
+              console.log(`[CUSTOMER CONFIRMATION DELIVERED] Order confirmation email accepted for ${customerEmail} (ID: ${res.messageId || 'ok'})`);
+            } else {
+              console.error(`[CUSTOMER CONFIRMATION FAILED] Delivery to customer ${customerEmail} failed: ${res.error}`);
+            }
+          })
+          .catch((err) => console.error('[CUSTOMER CONFIRMATION EXCEPTION]:', err));
+      } else {
+        console.warn(`[CUSTOMER EMAIL SKIPPED] Order #${newOrder.orderNumber} has invalid email address: "${newOrder.email}"`);
+      }
     }
 
-    // Notify Store Owner if ADMIN_NOTIFICATION_EMAIL is configured
-    const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
-    if (adminNotificationEmail) {
+    // Notify Store Owner if ADMIN_NOTIFICATION_EMAIL or ADMIN_EMAIL is configured
+    const adminNotificationEmail = (process.env.ADMIN_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL || '').trim();
+    if (adminNotificationEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminNotificationEmail)) {
       sendEmail({
         to: adminNotificationEmail,
         subject: `[NEW ORDER] #${newOrder.orderNumber} placed by ${newOrder.customerName} (₹${newOrder.total})`,
         html: generateOrderConfirmationHtml(newOrder),
-      }).catch((err) => console.warn('Admin notification email notice:', err));
+      })
+        .then((res) => {
+          if (res.success) {
+            console.log(`[ADMIN NOTIFICATION DELIVERED] Alert sent to store owner at ${adminNotificationEmail}`);
+          } else {
+            console.warn(`[ADMIN NOTIFICATION FAILED] Alert could not be sent to ${adminNotificationEmail}: ${res.error}`);
+          }
+        })
+        .catch((err) => console.warn('Admin notification email notice:', err));
     }
 
     return NextResponse.json({
@@ -322,13 +353,63 @@ export async function PATCH(request: Request) {
     }
 
     if (targetOrder) {
-      // When status changes to 'CONFIRMED', automatically trigger sendEmail with order confirmation details to customer
-      if (status === 'CONFIRMED' && targetOrder.email) {
-        sendEmail({
-          to: targetOrder.email,
-          subject: `Namaste ${targetOrder.customerName} — Your AABHA Order #${targetOrder.orderNumber} is Confirmed`,
-          html: generateOrderConfirmationHtml(targetOrder),
-        }).catch((err) => console.warn('Order confirmation email notice on status update:', err));
+      const normStatus = typeof status === 'string' ? status.trim().toUpperCase() : '';
+
+      // 1. When status changes to 'CONFIRMED', automatically trigger sendEmail with order confirmation details to customer ("same vara ne")
+      if (normStatus === 'CONFIRMED') {
+        const customerEmail = targetOrder.email ? targetOrder.email.trim() : '';
+        if (customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+          console.log(`[ADMIN STATUS CONFIRMED] Dispatching confirmation email to customer "${customerEmail}" for Order #${targetOrder.orderNumber}`);
+          sendEmail({
+            to: customerEmail,
+            subject: `Namaste ${targetOrder.customerName} — Your AABHA Order #${targetOrder.orderNumber} is Confirmed`,
+            html: generateOrderConfirmationHtml(targetOrder),
+          })
+            .then((res) => {
+              if (res.success) {
+                console.log(`[CUSTOMER CONFIRMATION DELIVERED] Order #${targetOrder.orderNumber} confirmation delivered to ${customerEmail} (ID: ${res.messageId || 'ok'})`);
+              } else {
+                console.error(`[CUSTOMER CONFIRMATION FAILED] Could not send confirmation to customer ${customerEmail}: ${res.error}`);
+              }
+            })
+            .catch((err) => console.error('Order confirmation email notice on status update:', err));
+        } else if (customerEmail) {
+          console.warn(`[CUSTOMER CONFIRMATION SKIPPED] Order #${targetOrder.orderNumber} has invalid customer email: "${targetOrder.email}"`);
+        } else {
+          console.warn(`[CUSTOMER CONFIRMATION SKIPPED] Order #${targetOrder.orderNumber} has no customer email address on file.`);
+        }
+      }
+
+      // 2. When status changes to 'DISPATCHED', automatically trigger dispatch notice to customer ("same vara ne")
+      if (normStatus === 'DISPATCHED') {
+        const customerEmail = targetOrder.email ? targetOrder.email.trim() : '';
+        if (customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+          console.log(`[ADMIN STATUS DISPATCHED] Dispatching shipping notice to customer "${customerEmail}" for Order #${targetOrder.orderNumber}`);
+          sendEmail({
+            to: customerEmail,
+            subject: `Your AABHA CLOTHING Order #${targetOrder.orderNumber} is Dispatched & Out for Delivery`,
+            html: generateDispatchNoticeHtml({
+              orderNumber: targetOrder.orderNumber,
+              customerName: targetOrder.customerName,
+              phone: targetOrder.phone,
+              city: targetOrder.city,
+              total: targetOrder.total,
+              riderNavUrl: targetOrder.mapUrl,
+            }),
+          })
+            .then((res) => {
+              if (res.success) {
+                console.log(`[CUSTOMER DISPATCH DELIVERED] Order #${targetOrder.orderNumber} dispatch notice delivered to ${customerEmail} (ID: ${res.messageId || 'ok'})`);
+              } else {
+                console.error(`[CUSTOMER DISPATCH FAILED] Could not send dispatch notice to ${customerEmail}: ${res.error}`);
+              }
+            })
+            .catch((err) => console.error('Order dispatch notice exception on status update:', err));
+        } else if (customerEmail) {
+          console.warn(`[CUSTOMER DISPATCH SKIPPED] Order #${targetOrder.orderNumber} has invalid customer email: "${targetOrder.email}"`);
+        } else {
+          console.warn(`[CUSTOMER DISPATCH SKIPPED] Order #${targetOrder.orderNumber} has no customer email address on file.`);
+        }
       }
 
       return NextResponse.json({ success: true, order: targetOrder });

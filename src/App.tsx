@@ -26,23 +26,33 @@ import { useAuth } from './context/AuthContext';
 import type { SiteSettings } from './app/api/settings/route';
 
 const getInitialProducts = (): Product[] => {
-  if (typeof window === 'undefined') return [];
+  if (typeof window === 'undefined') return PRODUCTS;
   try {
-    const cp = sessionStorage.getItem('aabha_products_cache');
-    if (cp) {
-      const p = JSON.parse(cp);
+    const local = localStorage.getItem('aabha_products_cache_v2');
+    if (local) {
+      const p = JSON.parse(local);
+      if (Array.isArray(p) && p.length > 0) return p;
+    }
+    const session = sessionStorage.getItem('aabha_products_cache');
+    if (session) {
+      const p = JSON.parse(session);
       if (Array.isArray(p) && p.length > 0) return p;
     }
   } catch {}
-  return [];
+  return PRODUCTS;
 };
 
 const getInitialSettings = (): SiteSettings | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const cs = sessionStorage.getItem('aabha_settings_cache');
-    if (cs) {
-      const s = JSON.parse(cs);
+    const local = localStorage.getItem('aabha_settings_cache_v2');
+    if (local) {
+      const s = JSON.parse(local);
+      if (s) return s;
+    }
+    const session = sessionStorage.getItem('aabha_settings_cache');
+    if (session) {
+      const s = JSON.parse(session);
       if (s) return s;
     }
   } catch {}
@@ -51,15 +61,7 @@ const getInitialSettings = (): SiteSettings | null => {
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>(getInitialProducts);
-  const [productsLoading, setProductsLoading] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      const cp = sessionStorage.getItem('aabha_products_cache');
-      return !cp;
-    } catch {
-      return true;
-    }
-  });
+  const [productsLoading, setProductsLoading] = useState<boolean>(false);
   const [activePage, setActivePage] = useState<ActivePage>('home');
   const [selectedCategory, setSelectedCategory] = useState<CollectionFilter>('All Collection');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
@@ -128,52 +130,57 @@ export default function App() {
   }, [cartItems, isHydrated]);
 
   useEffect(() => {
-    // Try sessionStorage cache for instant load (eliminates 1-2s blink on revisit)
-    let hasCachedProducts = false;
+    // 1. Immediate cache rehydration from localStorage / sessionStorage
     try {
-      const cp = sessionStorage.getItem('aabha_products_cache');
-      const cs = sessionStorage.getItem('aabha_settings_cache');
-      if (cp) {
-        const p = JSON.parse(cp);
+      const localP = localStorage.getItem('aabha_products_cache_v2');
+      const sessionP = sessionStorage.getItem('aabha_products_cache');
+      const cachedP = localP || sessionP;
+      if (cachedP) {
+        const p = JSON.parse(cachedP);
         if (Array.isArray(p) && p.length > 0) {
           setProducts(p);
-          setProductsLoading(false);
-          hasCachedProducts = true;
         }
       }
-      if (cs) {
-        const s = JSON.parse(cs);
+      const localS = localStorage.getItem('aabha_settings_cache_v2');
+      const sessionS = sessionStorage.getItem('aabha_settings_cache');
+      const cachedS = localS || sessionS;
+      if (cachedS) {
+        const s = JSON.parse(cachedS);
         if (s) setSiteSettings(s);
       }
     } catch {}
 
-    if (!hasCachedProducts) {
-      setProductsLoading(true);
+    // 2. Preload the primary hero image for immediate 0s first paint on mobile
+    if (typeof window !== 'undefined') {
+      const preloadImg = new Image();
+      preloadImg.src = '/images/hero_editorial_banner_1791119088652.jpg';
     }
+
+    // 3. Background revalidation from database API (non-blocking)
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(data.products);
-          try { sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products)); } catch {}
-        } else if (!hasCachedProducts) {
-          setProducts(PRODUCTS);
+          try {
+            localStorage.setItem('aabha_products_cache_v2', JSON.stringify(data.products));
+            sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products));
+          } catch {}
         }
       })
       .catch((err) => {
         console.warn('Live products sync notice:', err);
-        if (!hasCachedProducts) {
-          setProducts(PRODUCTS);
-        }
-      })
-      .finally(() => setProductsLoading(false));
+      });
 
     fetch('/api/settings')
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.settings) {
           setSiteSettings(data.settings);
-          try { sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings)); } catch {}
+          try {
+            localStorage.setItem('aabha_settings_cache_v2', JSON.stringify(data.settings));
+            sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings));
+          } catch {}
         }
       })
       .catch((err) => console.warn('Live settings sync notice:', err));
@@ -419,6 +426,8 @@ export default function App() {
         onOpenAccount={() => setAuthModalOpen(true)}
         logoUrl={siteSettings?.logoUrl}
         announcementText={siteSettings?.announcementText}
+        showAnnouncementBar={siteSettings?.showAnnouncementBar}
+        showNewArrivals={siteSettings?.showNewArrivals}
       />
 
       {/* Main Content View Router with Subtle Editorial Fade-In Transition */}
@@ -452,6 +461,7 @@ export default function App() {
               products={products}
               selectedCategory={selectedCategory}
               wishlistIds={wishlistIds}
+              siteSettings={siteSettings}
               onSelectCategory={(cat) => setSelectedCategory(cat)}
               onSelectProduct={handleSelectProduct}
               onToggleWishlist={handleToggleWishlist}
@@ -475,6 +485,7 @@ export default function App() {
               onToggleWishlist={handleToggleWishlist}
               onQuickAdd={handleQuickAdd}
               onAddReview={handleAddReview}
+              siteSettings={siteSettings}
             />
           )}
 
@@ -504,10 +515,13 @@ export default function App() {
           )}
 
           {activePage === 'about' && (
-            <AboutPage onExploreCollection={() => handleNavigateShopCategory('All Collection')} />
+            <AboutPage
+              onExploreCollection={() => handleNavigateShopCategory('All Collection')}
+              siteSettings={siteSettings}
+            />
           )}
 
-          {activePage === 'contact' && <ContactPage />}
+          {activePage === 'contact' && <ContactPage siteSettings={siteSettings} />}
 
           {activePage === 'policy' && (
             <PolicyPage
@@ -536,12 +550,14 @@ export default function App() {
           scrollToTop();
         }}
         logoUrl={siteSettings?.logoUrl}
+        siteSettings={siteSettings}
       />
 
       {/* Interactive Drawers & Search Overlay */}
       <CartDrawer
         isOpen={cartDrawerOpen}
         items={cartItems}
+        siteSettings={siteSettings}
         onClose={() => setCartDrawerOpen(false)}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
