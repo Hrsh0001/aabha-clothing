@@ -19,14 +19,22 @@ export async function sendEmail({
     process.env.EMAIL_FROM ||
     process.env.RESEND_FROM ||
     process.env.SMTP_FROM ||
-    'AABHA CLOTHING <info@aabhaclothing.in>';
+    'info@aabhaclothing.in';
 
-  // Ensure verified domain info@aabhaclothing.in is used when sandbox or legacy addresses are set
-  if (senderEmail.includes('onboarding@resend.dev') || senderEmail.includes('orders@aabhaclothing.in')) {
-    senderEmail = 'AABHA CLOTHING <info@aabhaclothing.in>';
+  // Extract direct email address without any labels or < > brackets
+  const match = senderEmail.match(/<([^>]+)>/);
+  if (match && match[1]) {
+    senderEmail = match[1].trim();
+  } else {
+    senderEmail = senderEmail.replace(/[<>]/g, '').trim();
   }
 
-  const fromHeader = senderEmail.includes('<') ? senderEmail : `AABHA CLOTHING <${senderEmail}>`;
+  // Ensure verified info@aabhaclothing.in is used when sandbox or legacy addresses are set
+  if (senderEmail.includes('onboarding@resend.dev') || senderEmail.includes('orders@aabhaclothing.in')) {
+    senderEmail = 'info@aabhaclothing.in';
+  }
+
+  const fromHeader = senderEmail;
 
   // Test / Local Mock Simulation Mode:
   // When executing tests or using a placeholder API key, simulate delivery cleanly
