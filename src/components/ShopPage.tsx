@@ -14,11 +14,13 @@ import {
   CATEGORIES,
 } from '../data/products';
 import { ProductCard } from './ProductCard';
+import type { SiteSettings } from '../app/api/settings/route';
 
 interface ShopPageProps {
   products: Product[];
   selectedCategory: CollectionFilter;
   wishlistIds: string[];
+  siteSettings?: SiteSettings | null;
   onSelectCategory: (category: CollectionFilter) => void;
   onSelectProduct: (product: Product) => void;
   onToggleWishlist: (productId: string, e: React.MouseEvent) => void;
@@ -40,6 +42,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   products,
   selectedCategory,
   wishlistIds,
+  siteSettings,
   onSelectCategory,
   onSelectProduct,
   onToggleWishlist,
@@ -79,40 +82,47 @@ export const ShopPage: React.FC<ShopPageProps> = ({
       return {
         title: 'All Collection',
         subtitle:
+          siteSettings?.categorySectionSubheading ||
           'The AABHA CLOTHING curated collection: handcrafted Anarkalis, Three-Piece Dresses, Co-ord Sets, and Chikankari Suits in Chanderi silk and fine linen.',
       };
     }
     const found = CATEGORIES.find((c) => c.id === selectedCategory);
+    const customTagline =
+      siteSettings?.categoryTaglines?.[selectedCategory] ||
+      (found ? siteSettings?.categoryTaglines?.[found.name] : undefined);
     return {
       title: selectedCategory,
-      subtitle: found?.tagline || 'Contemporary Indian silhouettes crafted in small batches.',
+      subtitle:
+        customTagline ||
+        found?.tagline ||
+        'Contemporary Indian silhouettes crafted in small batches.',
     };
-  }, [selectedCategory]);
+  }, [selectedCategory, siteSettings]);
 
   const categoryTabs = useMemo(() => {
     return [
       {
         id: 'All Collection' as CollectionFilter,
-        label: `All Collection – ${products.length}`,
+        label: 'All Collection',
       },
       {
         id: 'Anarkali' as CollectionFilter,
-        label: `Anarkali – ${products.filter((p) => p.category === 'Anarkali').length}`,
+        label: 'Anarkali',
       },
       {
         id: '3-Piece Dresses' as CollectionFilter,
-        label: `3-Piece Dresses – ${products.filter((p) => p.category === '3-Piece Dresses').length}`,
+        label: '3-Piece Dresses',
       },
       {
         id: 'Co-ord Sets' as CollectionFilter,
-        label: `Co-ord Sets – ${products.filter((p) => p.category === 'Co-ord Sets').length}`,
+        label: 'Co-ord Sets',
       },
       {
         id: 'Chikankari Suit' as CollectionFilter,
-        label: `Chikankari Suit – ${products.filter((p) => p.category === 'Chikankari Suit').length}`,
+        label: 'Chikankari Suit',
       },
     ];
-  }, [products]);
+  }, []);
 
   const filteredProducts = useMemo(() => {
     let list = [...products];
@@ -244,8 +254,8 @@ export const ShopPage: React.FC<ShopPageProps> = ({
           </div>
 
           <span className="text-xs text-[#7C736A] tabular-nums">
-            Showing {displayedProducts.length} of {filteredProducts.length}{' '}
-            {filteredProducts.length === 1 ? 'Silhouette' : 'Silhouettes'}
+            Showing {displayedProducts.length}{' '}
+            {displayedProducts.length === 1 ? 'Silhouette' : 'Silhouettes'}
           </span>
         </div>
       </div>
@@ -288,7 +298,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
           {displayedProducts.length < filteredProducts.length && (
             <div className="mt-14 sm:mt-20 flex flex-col items-center justify-center space-y-4 border-t border-[#ECE6DD] pt-12">
               <p className="text-xs text-[#7C736A] font-light">
-                Viewing {displayedProducts.length} of {filteredProducts.length} curated garments
+                Viewing {displayedProducts.length} curated garments
               </p>
               {/* Progress bar */}
               <div className="w-48 h-1 bg-[#ECE6DD] rounded-full overflow-hidden">
@@ -314,7 +324,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
                   onClick={() => setCurrentPage(totalPages)}
                   className="px-5 py-3.5 border border-[#E0D8CE] bg-transparent text-[#1E1B18] text-xs font-medium tracking-[0.16em] uppercase hover:border-[#1E1B18] transition-colors cursor-pointer"
                 >
-                  View All ({filteredProducts.length})
+                  View All Silhouettes
                 </button>
               </div>
             </div>

@@ -11,8 +11,8 @@ export const AtelierSkeleton: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1E1B18] flex flex-col font-sans select-none overflow-x-hidden">
       {/* 1. Announcement Bar Skeleton */}
-      <div className="h-8 bg-[#1E1B18] flex items-center justify-center px-4">
-        <div className="h-2.5 w-64 sm:w-96 bg-white/15 rounded-xs animate-pulse" />
+      <div className="h-8 bg-[#ECE6DD] flex items-center justify-center px-4">
+        <div className="h-2.5 w-64 sm:w-96 bg-[#D5CCC0] rounded-xs animate-pulse" />
       </div>
 
       {/* 2. Haute Atelier Header Skeleton */}
@@ -45,19 +45,19 @@ export const AtelierSkeleton: React.FC = () => {
         </div>
       </header>
 
-      {/* 3. Hero Carousel Banner Skeleton (Matches exact responsive framing) */}
-      <section className="relative w-full h-[70vh] sm:h-[80vh] md:h-[85vh] min-h-[460px] max-h-[880px] bg-[#181512] overflow-hidden flex items-end">
+      {/* 3. Hero Carousel Banner Skeleton (Warm Luxury Ivory/Beige — Eliminates Mobile Black Box) */}
+      <section className="relative w-full h-[70vh] sm:h-[80vh] md:h-[85vh] min-h-[460px] max-h-[880px] bg-[#F3EFEA] overflow-hidden flex items-end">
         {/* Shimmer Background */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-[#14110E] via-[#231F1D] to-[#2D2824] animate-pulse" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#14110E]/90 via-[#14110E]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#EAE4DC] via-[#F3EFEA] to-[#E5DDD3] animate-pulse" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#EAE4DC]/80 via-transparent to-transparent" />
 
         <div className="relative max-w-[1920px] w-full mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 pb-16 sm:pb-24 lg:pb-28">
           <div className="max-w-2xl space-y-4">
-            <div className="h-3 w-40 bg-[#FAF8F5]/25 rounded-xs animate-pulse" />
-            <div className="h-10 sm:h-14 w-3/4 bg-[#FAF8F5]/30 rounded-xs animate-pulse" />
-            <div className="h-4 w-1/2 bg-[#FAF8F5]/20 rounded-xs animate-pulse" />
+            <div className="h-3 w-40 bg-[#D5CCC0] rounded-xs animate-pulse" />
+            <div className="h-10 sm:h-14 w-3/4 bg-[#D5CCC0] rounded-xs animate-pulse" />
+            <div className="h-4 w-1/2 bg-[#DCD4C8] rounded-xs animate-pulse" />
             <div className="pt-2">
-              <div className="h-11 w-44 bg-[#FAF8F5]/90 rounded-xs animate-pulse" />
+              <div className="h-11 w-44 bg-[#D5CCC0] rounded-xs animate-pulse" />
             </div>
           </div>
         </div>

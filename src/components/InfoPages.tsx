@@ -6,29 +6,34 @@ import { EditorialImage } from './EditorialImage';
 
 interface AboutPageProps {
   onExploreCollection: () => void;
+  siteSettings?: any;
 }
 
-export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => {
+export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection, siteSettings }) => {
   return (
     <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-10 sm:py-16 lg:py-20 space-y-16 sm:space-y-20">
       {/* Hero Header */}
+      {siteSettings?.showAboutHero !== false && (
       <div className="max-w-3xl space-y-4">
         <p className="text-xs tracking-[0.18em] uppercase text-[#7C736A]">
           AABHA CLOTHING · Premium Indian Women&apos;s Ethnic Wear
         </p>
         <h1 className="font-serif text-4xl sm:text-6xl text-[#1E1B18] font-normal leading-[1.08]">
-          Quiet Indian Luxury, Woven for the Everyday Hour.
+          {siteSettings?.aboutHeroHeading || 'Quiet Indian Luxury, Woven for the Everyday Hour.'}
         </h1>
         <p className="text-base sm:text-lg text-[#4A433D] font-light leading-relaxed pt-2">
-          AABHA was founded with a singular conviction: Indian textiles do not belong locked inside occasion trunks. Handwoven Chanderi silk, breathable linen, kora cotton, and fine khadi deserve to be inhabited every single day—cut with architectural clarity, deep pockets, and unhurried grace.
+          {siteSettings?.aboutHeroLead ||
+            'AABHA was founded with a singular conviction: Indian textiles do not belong locked inside occasion trunks. Handwoven Chanderi silk, breathable linen, kora cotton, and fine khadi deserve to be inhabited every single day—cut with architectural clarity, deep pockets, and unhurried grace.'}
         </p>
       </div>
+      )}
 
       {/* Editorial Split */}
+      {siteSettings?.showAboutFoundational !== false && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
         <div className="lg:col-span-7 aspect-[16/10] bg-[#F3EFEA] overflow-hidden">
           <EditorialImage
-            src={EDITORIAL_ASSETS.brandStory}
+            src={siteSettings?.brandStory || EDITORIAL_ASSETS.brandStory}
             alt="AABHA CLOTHING craftsmanship"
             containerClassName="w-full h-full"
             className="w-full h-full object-cover"
@@ -36,10 +41,11 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => 
         </div>
         <div className="lg:col-span-5 space-y-6">
           <h2 className="font-serif text-3xl text-[#1E1B18] font-normal">
-            Handcrafted Foundational Silhouettes.
+            {siteSettings?.aboutFoundationalTitle || 'Handcrafted Foundational Silhouettes.'}
           </h2>
           <p className="text-sm sm:text-base text-[#4A433D] font-light leading-relaxed">
-            Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.
+            {siteSettings?.aboutFoundationalBody ||
+              'Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.'}
           </p>
           <div className="space-y-4 pt-4 border-t border-[#ECE6DD] text-xs sm:text-sm">
             <div>
@@ -78,6 +84,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onExploreCollection }) => 
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 };
@@ -127,10 +134,14 @@ export const ContactPage: React.FC<ContactPageProps> = ({ siteSettings }) => {
     }
   };
 
+  const showChannels = siteSettings?.showContactChannels !== false;
+  const showForm = siteSettings?.showContactForm !== false;
+
   return (
     <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-10 sm:py-16 lg:py-20">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        <div className="lg:col-span-5 space-y-8">
+      <div className={`grid grid-cols-1 ${showChannels && showForm ? 'lg:grid-cols-12 gap-12' : 'gap-10'} items-start`}>
+        {showChannels && (
+          <div className={`${showForm ? 'lg:col-span-5' : 'lg:col-span-12 max-w-2xl mx-auto w-full'} space-y-8`}>
           <div>
             <p className="text-xs tracking-[0.18em] uppercase text-[#7C736A] mb-2">
               AABHA CLOTHING · Client Care
@@ -217,8 +228,10 @@ export const ContactPage: React.FC<ContactPageProps> = ({ siteSettings }) => {
             </div>
           </div>
         </div>
+      )}
 
-        <div className="lg:col-span-7 bg-[#F3EFEA] p-8 sm:p-10">
+        {showForm && (
+          <div className={`${showChannels ? 'lg:col-span-7' : 'lg:col-span-12 max-w-3xl mx-auto w-full'} bg-[#F3EFEA] p-8 sm:p-10`}>
           {submitted ? (
             <div className="py-12 text-center space-y-4">
               <CheckCircle2 className="w-9 h-9 text-[#6E5043] mx-auto stroke-[1.35]" />
@@ -337,6 +350,16 @@ export const ContactPage: React.FC<ContactPageProps> = ({ siteSettings }) => {
             </form>
           )}
         </div>
+        )}
+
+        {!showChannels && !showForm && (
+          <div className="col-span-12 py-16 px-6 text-center bg-[#F3EFEA] border border-dashed border-[#D5CCC0] space-y-3 max-w-xl mx-auto w-full">
+            <p className="font-serif text-2xl text-[#1E1B18]">Direct Atelier Assistance</p>
+            <p className="text-xs text-[#7C736A]">
+              Direct contact channels and web messaging are temporarily paused. For immediate assistance, please reach out via our official WhatsApp Concierge.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

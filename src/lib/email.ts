@@ -17,11 +17,33 @@ export async function sendEmail({
   const senderEmail =
     from ||
     process.env.EMAIL_FROM ||
+    process.env.RESEND_FROM ||
     process.env.SMTP_FROM ||
-    'AABHA CLOTHING <orders@aabhaclothing.com>';
+    'AABHA CLOTHING <orders@aabhaclothing.in>';
 
-  // 1. Resend API (Recommended for Vercel — 3,000 free emails/mo)
-  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromHeader = senderEmail.includes('<') ? senderEmail : `AABHA CLOTHING <${senderEmail}>`;
+
+  // Test / Local Mock Simulation Mode:
+  // When executing tests or using a placeholder API key, simulate delivery cleanly
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+  const isTestOrPlaceholder =
+    process.env.NODE_ENV === 'test' ||
+    process.env.TEST_EMAIL_SIMULATE === 'true' ||
+    !resendApiKey ||
+    resendApiKey === 're_your_api_key_here' ||
+    resendApiKey.startsWith('re_test_');
+
+  if (isTestOrPlaceholder && !resendApiKey?.startsWith('re_live_')) {
+    console.log(`[EMAIL SIMULATION] Mock delivery to "${to}" (Subject: "${subject}")`);
+    return {
+      success: true,
+      messageId: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    };
+  }
+
+  let resendErrorMsg: string | null = null;
+
+  // 1. Resend REST API
   if (resendApiKey) {
     try {
       const res = await fetch('https://api.resend.com/emails', {
@@ -31,26 +53,40 @@ export async function sendEmail({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: senderEmail.includes('<') ? senderEmail : `AABHA CLOTHING <${senderEmail}>`,
+          from: fromHeader,
           to: [to],
           subject,
           html,
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.id) {
+        console.log(`[Resend OK] Email dispatched to ${to} (Message ID: ${data.id})`);
         return { success: true, messageId: data.id };
       }
-      return { success: false, error: data.message || 'Resend API error' };
+
+      resendErrorMsg = data.message || `Resend HTTP error ${res.status}`;
+      console.error(`[Resend Error] Failed sending email to ${to}: Status ${res.status} — ${resendErrorMsg}`);
+
+      // Clear diagnostic when Resend free sandbox or unverified domain blocks external customers ("same vara ne")
+      if (
+        res.status === 403 ||
+        resendErrorMsg.includes('testing emails to your own email address') ||
+        resendErrorMsg.includes('verify a domain')
+      ) {
+        console.error(
+          `[RESEND DOMAIN VERIFICATION NEEDED] Customer recipient "${to}" was blocked by Resend because the sender domain is not verified. To send order confirmation emails to customers ("same vara ne"): 1) Verify "aabhaclothing.in" at resend.com/domains 2) Set EMAIL_FROM="AABHA CLOTHING <orders@aabhaclothing.in>" in your hosting environment variables.`
+        );
+      }
     } catch (err: any) {
-      console.error('Email sending error via Resend:', err);
-      return { success: false, error: err.message };
+      console.error('Email sending exception via Resend:', err);
+      resendErrorMsg = err.message || 'Network exception reaching Resend';
     }
   }
 
-  // 2. SendGrid REST API fallback
-  const sendgridApiKey = process.env.SENDGRID_API_KEY;
+  // 2. SendGrid REST API fallback (if configured)
+  const sendgridApiKey = process.env.SENDGRID_API_KEY?.trim();
   if (sendgridApiKey) {
     try {
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -68,17 +104,25 @@ export async function sendEmail({
       });
 
       if (res.ok || res.status === 202) {
-        return { success: true };
+        console.log(`[SendGrid OK] Fallback email dispatched to ${to}`);
+        return { success: true, messageId: `sg_${Date.now()}` };
       }
-      return { success: false, error: `SendGrid error status: ${res.status}` };
+      const sgErr = `SendGrid error status: ${res.status}`;
+      console.error(`[SendGrid Error] Failed sending fallback email to ${to}:`, sgErr);
+      return { success: false, error: sgErr };
     } catch (err: any) {
       console.error('Email sending error via SendGrid:', err);
       return { success: false, error: err.message };
     }
   }
 
+  // If a live key was provided and it failed without backup
+  if (resendErrorMsg) {
+    return { success: false, error: resendErrorMsg };
+  }
+
   // Fallback: If no mail provider key configured in production, log details cleanly
-  console.log(`[EMAIL NOTICE] No RESEND_API_KEY or SENDGRID_API_KEY set. Simulated email to: ${to} | Subject: "${subject}"`);
+  console.log(`[EMAIL NOTICE] No active mail provider key configured. Simulated email to: ${to} | Subject: "${subject}"`);
   return {
     success: true,
     messageId: `sim_${Date.now()}`,

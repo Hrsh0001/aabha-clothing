@@ -9,6 +9,7 @@ interface EditorialImageProps {
   containerClassName?: string;
   fallbackLabel?: string;
   priority?: boolean;
+  onLoad?: () => void;
 }
 
 export const EditorialImage: React.FC<EditorialImageProps> = ({
@@ -18,6 +19,7 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
   containerClassName = 'w-full h-full bg-[#EFECE6]',
   fallbackLabel,
   priority = false,
+  onLoad,
 }) => {
   const imgRef = React.useRef<HTMLImageElement>(null);
   const cleanSrc = typeof src === 'string' ? src.trim() : '';
@@ -54,9 +56,9 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
     <div className={`relative overflow-hidden ${containerClassName}`}>
       {!hasError && cleanSrc ? (
         <>
-          {/* Fast, subtle shimmer while downloading */}
-          {!isLoaded && !priority && (
-            <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse pointer-events-none" />
+          {/* Fast, warm subtle shimmer while downloading */}
+          {!isLoaded && (
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#EAE4DC] via-[#F3EFEA] to-[#E5DDD3] animate-pulse pointer-events-none" />
           )}
           <img
             ref={imgRef}
@@ -65,10 +67,13 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
             loading={priority || cleanSrc.startsWith('data:') ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : 'auto'}
             decoding={priority ? 'sync' : 'async'}
-            onLoad={() => setIsLoaded(true)}
+            onLoad={() => {
+              setIsLoaded(true);
+              onLoad?.();
+            }}
             onError={handleError}
-            className={`${className} transition-opacity duration-200 ease-out ${
-              isLoaded || priority || cleanSrc.startsWith('data:') ? 'opacity-100' : 'opacity-0'
+            className={`${className} transition-opacity duration-300 ease-out ${
+              isLoaded || cleanSrc.startsWith('data:') ? 'opacity-100' : 'opacity-0'
             }`}
           />
         </>

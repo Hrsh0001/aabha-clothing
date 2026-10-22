@@ -85,6 +85,7 @@ export const Footer: React.FC<FooterProps> = ({
             </p>
 
             {/* Minimal Underlined Newsletter Subscription */}
+            {siteSettings?.showFooterNewsletter !== false && (
             <div className="pt-3 max-w-md">
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#D8CEC2] mb-3">
                 Newsletter & Private Previews
@@ -128,6 +129,7 @@ export const Footer: React.FC<FooterProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Shop Categories */}
