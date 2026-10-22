@@ -21,10 +21,12 @@ import {
   Mail,
   KeyRound,
   AlertCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { Product, GarmentSize, formatINR } from '../data/products';
 import { EditorialImage } from './EditorialImage';
 import { useAuth } from '../context/AuthContext';
+import type { SiteSettings } from '../app/api/settings/route';
 
 export interface CartItem {
   product: Product;
@@ -36,6 +38,7 @@ export interface CartItem {
 interface CartDrawerProps {
   isOpen: boolean;
   items: CartItem[];
+  siteSettings?: SiteSettings | null;
   onClose: () => void;
   onUpdateQuantity: (productId: string, size: GarmentSize, delta: number, color?: string) => void;
   onRemoveItem: (productId: string, size: GarmentSize, color?: string) => void;
@@ -46,6 +49,7 @@ interface CartDrawerProps {
 export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   items,
+  siteSettings,
   onClose,
   onUpdateQuantity,
   onRemoveItem,
@@ -221,11 +225,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             <button
               type="button"
               onClick={onProceedToCheckout}
-              className="w-full py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors flex items-center justify-center gap-2.5 cursor-pointer"
+              className="w-full py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-xs"
             >
               <span>Proceed to Checkout</span>
               <ArrowRight className="w-3.5 h-3.5 stroke-[1.4]" />
             </button>
+
+            {siteSettings?.showWhatsAppDirectOrder !== false && (
+              <a
+                href={`https://wa.me/${(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                  `Namaste AABHA, I would like to order my bag items via Cash on Delivery:\n\n${items
+                    .map((it) => `• ${it.product.name} (Size: ${it.size}${it.selectedColor ? `, Color: ${it.selectedColor}` : ''}, Qty: ${it.quantity}) - ${formatINR(it.product.price * it.quantity)}`)
+                    .join('\n')}\n\nTotal: ${formatINR(subtotal)}\n\nPlease assist with booking this order!`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3.5 px-6 bg-[#25D366] hover:bg-[#20BD5A] text-white text-xs font-medium tracking-[0.16em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+              >
+                <MessageCircle className="w-4 h-4 text-white" />
+                <span>{siteSettings?.whatsAppOrderButtonText || 'Quick Order on WhatsApp'}</span>
+              </a>
+            )}
           </div>
         )}
       </div>

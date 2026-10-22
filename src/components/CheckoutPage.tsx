@@ -12,6 +12,8 @@ import {
   User,
   MapPin,
   ExternalLink,
+  RotateCcw,
+  CreditCard,
 } from 'lucide-react';
 import { CartItem } from './Drawers';
 import { formatINR } from '../data/products';
@@ -747,10 +749,48 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           <button
             type="submit"
             disabled={items.length === 0 || isSubmitting}
-            className="w-full py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors disabled:opacity-50 cursor-pointer"
+            className="w-full py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors disabled:opacity-50 cursor-pointer shadow-md"
           >
             {isSubmitting ? 'RECORDING ORDER...' : `CONFIRM CASH ON DELIVERY ORDER · ${formatINR(finalTotal)}`}
           </button>
+
+          {/* COD Trust Guarantee Box */}
+          {siteSettings?.showCodTrustGuarantee !== false && (
+            <div className="p-4 sm:p-5 bg-[#FAF8F5] border border-[#E0D8CE] space-y-3">
+              <span className="text-[11px] font-medium tracking-[0.16em] uppercase text-[#6E5043] block">
+                The AABHA Cash On Delivery Guarantee
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#1E1B18]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#6E5043] shrink-0" />
+                    <span>{siteSettings?.codTrustPillar1Title || 'Zero Advance Payment'}</span>
+                  </div>
+                  <p className="text-[11px] text-[#7C736A] font-light leading-snug">
+                    {siteSettings?.codTrustPillar1Desc || 'Pay only when your parcel arrives safely at your doorstep.'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#1E1B18]">
+                    <CreditCard className="w-3.5 h-3.5 text-[#6E5043] shrink-0" />
+                    <span>{siteSettings?.codTrustPillar2Title || 'Doorstep Cash or UPI'}</span>
+                  </div>
+                  <p className="text-[11px] text-[#7C736A] font-light leading-snug">
+                    {siteSettings?.codTrustPillar2Desc || 'Pay courier conveniently via Cash, GPay, PhonePe, or Paytm.'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#1E1B18]">
+                    <RotateCcw className="w-3.5 h-3.5 text-[#6E5043] shrink-0" />
+                    <span>{siteSettings?.codTrustPillar3Title || '14-Day Free Exchange'}</span>
+                  </div>
+                  <p className="text-[11px] text-[#7C736A] font-light leading-snug">
+                    {siteSettings?.codTrustPillar3Desc || 'Doorstep size replacement or exchange if fit needs adjusting.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Right Column: Order Summary */}

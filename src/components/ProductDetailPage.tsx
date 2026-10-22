@@ -90,6 +90,28 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
   }, [product.id, product.sizes, product.colors, product.colorName]);
 
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (!product?.id) return;
+    try {
+      const stored = localStorage.getItem('aabha_recently_viewed');
+      const ids: string[] = stored ? JSON.parse(stored) : [];
+      setRecentlyViewedIds(ids.filter((id) => id !== product.id));
+      const updated = [product.id, ...ids.filter((id) => id !== product.id)].slice(0, 8);
+      localStorage.setItem('aabha_recently_viewed', JSON.stringify(updated));
+    } catch {
+      // Ignore
+    }
+  }, [product.id]);
+
+  const recentlyViewedProducts = React.useMemo(() => {
+    return recentlyViewedIds
+      .map((id) => allProducts.find((p) => p.id === id))
+      .filter((p): p is Product => Boolean(p))
+      .slice(0, 4);
+  }, [recentlyViewedIds, allProducts]);
+
   React.useEffect(() => {
     if (!sizeGuideOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -418,6 +440,43 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
             </div>
 
+            {/* Find My Fit: 1-Click Bust Measurement Recommender */}
+            {siteSettings?.showSizeRecommender !== false && (
+              <div className="p-3 bg-[#F3EFEA] border border-[#ECE6DD] space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-[#1E1B18] tracking-wider uppercase">
+                    Select Your Bust Measurement:
+                  </span>
+                  <span className="text-[#6E5043] font-light">
+                    {selectedSize}: {SIZE_CHART[selectedSize].bust}&quot; Bust
+                  </span>
+                </div>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {(['XS', 'S', 'M', 'L', 'XL', 'XXL'] as GarmentSize[]).map((sz) => {
+                    const isRec = selectedSize === sz;
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setSelectedSize(sz)}
+                        className={`py-1.5 px-1 text-[11px] font-mono border text-center transition-colors cursor-pointer ${
+                          isRec
+                            ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] font-medium shadow-xs'
+                            : 'bg-[#FAF8F5] text-[#4A433D] border-[#D5CCC0] hover:border-[#1E1B18]'
+                        }`}
+                      >
+                        <div className="text-[10px] text-[#7C736A]">{sz}</div>
+                        <div>{SIZE_CHART[sz].bust}&quot;</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[#7C736A] font-light leading-snug">
+                  {siteSettings?.sizeRecommenderNote || 'Tailored with 2.5″ comfortable ease for effortless all-day wear.'}
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {availableSizes.map((size) => {
                 const active = selectedSize === size;
@@ -515,6 +574,23 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             >
               {product.inStock ? 'Buy Now' : 'Currently Unavailable'}
             </button>
+
+            {/* Direct WhatsApp Quick Order CTA */}
+            {siteSettings?.showWhatsAppDirectOrder !== false && (
+              <a
+                href={`https://wa.me/${(siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                  `Namaste AABHA, I want to place a Cash on Delivery (COD) order for:\n\n• Garment: ${product.name}\n• Size: ${selectedSize}${
+                    selectedColor ? `\n• Color: ${selectedColor}` : ''
+                  }\n• Price: ${formatINR(product.price)}\n\nPlease confirm my order details!`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3.5 px-6 bg-[#25D366] hover:bg-[#20BD5A] text-white text-xs font-medium tracking-[0.16em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                <MessageCircle className="w-4 h-4 text-white" />
+                <span>{siteSettings?.whatsAppOrderButtonText || 'Quick Order on WhatsApp'}</span>
+              </a>
+            )}
 
             {/* Direct WhatsApp Stylist Inquiry */}
             <a
@@ -857,6 +933,33 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 key={rel.id}
                 product={rel}
                 isWishlisted={wishlistIds.includes(rel.id)}
+                onSelectProduct={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                onQuickAdd={onQuickAdd}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recently Viewed Silhouettes */}
+      {siteSettings?.showRecentlyViewed !== false && recentlyViewedProducts.length > 0 && (
+        <section className="mt-24 sm:mt-32 pt-16 sm:pt-20 border-t border-[#ECE6DD]">
+          <div className="mb-10 sm:mb-14">
+            <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
+              Your Atelier Journey
+            </p>
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#1E1B18] font-normal">
+              {siteSettings?.recentlyViewedTitle || 'Recently Viewed Silhouettes'}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 sm:gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-14">
+            {recentlyViewedProducts.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={p}
+                isWishlisted={wishlistIds.includes(p.id)}
                 onSelectProduct={onSelectProduct}
                 onToggleWishlist={onToggleWishlist}
                 onQuickAdd={onQuickAdd}

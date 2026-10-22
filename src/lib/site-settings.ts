@@ -104,6 +104,22 @@ export interface SiteSettings {
   showPinCodeChecker?: boolean;
   showShopHeader?: boolean;
   showShopFilters?: boolean;
+
+  // 11. High-Impact Conversion & Trust Features
+  showSizeRecommender?: boolean;
+  sizeRecommenderNote?: string;
+  showWhatsAppDirectOrder?: boolean;
+  whatsAppOrderButtonText?: string;
+  showRecentlyViewed?: boolean;
+  recentlyViewedTitle?: string;
+  showCodTrustGuarantee?: boolean;
+  codTrustPillar1Title?: string;
+  codTrustPillar1Desc?: string;
+  codTrustPillar2Title?: string;
+  codTrustPillar2Desc?: string;
+  codTrustPillar3Title?: string;
+  codTrustPillar3Desc?: string;
+  showOrderSelfService?: boolean;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -221,6 +237,22 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   showPinCodeChecker: true,
   showShopHeader: true,
   showShopFilters: true,
+
+  // 11. Conversion Features Defaults
+  showSizeRecommender: true,
+  sizeRecommenderNote: 'Tailored with 2.5″ comfortable ease for effortless all-day wear.',
+  showWhatsAppDirectOrder: true,
+  whatsAppOrderButtonText: 'Quick Order on WhatsApp',
+  showRecentlyViewed: true,
+  recentlyViewedTitle: 'Recently Viewed Silhouettes',
+  showCodTrustGuarantee: true,
+  codTrustPillar1Title: 'Zero Advance Payment',
+  codTrustPillar1Desc: 'Pay only when your parcel arrives safely at your doorstep.',
+  codTrustPillar2Title: 'Doorstep Cash or UPI',
+  codTrustPillar2Desc: 'Pay courier conveniently via Cash, GPay, PhonePe, or Paytm.',
+  codTrustPillar3Title: '14-Day Free Exchange',
+  codTrustPillar3Desc: 'Doorstep size replacement or exchange if fit needs adjusting.',
+  showOrderSelfService: true,
 };
 
 export const SETTINGS_FILE_PATH = path.join(process.cwd(), 'data', 'settings.json');

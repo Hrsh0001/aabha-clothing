@@ -557,6 +557,7 @@ export default function App() {
       <CartDrawer
         isOpen={cartDrawerOpen}
         items={cartItems}
+        siteSettings={siteSettings}
         onClose={() => setCartDrawerOpen(false)}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}

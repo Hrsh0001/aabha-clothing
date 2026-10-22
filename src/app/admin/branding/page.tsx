@@ -441,7 +441,7 @@ export default function AdminBrandingPage() {
               { id: 'categories', label: '2. Category & Curated', icon: ShoppingBag },
               { id: 'arrivals_trust', label: '3. New Arrivals & Pillars', icon: Award },
               { id: 'story_about', label: '4. Brand Story & About Page', icon: BookOpen },
-              { id: 'contact_social', label: '5. Concierge, Contact & Identity', icon: MessageCircle },
+              { id: 'contact_social', label: '5. Concierge, Trust & Conversion', icon: MessageCircle },
               { id: 'layout_manager', label: '6. Page Sections Add/Remove', icon: Sliders },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -1811,6 +1811,322 @@ export default function AdminBrandingPage() {
                   </button>
                 </div>
               </section>
+
+              {/* Section: High-Impact Conversion & COD Trust Customization */}
+              <section className="bg-[#F3EFEA] border border-[#ECE6DD] p-6 sm:p-8 space-y-6">
+                <div>
+                  <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#7C736A] block">
+                    Conversion Engine &amp; Patron Trust
+                  </span>
+                  <h2 className="font-serif text-2xl text-[#1E1B18] font-normal mt-0.5">
+                    High-Impact Storefront &amp; COD Experience Controls
+                  </h2>
+                  <p className="text-xs text-[#5C544D] mt-1">
+                    Control visibility, customize microcopy, and tailor conversational ordering across Product Pages, Cart Drawer, Checkout, and Order Concierge.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Feature 1: Find My Fit Quick Bust Recommender */}
+                  <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E0D8CE]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#1E1B18]">
+                            1. &ldquo;Find My Fit&rdquo; Quick Bust Recommender
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                              settings.showSizeRecommender !== false
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {settings.showSizeRecommender !== false ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#7C736A] mt-0.5">
+                          Renders a 1-click bust measurement selector (32&quot; - 44&quot;) on the Product Detail Page to eliminate sizing uncertainty.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('showSizeRecommender')}
+                        className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider border cursor-pointer whitespace-nowrap ${
+                          settings.showSizeRecommender !== false
+                            ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                            : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                        }`}
+                      >
+                        {settings.showSizeRecommender !== false ? 'Disable Recommender' : 'Enable Recommender'}
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                        Fit Guidance Note / Tailoring Advice:
+                      </label>
+                      <input
+                        type="text"
+                        value={
+                          settings.sizeRecommenderNote ??
+                          'Tailored with 2.5″ comfortable ease for effortless all-day wear.'
+                        }
+                        onChange={(e) =>
+                          setSettings({ ...settings, sizeRecommenderNote: e.target.value })
+                        }
+                        placeholder="e.g. Tailored with 2.5″ comfortable ease for effortless all-day wear."
+                        className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Feature 2: Quick WhatsApp Direct Order CTA */}
+                  <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E0D8CE]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#1E1B18]">
+                            2. Direct &ldquo;Quick Order on WhatsApp&rdquo; Conversational Commerce
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                              settings.showWhatsAppDirectOrder !== false
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {settings.showWhatsAppDirectOrder !== false ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#7C736A] mt-0.5">
+                          Provides a prominent WhatsApp order CTA on Product Detail Page and in Shopping Bag Drawer pre-filling garment details and COD prompt.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('showWhatsAppDirectOrder')}
+                        className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider border cursor-pointer whitespace-nowrap ${
+                          settings.showWhatsAppDirectOrder !== false
+                            ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                            : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                        }`}
+                      >
+                        {settings.showWhatsAppDirectOrder !== false ? 'Disable Direct CTA' : 'Enable Direct CTA'}
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                        WhatsApp Button CTA Label:
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.whatsAppOrderButtonText ?? 'Quick Order on WhatsApp'}
+                        onChange={(e) =>
+                          setSettings({ ...settings, whatsAppOrderButtonText: e.target.value })
+                        }
+                        placeholder="e.g. Quick Order on WhatsApp"
+                        className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Feature 3: Recently Viewed Silhouettes Shelf */}
+                  <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E0D8CE]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#1E1B18]">
+                            3. &ldquo;Recently Viewed Silhouettes&rdquo; PDP Shelf
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                              settings.showRecentlyViewed !== false
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {settings.showRecentlyViewed !== false ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#7C736A] mt-0.5">
+                          Tracks recently visited garments on client devices to remind patrons of previously explored pieces.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('showRecentlyViewed')}
+                        className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider border cursor-pointer whitespace-nowrap ${
+                          settings.showRecentlyViewed !== false
+                            ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                            : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                        }`}
+                      >
+                        {settings.showRecentlyViewed !== false ? 'Disable Shelf' : 'Enable Shelf'}
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
+                        Recently Viewed Shelf Heading:
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.recentlyViewedTitle ?? 'Recently Viewed Silhouettes'}
+                        onChange={(e) =>
+                          setSettings({ ...settings, recentlyViewedTitle: e.target.value })
+                        }
+                        placeholder="e.g. Recently Viewed Silhouettes"
+                        className="w-full bg-white border border-[#E0D8CE] px-3.5 py-2 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Feature 4: The AABHA COD Trust Guarantee Card */}
+                  <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E0D8CE]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#1E1B18]">
+                            4. Checkout COD Trust Guarantee (3 Pillars)
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                              settings.showCodTrustGuarantee !== false
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {settings.showCodTrustGuarantee !== false ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#7C736A] mt-0.5">
+                          High-converting 3-point assurance card rendered right next to the Confirm Order button on /checkout.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('showCodTrustGuarantee')}
+                        className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider border cursor-pointer whitespace-nowrap ${
+                          settings.showCodTrustGuarantee !== false
+                            ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                            : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                        }`}
+                      >
+                        {settings.showCodTrustGuarantee !== false ? 'Disable Guarantee Card' : 'Enable Guarantee Card'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Pillar 1 */}
+                      <div className="bg-white border border-[#E0D8CE] p-3 space-y-2">
+                        <span className="text-[11px] font-semibold text-[#1E1B18] block">COD Pillar 1</span>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Title:</label>
+                          <input
+                            type="text"
+                            value={settings.codTrustPillar1Title ?? 'Zero Advance Payment'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar1Title: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Description:</label>
+                          <textarea
+                            rows={2}
+                            value={settings.codTrustPillar1Desc ?? 'Pay only when your parcel arrives safely at your doorstep.'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar1Desc: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pillar 2 */}
+                      <div className="bg-white border border-[#E0D8CE] p-3 space-y-2">
+                        <span className="text-[11px] font-semibold text-[#1E1B18] block">COD Pillar 2</span>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Title:</label>
+                          <input
+                            type="text"
+                            value={settings.codTrustPillar2Title ?? 'Doorstep Cash or UPI'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar2Title: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Description:</label>
+                          <textarea
+                            rows={2}
+                            value={settings.codTrustPillar2Desc ?? 'Pay courier conveniently via Cash, GPay, PhonePe, or Paytm.'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar2Desc: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pillar 3 */}
+                      <div className="bg-white border border-[#E0D8CE] p-3 space-y-2">
+                        <span className="text-[11px] font-semibold text-[#1E1B18] block">COD Pillar 3</span>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Title:</label>
+                          <input
+                            type="text"
+                            value={settings.codTrustPillar3Title ?? '14-Day Free Exchange'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar3Title: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-0.5">Description:</label>
+                          <textarea
+                            rows={2}
+                            value={settings.codTrustPillar3Desc ?? 'Doorstep size replacement or exchange if fit needs adjusting.'}
+                            onChange={(e) => setSettings({ ...settings, codTrustPillar3Desc: e.target.value })}
+                            className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Feature 5: Customer Order Self-Service Window */}
+                  <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 sm:p-5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#1E1B18]">
+                            5. Customer Order Self-Service Window (/my-orders)
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${
+                              settings.showOrderSelfService !== false
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {settings.showOrderSelfService !== false ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#7C736A] mt-0.5">
+                          Enables a 1-click WhatsApp concierge card on the customer tracking page while an order status is &ldquo;PENDING&rdquo;, allowing patrons to request delivery address or size corrections prior to dispatch.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('showOrderSelfService')}
+                        className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider border cursor-pointer whitespace-nowrap ${
+                          settings.showOrderSelfService !== false
+                            ? 'bg-white text-[#C62828] border-[#FFCDD2] hover:bg-[#FFEBEE]'
+                            : 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] hover:bg-[#14110E]'
+                        }`}
+                      >
+                        {settings.showOrderSelfService !== false ? 'Disable Window' : 'Enable Window'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           )}
 
@@ -1908,6 +2224,21 @@ export default function AdminBrandingPage() {
                       desc: 'Subtle 6-digit postal code check for complimentary courier serviceability',
                     },
                     {
+                      flag: 'showSizeRecommender' as keyof SiteSettings,
+                      name: 'Find My Fit Bust Recommender',
+                      desc: '1-click bust measurement selector and interactive size recommendation chip on PDP',
+                    },
+                    {
+                      flag: 'showWhatsAppDirectOrder' as keyof SiteSettings,
+                      name: 'Quick Order on WhatsApp Direct CTA',
+                      desc: 'One-tap WhatsApp concierge order button with pre-filled garment details and COD prompt',
+                    },
+                    {
+                      flag: 'showRecentlyViewed' as keyof SiteSettings,
+                      name: 'Recently Viewed Silhouettes Shelf',
+                      desc: 'Client-side history shelf displaying recently inspected garments at the bottom of PDP',
+                    },
+                    {
                       flag: 'showProductReviews' as keyof SiteSettings,
                       name: 'Client Impressions & Review Form',
                       desc: 'Customer star ratings, written reviews, verified buyer badges, and submission form',
@@ -1916,6 +2247,22 @@ export default function AdminBrandingPage() {
                       flag: 'showRelatedProducts' as keyof SiteSettings,
                       name: 'Related Products / Complete The Look',
                       desc: 'Curated companion garments from the same silhouette or fabric family',
+                    },
+                  ],
+                },
+                {
+                  pageTitle: 'Checkout & Order Tracking (/checkout, /my-orders)',
+                  pageDesc: 'Friction-free COD ordering assurances and self-service order modifications',
+                  sections: [
+                    {
+                      flag: 'showCodTrustGuarantee' as keyof SiteSettings,
+                      name: 'COD Trust Guarantee 3-Pillar Card',
+                      desc: 'Prominent 3-point assurance box (Zero advance payment, Doorstep Cash/UPI, 14-day exchange) at checkout',
+                    },
+                    {
+                      flag: 'showOrderSelfService' as keyof SiteSettings,
+                      name: 'Order Self-Service Update Window',
+                      desc: 'Allow patrons to 1-click message WhatsApp concierge to adjust delivery address or garment size while order is pending',
                     },
                   ],
                 },

@@ -121,6 +121,19 @@ describe('Storefront Sections & Dynamic Content Management', () => {
     expect(s.showPinCodeChecker).toBe(true);
     expect(s.showShopHeader).toBe(true);
     expect(s.showShopFilters).toBe(true);
+
+    // 11. High-Impact Conversion & COD Trust Features
+    expect(s.showSizeRecommender).toBe(true);
+    expect(s.sizeRecommenderNote).toBe('Tailored with 2.5″ comfortable ease for effortless all-day wear.');
+    expect(s.showWhatsAppDirectOrder).toBe(true);
+    expect(s.whatsAppOrderButtonText).toBe('Quick Order on WhatsApp');
+    expect(s.showRecentlyViewed).toBe(true);
+    expect(s.recentlyViewedTitle).toBe('Recently Viewed Silhouettes');
+    expect(s.showCodTrustGuarantee).toBe(true);
+    expect(s.codTrustPillar1Title).toBe('Zero Advance Payment');
+    expect(s.codTrustPillar2Title).toBe('Doorstep Cash or UPI');
+    expect(s.codTrustPillar3Title).toBe('14-Day Free Exchange');
+    expect(s.showOrderSelfService).toBe(true);
   });
 
   test('POST /api/settings allows admin to customize any section and toggle add/remove visibility flags', async () => {
@@ -155,6 +168,16 @@ describe('Storefront Sections & Dynamic Content Management', () => {
       categoryImages: {
         Anarkali: '/images/custom_anarkali_launch.jpg',
       },
+      // 11. Customizing conversion & trust features
+      showSizeRecommender: false,
+      sizeRecommenderNote: 'Designed with extra relaxed royal drape.',
+      showWhatsAppDirectOrder: false,
+      whatsAppOrderButtonText: 'Direct Order on Concierge WhatsApp',
+      showRecentlyViewed: false,
+      recentlyViewedTitle: 'Previously Explored Ensembles',
+      showCodTrustGuarantee: false,
+      codTrustPillar1Title: 'Doorstep Verification & Payment',
+      showOrderSelfService: false,
     };
 
     const postReq = createJsonRequest(
@@ -187,6 +210,15 @@ describe('Storefront Sections & Dynamic Content Management', () => {
     expect(postData.settings.showAboutHero).toBe(false);
     expect(postData.settings.showContactChannels).toBe(false);
     expect(postData.settings.showContactForm).toBe(false);
+    expect(postData.settings.showSizeRecommender).toBe(false);
+    expect(postData.settings.sizeRecommenderNote).toBe('Designed with extra relaxed royal drape.');
+    expect(postData.settings.showWhatsAppDirectOrder).toBe(false);
+    expect(postData.settings.whatsAppOrderButtonText).toBe('Direct Order on Concierge WhatsApp');
+    expect(postData.settings.showRecentlyViewed).toBe(false);
+    expect(postData.settings.recentlyViewedTitle).toBe('Previously Explored Ensembles');
+    expect(postData.settings.showCodTrustGuarantee).toBe(false);
+    expect(postData.settings.codTrustPillar1Title).toBe('Doorstep Verification & Payment');
+    expect(postData.settings.showOrderSelfService).toBe(false);
 
     // 3. Test restoring / adding back sections
     const restorePayload = {
@@ -197,6 +229,11 @@ describe('Storefront Sections & Dynamic Content Management', () => {
       showAboutHero: true,
       showContactChannels: true,
       showContactForm: true,
+      showSizeRecommender: true,
+      showWhatsAppDirectOrder: true,
+      showRecentlyViewed: true,
+      showCodTrustGuarantee: true,
+      showOrderSelfService: true,
     };
 
     const restoreReq = createJsonRequest(
@@ -215,6 +252,11 @@ describe('Storefront Sections & Dynamic Content Management', () => {
     expect(restoreData.settings.showAboutHero).toBe(true);
     expect(restoreData.settings.showContactChannels).toBe(true);
     expect(restoreData.settings.showContactForm).toBe(true);
+    expect(restoreData.settings.showSizeRecommender).toBe(true);
+    expect(restoreData.settings.showWhatsAppDirectOrder).toBe(true);
+    expect(restoreData.settings.showRecentlyViewed).toBe(true);
+    expect(restoreData.settings.showCodTrustGuarantee).toBe(true);
+    expect(restoreData.settings.showOrderSelfService).toBe(true);
 
     resetSettingsForTesting();
   });

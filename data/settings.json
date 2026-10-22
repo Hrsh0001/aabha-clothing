@@ -92,5 +92,19 @@
   "showRelatedProducts": true,
   "showPinCodeChecker": true,
   "showShopHeader": true,
-  "showShopFilters": true
+  "showShopFilters": true,
+  "showSizeRecommender": true,
+  "sizeRecommenderNote": "Tailored with 2.5″ comfortable ease for effortless all-day wear.",
+  "showWhatsAppDirectOrder": true,
+  "whatsAppOrderButtonText": "Quick Order on WhatsApp",
+  "showRecentlyViewed": true,
+  "recentlyViewedTitle": "Recently Viewed Silhouettes",
+  "showCodTrustGuarantee": true,
+  "codTrustPillar1Title": "Zero Advance Payment",
+  "codTrustPillar1Desc": "Pay only when your parcel arrives safely at your doorstep.",
+  "codTrustPillar2Title": "Doorstep Cash or UPI",
+  "codTrustPillar2Desc": "Pay courier conveniently via Cash, GPay, PhonePe, or Paytm.",
+  "codTrustPillar3Title": "14-Day Free Exchange",
+  "codTrustPillar3Desc": "Doorstep size replacement or exchange if fit needs adjusting.",
+  "showOrderSelfService": true
 }

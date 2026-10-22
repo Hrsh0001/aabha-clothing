@@ -56,13 +56,15 @@ export default function MyOrdersPage() {
   const [storeWhatsApp, setStoreWhatsApp] = useState(
     process.env.NEXT_PUBLIC_STORE_WHATSAPP || '919876543210'
   );
+  const [showSelfService, setShowSelfService] = useState(true);
 
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => r.json())
       .then((d) => {
-        if (d.success && d.settings?.whatsappNumber) {
-          setStoreWhatsApp(d.settings.whatsappNumber);
+        if (d.success && d.settings) {
+          if (d.settings.whatsappNumber) setStoreWhatsApp(d.settings.whatsappNumber);
+          if (d.settings.showOrderSelfService !== undefined) setShowSelfService(d.settings.showOrderSelfService);
         }
       })
       .catch(() => {});
@@ -367,6 +369,31 @@ export default function MyOrdersPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Customer Order Self-Service Correction Window */}
+                    {order.status === 'PENDING' && showSelfService && (
+                      <div className="p-3 bg-[#FAF8F5] border border-[#E0D8CE] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-0.5">
+                          <span className="font-medium text-[#1E1B18] block">
+                            Need to update address, phone, or size before dispatch?
+                          </span>
+                          <p className="text-[11px] text-[#7C736A] font-light">
+                            Your Cash on Delivery order is pending packaging. You can adjust details directly with our atelier concierge.
+                          </p>
+                        </div>
+                        <a
+                          href={`https://wa.me/${storeWhatsApp.replace(/[^0-9]/g, '') || '919876543210'}?text=${encodeURIComponent(
+                            `Namaste AABHA, I would like to request an address or size change for Order #${order.orderNumber} before dispatch.`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3.5 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-[11px] font-medium tracking-wider uppercase inline-flex items-center gap-1.5 whitespace-nowrap self-start sm:self-auto cursor-pointer shadow-2xs"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-white" />
+                          <span>Request Change on WhatsApp</span>
+                        </a>
+                      </div>
+                    )}
 
                     {/* Help Action */}
                     <div className="pt-2 flex justify-end">
