@@ -160,6 +160,12 @@ export interface SiteSettings {
   heroBannerHeight?: 'fullscreen' | 'standard' | 'compact';
   heroFocalAlignment?: 'top' | 'center' | 'bottom';
   heroOverlayOpacity?: number; // 0 to 90
+  heroBannerBlur?: number; // 0 to 20 px
+  heroBackdropBlur?: number; // 0 to 20 px
+  headerOpacity?: number; // 50 to 100 %
+  headerBlur?: number; // 0 to 24 px
+  drawerBackdropBlur?: number; // 0 to 16 px
+  drawerBackdropOpacity?: number; // 20 to 90 %
   enableGlassBlur?: boolean;
   glassBlurIntensity?: 'none' | 'subtle' | 'rich';
   storefrontBgTint?: string;
@@ -359,6 +365,12 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   heroBannerHeight: 'standard',
   heroFocalAlignment: 'center',
   heroOverlayOpacity: 25,
+  heroBannerBlur: 0,
+  heroBackdropBlur: 0,
+  headerOpacity: 95,
+  headerBlur: 8,
+  drawerBackdropBlur: 4,
+  drawerBackdropOpacity: 60,
   enableGlassBlur: true,
   glassBlurIntensity: 'subtle',
   storefrontBgTint: '#FAF8F5',

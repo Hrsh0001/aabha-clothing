@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Upload,
   CheckCircle,
@@ -106,6 +107,40 @@ export default function AdminBrandingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<BrandingTab>('nav_footer');
+
+  // Synchronize active tab with URL query parameter ?tab=
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (
+        tabParam &&
+        [
+          'pages_manager',
+          'nav_footer',
+          'hero',
+          'categories',
+          'arrivals_trust',
+          'story_about',
+          'contact_social',
+          'themes',
+          'layout_manager',
+          'preview',
+        ].includes(tabParam)
+      ) {
+        setActiveTab(tabParam as BrandingTab);
+      }
+    }
+  }, []);
+
+  const switchTab = (tab: BrandingTab) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
   const [toast, setToast] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -853,6 +888,21 @@ export default function AdminBrandingPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Quick Dedicated Pages Hub Link */}
+          <div className="bg-[#1A1715] text-[#FAF8F5] p-3 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border border-[#2C2723]">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#A8E6CF] animate-pulse"></span>
+              <span className="font-serif tracking-wide text-sm">Dedicated Pages &amp; Navigation Manager Available</span>
+              <span className="text-[#A69C91] text-[11px]">— Manage all system &amp; custom lookbook pages in a dedicated view</span>
+            </div>
+            <Link
+              href="/admin/pages"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#D4AF37] hover:bg-[#C29D26] text-[#1A1715] font-semibold text-[11px] uppercase tracking-wider shrink-0"
+            >
+              <span>Open Dedicated Pages Manager →</span>
+            </Link>
+          </div>
+
           {/* Top Tabs Navigation */}
           <div className="flex flex-wrap items-center gap-2 border-b border-[#ECE6DD] pb-2 bg-[#FAF8F5] p-2">
             {[
@@ -863,7 +913,7 @@ export default function AdminBrandingPage() {
               { id: 'arrivals_trust', label: '4. New Arrivals & Pillars', icon: Award },
               { id: 'story_about', label: '5. Brand Story & About Page', icon: BookOpen },
               { id: 'contact_social', label: '6. Concierge, PDP & Orders', icon: MessageCircle },
-              { id: 'themes', label: '7. Themes & Media Styling', icon: Palette },
+              { id: 'themes', label: '7. Themes, Blur & Opacity', icon: Palette },
               { id: 'layout_manager', label: '8. Page Sections Add/Remove', icon: Sliders },
               { id: 'preview', label: '9. Live Device Preview', icon: Smartphone },
             ].map((tab) => {
@@ -873,7 +923,7 @@ export default function AdminBrandingPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as BrandingTab)}
+                  onClick={() => switchTab(tab.id as BrandingTab)}
                   className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer border ${
                     isActive
                       ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] shadow-sm'
@@ -3564,10 +3614,43 @@ export default function AdminBrandingPage() {
                       <input
                         type="range"
                         min="0"
-                        max="80"
+                        max="90"
                         step="5"
                         value={settings.heroOverlayOpacity ?? 25}
                         onChange={(e) => setSettings({ ...settings, heroOverlayOpacity: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Image Background Blur: {settings.heroBannerBlur ?? 0}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="1"
+                        value={settings.heroBannerBlur ?? 0}
+                        onChange={(e) => setSettings({ ...settings, heroBannerBlur: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                      <span className="text-[10px] text-[#7C736A] block mt-0.5">
+                        0px (Crisp Sharp) · 4px (Soft Focus) · 12px (Editorial Depth)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Overlay Frosted Glass Blur: {settings.heroBackdropBlur ?? 0}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="1"
+                        value={settings.heroBackdropBlur ?? 0}
+                        onChange={(e) => setSettings({ ...settings, heroBackdropBlur: Number(e.target.value) })}
                         className="w-full accent-[#231F1D]"
                       />
                     </div>
@@ -3576,11 +3659,41 @@ export default function AdminBrandingPage() {
 
                 {/* Glassmorphism & Micro-Interactions */}
                 <div className="bg-white border border-[#ECE6DD] p-6 space-y-4">
-                  <h3 className="font-serif text-lg text-[#1E1B18]">Glassmorphism &amp; Atmosphere</h3>
+                  <h3 className="font-serif text-lg text-[#1E1B18]">Header Blur, Opacity &amp; Atmosphere</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
-                        Glass Blur Intensity
+                        Top Header Background Opacity: {settings.headerOpacity ?? 95}%
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        value={settings.headerOpacity ?? 95}
+                        onChange={(e) => setSettings({ ...settings, headerOpacity: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Top Header Glass Backdrop Blur: {settings.headerBlur ?? 8}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="24"
+                        step="2"
+                        value={settings.headerBlur ?? 8}
+                        onChange={(e) => setSettings({ ...settings, headerBlur: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Glass Blur Intensity Preset
                       </label>
                       <select
                         value={settings.glassBlurIntensity || 'subtle'}

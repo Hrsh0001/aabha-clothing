@@ -127,21 +127,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       icon: Layers,
     },
     {
-      label: 'Pages Manager',
-      href: '/admin/branding?tab=pages_manager',
+      label: 'Pages (All Pages & CMS)',
+      href: '/admin/pages',
       icon: FileText,
-      badge: 'CRUD',
+      badge: 'ALL',
       badgeColor: 'bg-[#6E5043] text-white',
     },
     {
-      label: 'Page CMS & Studio',
+      label: 'Page Studio & Themes',
       href: '/admin/branding',
       icon: Sliders,
-    },
-    {
-      label: 'Navbar & Footer',
-      href: '/admin/branding?tab=nav_footer',
-      icon: Compass,
     },
     {
       label: 'Inquiries',
