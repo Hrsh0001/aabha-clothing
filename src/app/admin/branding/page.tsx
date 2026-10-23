@@ -39,6 +39,7 @@ import {
   Check,
   Tag,
   X,
+  Copy,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -433,6 +434,19 @@ export default function AdminBrandingPage() {
     setEditingPageId(page.id);
     setPageForm({ ...page });
     setPageModalOpen(true);
+  };
+
+  const handleDuplicateCustomPage = (page: CustomPageItem) => {
+    setEditingPageId(null);
+    setPageForm({
+      ...page,
+      id: `page_${Date.now()}`,
+      slug: `${page.slug}-copy`,
+      title: `${page.title} (Copy)`,
+      published: false,
+    });
+    setPageModalOpen(true);
+    showToast(`Cloned "${page.title}". Review details and save to create.`);
   };
 
   const handleSaveCustomPage = () => {
@@ -1100,6 +1114,16 @@ export default function AdminBrandingPage() {
                             >
                               <Edit2 className="w-3 h-3" />
                               <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateCustomPage(page)}
+                              className="px-2.5 py-1.5 text-xs font-medium text-[#6E5043] bg-white border border-[#D5CCC0] hover:bg-[#231F1D] hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Duplicate / Clone Page"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Clone</span>
                             </button>
 
                             <button

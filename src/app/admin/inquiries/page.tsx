@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -113,6 +114,39 @@ export default function AdminInquiriesPage() {
     }
   };
 
+  // Export Inquiries to CSV
+  const handleExportInquiriesCSV = () => {
+    if (inquiries.length === 0) {
+      showToast('No inquiries available to export.');
+      return;
+    }
+    const headers = ['ID', 'Date', 'Name', 'Email', 'Phone', 'Topic', 'Status', 'Message'];
+    const rows = inquiries.map((inq) => [
+      `"${inq.id}"`,
+      `"${inq.createdAt || ''}"`,
+      `"${(inq.name || '').replace(/"/g, '""')}"`,
+      `"${inq.email || ''}"`,
+      `"${inq.phone || ''}"`,
+      `"${(inq.topic || '').replace(/"/g, '""')}"`,
+      `"${inq.status}"`,
+      `"${(inq.message || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `aabha_inquiries_${new Date().toISOString().split('T')[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${inquiries.length} inquiries to CSV!`);
+  };
+
   const filteredInquiries = useMemo(() => {
     return inquiries.filter((inq) => {
       if (statusFilter !== 'ALL' && inq.status !== statusFilter) return false;
@@ -141,13 +175,24 @@ export default function AdminInquiriesPage() {
       title="Client Inquiries & Styling Atelier"
       subtitle="Messages, bespoke styling requests, and sizing inquiries submitted from the storefront Contact Us form."
       extraAction={
-        <button
-          onClick={fetchInquiries}
-          className="flex items-center gap-2 px-3.5 py-2 border border-[#E0D8CE] bg-[#FAF8F5] text-xs text-[#5C544D] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportInquiriesCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-[#E0D8CE] bg-white text-xs font-medium text-[#1E1B18] hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors cursor-pointer shadow-xs"
+            title="Export all client inquiries as CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-[#6E5043]" />
+            <span>Export Inquiries (CSV)</span>
+          </button>
+          <button
+            onClick={fetchInquiries}
+            className="flex items-center gap-2 px-3.5 py-2 border border-[#E0D8CE] bg-[#FAF8F5] text-xs text-[#5C544D] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       }
     >
       {/* Toast Feedback */}

@@ -28,6 +28,8 @@ import {
   AlertTriangle,
   HardDrive,
   Sliders,
+  Copy,
+  Download,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -478,6 +480,75 @@ export default function AdminProductsPage() {
     setModalOpen(true);
   };
 
+  // Duplicate / Clone Garment Action
+  const handleDuplicateProduct = (p: ProductItem) => {
+    setEditingProduct(null); // New product payload
+    setName(`${p.name} (Copy)`);
+    setCategory(p.category);
+    setPrice(p.price.toString());
+    setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
+    setPrimaryImage(p.primaryImage);
+    setSecondaryImage(p.secondaryImage || p.primaryImage);
+    setGallery(p.gallery || []);
+    setFabric(p.fabric || 'Pure Handloom Chanderi Silk');
+    setDescription(p.description || '');
+    setSelectedSizes(p.sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+    setNewGalleryUrl('');
+    setNewGalleryLabel('');
+    setShowAddUrlForm(false);
+    setErrors({});
+    setIsSubmitted(false);
+    setUploadErrors([]);
+    setServerError(null);
+    setModalOpen(true);
+    showToast(`Cloned "${p.name}". Review details and click "Add Garment" to save.`);
+  };
+
+  // Export Catalog to CSV Action
+  const handleExportCatalogCSV = () => {
+    if (products.length === 0) {
+      showToast('No products available to export.');
+      return;
+    }
+    const headers = [
+      'SKU',
+      'Name',
+      'Category',
+      'Price (INR)',
+      'Original Price (INR)',
+      'Fabric',
+      'Stock Status',
+      'Available Sizes',
+      'Primary Image URL',
+    ];
+
+    const rows = products.map((p) => [
+      `"${p.sku}"`,
+      `"${(p.name || '').replace(/"/g, '""')}"`,
+      `"${p.category}"`,
+      p.price,
+      p.originalPrice || '',
+      `"${(p.fabric || '').replace(/"/g, '""')}"`,
+      p.inStock ? 'IN_STOCK' : 'OUT_OF_STOCK',
+      `"${(p.sizes || []).join(', ')}"`,
+      `"${p.primaryImage || ''}"`,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `aabha_garments_catalog_${new Date().toISOString().split('T')[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${products.length} garments to CSV successfully!`);
+  };
+
   const handleOpenEdit = (p: ProductItem) => {
     setEditingProduct(p);
     setName(p.name);
@@ -888,13 +959,33 @@ export default function AdminProductsPage() {
       title="Garments & Stock Inventory"
       subtitle="Catalog of handcrafted Anarkalis, Co-ord sets, and suits. Manage sizes, pricing, and stock status."
       extraAction={
-        <Link
-          href="/admin/products/edit?id=new"
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Add Silhouette (Full Page)</span>
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportCatalogCSV}
+            className="flex items-center gap-1.5 px-3 py-2 border border-[#E0D8CE] bg-white text-xs font-medium text-[#1E1B18] hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors cursor-pointer shadow-xs"
+            title="Download full garments catalog as CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-[#6E5043]" />
+            <span>Export Catalog (CSV)</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#D5CCC0] text-xs font-medium text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+            title="Open quick garment add modal"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Quick Add</span>
+          </button>
+          <Link
+            href="/admin/products/edit?id=new"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4 text-[#D4AF37]" />
+            <span>+ Add Garment</span>
+          </Link>
+        </div>
       }
     >
       {/* Toast Feedback */}
@@ -1182,6 +1273,15 @@ export default function AdminProductsPage() {
                               <Edit2 className="w-3.5 h-3.5" />
                               <span className="text-[11px] font-medium hidden sm:inline">Edit</span>
                             </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateProduct(p)}
+                              className="p-1.5 text-[#6E5043] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer flex items-center gap-1"
+                              title="Duplicate / Clone Garment with all details & photos"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-medium hidden sm:inline">Clone</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(p.id)}

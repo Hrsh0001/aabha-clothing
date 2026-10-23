@@ -14,8 +14,8 @@
         "name": "Dusty Pink",
         "hex": "#D3A1B8",
         "imageUrl": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
-        "inStock": true,
-        "stockQuantity": 12
+        "inStock": false,
+        "stockQuantity": 0
       }
     ],
     "sizeStock": {

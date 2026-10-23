@@ -23,6 +23,8 @@ import {
   MapPin,
   Navigation,
   ExternalLink,
+  Download,
+  Trash2,
 } from 'lucide-react';
 import type { CODOrder } from '../../api/orders/route';
 import { AdminLayout } from '@/src/components/AdminLayout';
@@ -170,6 +172,94 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // Delete Order Action (Admin)
+  const handleDeleteOrder = async (order: CODOrder) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete Order #${order.orderNumber} placed by ${order.customerName}? This action is irreversible.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/orders?id=${order.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders((prev) =>
+          prev.filter((o) => o.id !== order.id && o.orderNumber !== order.orderNumber)
+        );
+        showToast(`Order #${order.orderNumber} deleted successfully.`);
+      } else {
+        showToast(data.error || 'Failed to delete order');
+      }
+    } catch {
+      showToast('Error communicating with order service');
+    }
+  };
+
+  // Export Orders to CSV Action (Admin)
+  const handleExportOrdersCSV = () => {
+    if (orders.length === 0) {
+      showToast('No orders available to export.');
+      return;
+    }
+    const headers = [
+      'Order Number',
+      'Date',
+      'Customer Name',
+      'Phone',
+      'Email',
+      'Address',
+      'City',
+      'State',
+      'Pincode',
+      'Status',
+      'Payment Method',
+      'Total Amount (INR)',
+      'Items Count',
+      'Garments Summary',
+    ];
+
+    const rows = orders.map((o) => {
+      const garments = (o.items || [])
+        .map((it: any) => `${it.name || it.title || 'Garment'} (${it.size || 'M'}, Qty: ${it.quantity || 1})`)
+        .join('; ');
+      return [
+        `"${o.orderNumber}"`,
+        `"${o.createdAt || ''}"`,
+        `"${(o.customerName || '').replace(/"/g, '""')}"`,
+        `"${o.phone || ''}"`,
+        `"${o.email || ''}"`,
+        `"${(o.address || (o as any).shippingAddress || '').replace(/"/g, '""')}"`,
+        `"${o.city || ''}"`,
+        `"${o.state || ''}"`,
+        `"${o.pincode || ''}"`,
+        `"${o.status}"`,
+        `"${o.paymentMethod || 'COD'}"`,
+        o.total || (o as any).totalAmount || 0,
+        (o.items || []).length,
+        `"${garments.replace(/"/g, '""')}"`,
+      ].join(',');
+    });
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `aabha_orders_export_${new Date().toISOString().split('T')[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${orders.length} orders to CSV successfully!`);
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
       // Status filter
@@ -208,13 +298,24 @@ export default function AdminOrdersPage() {
       title="COD Orders & Fulfillment"
       subtitle="Review incoming Cash on Delivery orders, verify patron details, and dispatch garments."
       extraAction={
-        <button
-          onClick={fetchOrders}
-          className="flex items-center gap-2 px-3.5 py-2 border border-[#E0D8CE] bg-[#FAF8F5] text-xs text-[#5C544D] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh Orders</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportOrdersCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-[#E0D8CE] bg-white text-xs font-medium text-[#1E1B18] hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors cursor-pointer shadow-xs"
+            title="Download full orders ledger in Excel/CSV format"
+          >
+            <Download className="w-3.5 h-3.5 text-[#6E5043]" />
+            <span>Export Orders (CSV)</span>
+          </button>
+          <button
+            onClick={fetchOrders}
+            className="flex items-center gap-2 px-3.5 py-2 border border-[#E0D8CE] bg-[#FAF8F5] text-xs text-[#5C544D] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh Orders</span>
+          </button>
+        </div>
       }
     >
       {/* Toast Feedback */}
@@ -492,6 +593,17 @@ export default function AdminOrdersPage() {
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>Notify Client</span>
+                      </button>
+
+                      {/* Delete Order Action */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrder(order)}
+                        className="px-2.5 py-1.5 bg-white text-[#C62828] border border-[#FFCDD2] hover:bg-[#FFEBEE] text-xs font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Delete Order (Admin)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Delete</span>
                       </button>
                     </div>
                   </div>
