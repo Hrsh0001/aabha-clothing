@@ -62,6 +62,7 @@ import {
 } from '@/src/lib/image-upload';
 import {
   MAX_IMAGE_FILE_SIZE_MB,
+  IMAGE_UPLOAD_LIMIT_BADGE,
   validateImageFile,
   validateBrandingForm,
   validateJsonPayloadSize,
@@ -859,7 +860,7 @@ export default function AdminBrandingPage() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="image/png,image/jpeg,image/webp,image/avif,image/svg+xml"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
         className="hidden"
       />
 

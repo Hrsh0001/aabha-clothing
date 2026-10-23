@@ -9,6 +9,7 @@ export const IMAGE_UPLOAD_LIMIT_BADGE =
 export const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
+  'image/pjpeg',
   'image/png',
   'image/webp',
   'image/gif',

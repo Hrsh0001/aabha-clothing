@@ -51,6 +51,11 @@ import {
   DEFAULT_FOOTER_COLUMNS,
   DEFAULT_SETTINGS,
 } from '@/src/lib/site-settings';
+import {
+  validateImageFile,
+  IMAGE_UPLOAD_LIMIT_BADGE,
+  MAX_IMAGE_FILE_SIZE_MB,
+} from '@/src/lib/form-validation';
 
 type EditorTab = 'sections' | 'blur_opacity' | 'animations' | 'dual_media' | 'seo_nav';
 type ViewportMode = 'mobile' | 'tablet' | 'desktop';
@@ -142,7 +147,7 @@ function AdminPagesStudio() {
     slug: '',
     title: '',
     subtitle: '',
-    heroImage: '/images/brand_story_editorial_1791119191742.webp',
+    heroImage: '/images/brand_story_editorial_1791119191742.jpg',
     heroImageMobile: '',
     content: '',
     published: true,
@@ -236,6 +241,12 @@ function AdminPagesStudio() {
 
   // Image Upload Handler
   const uploadImageFile = async (file: File): Promise<string | null> => {
+    const check = validateImageFile(file, { maxSizeMB: MAX_IMAGE_FILE_SIZE_MB });
+    if (!check.valid) {
+      showToast(check.error || `File exceeds ${MAX_IMAGE_FILE_SIZE_MB} MB limit.`, 'error');
+      return null;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -245,10 +256,11 @@ function AdminPagesStudio() {
         body: formData,
       });
       const data = await res.json();
-      if (res.ok && data.success && data.url) {
-        return data.url;
+      const uploadedUrl = data?.imageUrl || data?.url;
+      if (res.ok && data?.success && uploadedUrl) {
+        return uploadedUrl;
       }
-      showToast(data.error || 'Failed to upload photo.', 'error');
+      showToast(data?.error || 'Failed to upload photo.', 'error');
       return null;
     } catch {
       showToast('Photo upload failed due to network error.', 'error');
@@ -293,7 +305,7 @@ function AdminPagesStudio() {
       slug: '',
       title: '',
       subtitle: '',
-      heroImage: '/images/brand_story_editorial_1791119191742.webp',
+      heroImage: '/images/brand_story_editorial_1791119191742.jpg',
       heroImageMobile: '',
       content: '',
       published: true,
@@ -1441,6 +1453,10 @@ function AdminPagesStudio() {
                 <p className="text-xs text-[#7C736A]">
                   Upload dedicated landscape banners for wide monitors and portrait banners for mobile screens.
                 </p>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FAF8F5] border border-[#D5CCC0] text-[11px] text-[#6E5043] font-medium rounded-xs mt-1">
+                  <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>{IMAGE_UPLOAD_LIMIT_BADGE}</span>
+                </div>
               </div>
 
               {/* 1. Desktop Image Banner */}
@@ -1471,7 +1487,7 @@ function AdminPagesStudio() {
                         setSettings({ ...settings, heroBanner: val });
                       }
                     }}
-                    placeholder="/images/hero_editorial_banner_1791119088652.webp or https://..."
+                    placeholder="/images/hero_editorial_banner_1791119088652.jpg or https://..."
                     className="flex-1 px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs font-mono"
                   />
 
@@ -1480,7 +1496,7 @@ function AdminPagesStudio() {
                     <span>{uploadingDesktop ? 'Uploading...' : 'Upload'}</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
                       disabled={uploadingDesktop}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
@@ -1555,7 +1571,7 @@ function AdminPagesStudio() {
                     <span>{uploadingMobile ? 'Uploading...' : 'Upload'}</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
                       disabled={uploadingMobile}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
@@ -1877,7 +1893,7 @@ function AdminPagesStudio() {
                       <span>{uploadingSectionDesktop ? '...' : 'Upload'}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
                         disabled={uploadingSectionDesktop}
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
@@ -1909,7 +1925,7 @@ function AdminPagesStudio() {
                       <span>{uploadingSectionMobile ? '...' : 'Upload'}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
                         disabled={uploadingSectionMobile}
                         onChange={async (e) => {
                           const file = e.target.files?.[0];

@@ -98,38 +98,10 @@ export async function compressImageFile(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // 1. Encode as WebP first (max 1080px, quality 0.78 -> ~40KB–90KB)
+        // 1. Encode preserving high fidelity (0.95+)
         let blob = await canvasToBlob(canvas, 'image/webp', quality);
-
-        // 2. If browser fell back to PNG or blob exceeds target budget, compress further
-        if (!blob || blob.size > TARGET_MAX_BYTES) {
-          const smallerDim = Math.min(900, maxDimension);
-          if (canvas.width > smallerDim || canvas.height > smallerDim) {
-            const scale = smallerDim / Math.max(canvas.width, canvas.height);
-            const c2 = document.createElement('canvas');
-            c2.width = Math.max(1, Math.round(canvas.width * scale));
-            c2.height = Math.max(1, Math.round(canvas.height * scale));
-            const ctx2 = c2.getContext('2d');
-            if (ctx2) {
-              ctx2.imageSmoothingEnabled = true;
-              ctx2.imageSmoothingQuality = 'high';
-              ctx2.fillStyle = '#FAF8F5';
-              ctx2.fillRect(0, 0, c2.width, c2.height);
-              ctx2.drawImage(canvas, 0, 0, c2.width, c2.height);
-              const webp2 = await canvasToBlob(c2, 'image/webp', 0.72);
-              if (webp2 && webp2.size <= TARGET_MAX_BYTES) {
-                blob = webp2;
-              } else {
-                const jpg2 = await canvasToBlob(c2, 'image/jpeg', 0.72);
-                if (jpg2) blob = jpg2;
-              }
-            }
-          } else {
-            const jpgBlob = await canvasToBlob(canvas, 'image/jpeg', 0.74);
-            if (jpgBlob && (!blob || jpgBlob.size < blob.size)) {
-              blob = jpgBlob;
-            }
-          }
+        if (!blob) {
+          blob = await canvasToBlob(canvas, 'image/jpeg', 0.95);
         }
 
         if (!blob) {

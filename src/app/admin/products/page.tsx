@@ -1645,21 +1645,21 @@ export default function AdminProductsPage() {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileUpload}
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,.jpg,.jpeg,.png,.webp,.avif,.gif"
                   className="hidden"
                 />
                 <input
                   type="file"
                   ref={secondaryFileInputRef}
                   onChange={handleSecondaryUpload}
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,.jpg,.jpeg,.png,.webp,.avif,.gif"
                   className="hidden"
                 />
                 <input
                   type="file"
                   ref={galleryFileInputRef}
                   onChange={handleGalleryUpload}
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,.jpg,.jpeg,.png,.webp,.avif,.gif"
                   multiple
                   className="hidden"
                 />
