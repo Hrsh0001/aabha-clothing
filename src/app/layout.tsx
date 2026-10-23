@@ -44,7 +44,8 @@ export default function RootLayout({
         <link
           rel="preload"
           as="image"
-          href="/images/hero_editorial_banner_1791119088652.jpg"
+          href="/images/hero_editorial_banner_1791119088652.webp"
+          type="image/webp"
           fetchPriority="high"
         />
       </head>
