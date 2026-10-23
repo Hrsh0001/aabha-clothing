@@ -14,7 +14,7 @@ export type { SiteSettings };
 // GET /api/settings — Fetch active branding & section images
 export async function GET() {
   try {
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         const row = await prisma.siteSetting.findUnique({
           where: { id: 'site_branding' },
@@ -27,7 +27,7 @@ export async function GET() {
           return NextResponse.json({ success: true, settings: merged });
         }
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings read notice:', dbErr);
         }
       }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     let current = readLocalSettings();
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         const row = await prisma.siteSetting.findUnique({
           where: { id: 'site_branding' },
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
           current = { ...DEFAULT_SETTINGS, ...parsed };
         }
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings read notice in POST:', dbErr);
         }
       }
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         Object.keys(categoryImages).length > 0 ? categoryImages : (rawUpdated.categoryImages || {}),
     };
 
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         await prisma.siteSetting.upsert({
           where: { id: 'site_branding' },
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
           create: { id: 'site_branding', data: updated as any },
         });
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings write notice:', dbErr);
         }
       }

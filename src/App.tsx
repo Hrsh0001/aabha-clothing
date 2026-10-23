@@ -20,6 +20,7 @@ import { ProductDetailPage } from './components/ProductDetailPage';
 import { CartDrawer, WishlistDrawer, SearchModal, CartItem } from './components/Drawers';
 import { CheckoutPage } from './components/CheckoutPage';
 import { AboutPage, ContactPage, PolicyPage, PolicyTopic } from './components/InfoPages';
+import { CustomPageView } from './components/CustomPageView';
 import { Footer } from './components/Footer';
 import { AtelierSkeleton } from './components/AtelierSkeleton';
 import { useAuth } from './context/AuthContext';
@@ -72,6 +73,7 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(getInitialSettings);
+  const [customPageSlug, setCustomPageSlug] = useState<string>('our-craft');
 
   const { setAuthModalOpen } = useAuth();
 
@@ -92,18 +94,59 @@ export default function App() {
         setCartItems(JSON.parse(savedCart));
       }
       const params = new URLSearchParams(window.location.search);
-      if (params.get('checkout') === '1') {
+      const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+
+      if (params.get('checkout') === '1' || path === '/checkout') {
         setActivePage('checkout');
       } else {
         const pageParam = params.get('page');
-        if (
+        if (pageParam === 'custom') {
+          setActivePage('custom');
+          const slugParam = params.get('slug');
+          if (slugParam) setCustomPageSlug(slugParam);
+        } else if (path.startsWith('/pages/') || path.startsWith('/page/')) {
+          const match = path.match(/\/pages?\/([^?#/]+)/);
+          if (match) {
+            setActivePage('custom');
+            setCustomPageSlug(match[1]);
+          }
+        } else if (
           pageParam === 'about' ||
           pageParam === 'contact' ||
           pageParam === 'policy' ||
           pageParam === 'shop'
         ) {
           setActivePage(pageParam);
+        } else if (path === '/shop') {
+          setActivePage('shop');
+        } else if (path === '/about') {
+          setActivePage('about');
+        } else if (path === '/contact') {
+          setActivePage('contact');
+        } else if (path === '/policy') {
+          setActivePage('policy');
         }
+      }
+
+      const catParam = params.get('category');
+      if (catParam) {
+        setSelectedCategory(decodeURIComponent(catParam) as CollectionFilter);
+        setActivePage('shop');
+      }
+
+      const topicParam = params.get('topic');
+      if (topicParam) {
+        setPolicyTopic(topicParam as PolicyTopic);
+        setActivePage('policy');
+      }
+
+      // Smooth scroll if URL has a hash anchor on load
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const targetId = window.location.hash.replace('#', '');
+        setTimeout(() => {
+          const el = document.getElementById(targetId);
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 150);
       }
     } catch {
       // ignore
@@ -218,6 +261,12 @@ export default function App() {
   const handleNavigateShopCategory = (category: CollectionFilter = 'All Collection') => {
     setSelectedCategory(category);
     setActivePage('shop');
+    scrollToTop();
+  };
+
+  const handleNavigateCustomPage = (slug: string) => {
+    setCustomPageSlug(slug);
+    setActivePage('custom');
     scrollToTop();
   };
 
@@ -394,6 +443,8 @@ export default function App() {
       ? `product-${selectedProduct?.id || 'none'}`
       : activePage === 'policy'
       ? `policy-${policyTopic}`
+      : activePage === 'custom'
+      ? `custom-${customPageSlug}`
       : activePage;
 
   if (!isHydrated || (productsLoading && products.length === 0)) {
@@ -428,6 +479,14 @@ export default function App() {
         announcementText={siteSettings?.announcementText}
         showAnnouncementBar={siteSettings?.showAnnouncementBar}
         showNewArrivals={siteSettings?.showNewArrivals}
+        navLinks={siteSettings?.navLinks}
+        siteSettings={siteSettings}
+        onNavigatePolicy={(topic) => {
+          setPolicyTopic(topic);
+          setActivePage('policy');
+          scrollToTop();
+        }}
+        onNavigateCustomPage={handleNavigateCustomPage}
       />
 
       {/* Main Content View Router with Subtle Editorial Fade-In Transition */}
@@ -527,6 +586,14 @@ export default function App() {
             <PolicyPage
               topic={policyTopic}
               onSelectTopic={(topic) => setPolicyTopic(topic)}
+            />
+          )}
+
+          {activePage === 'custom' && (
+            <CustomPageView
+              slug={customPageSlug}
+              siteSettings={siteSettings}
+              onBackToShop={() => handleNavigateShopCategory('All Collection')}
             />
           )}
         </motion.div>

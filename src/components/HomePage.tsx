@@ -564,7 +564,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 4. Brand Story — Generous Editorial Rest Section */}
       {siteSettings?.showBrandStory !== false && (
-      <section className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
+      <section id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
         <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
@@ -621,7 +621,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 5. Curated Collection */}
       {siteSettings?.showCuratedSection !== false && curatedProducts.length > 0 && (
-        <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <section id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
             <div>
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">

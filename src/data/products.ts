@@ -36,6 +36,13 @@ export interface ProductColorVariant {
   name: string;
   hex: string;
   imageUrl?: string;
+  inStock?: boolean;
+  stockQuantity?: number;
+}
+
+export interface SizeStockItem {
+  inStock: boolean;
+  quantity?: number;
 }
 
 export interface ProductGalleryItem {
@@ -65,6 +72,7 @@ export interface Product {
   colorName: string;
   colorHex: string;
   colors?: ProductColorVariant[];
+  sizeStock?: Record<string, SizeStockItem>;
   fabric: string;
   isNewArrival: boolean;
   isCurated: boolean;
@@ -80,6 +88,61 @@ export interface Product {
   deliveryInfo: string;
   returnsInfo: string;
   reviews: ProductReview[];
+}
+
+/**
+ * Returns a normalized size inventory map for a product, ensuring every size in product.sizes
+ * has an explicit inStock flag and stock quantity.
+ */
+export function getProductSizeStock(product: Product): Record<string, SizeStockItem> {
+  const result: Record<string, SizeStockItem> = {};
+  const sizes = (product.sizes && product.sizes.length > 0)
+    ? product.sizes
+    : ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  sizes.forEach((s) => {
+    if (product.sizeStock && product.sizeStock[s]) {
+      result[s] = {
+        inStock:
+          typeof product.sizeStock[s].inStock === 'boolean'
+            ? product.sizeStock[s].inStock && product.inStock
+            : product.inStock,
+        quantity:
+          typeof product.sizeStock[s].quantity === 'number'
+            ? product.sizeStock[s].quantity!
+            : product.inStock
+            ? 10
+            : 0,
+      };
+    } else {
+      result[s] = {
+        inStock: product.inStock,
+        quantity: product.inStock ? 10 : 0,
+      };
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Checks whether a specific size is available for purchase in a given product.
+ */
+export function isSizeInStock(product: Product, size: string): boolean {
+  if (!product.inStock) return false;
+  if (!product.sizeStock) return true;
+  const item = product.sizeStock[size];
+  if (!item) return true;
+  return item.inStock !== false && (item.quantity === undefined || item.quantity > 0);
+}
+
+/**
+ * Checks whether a specific color variant is in stock.
+ */
+export function isColorInStock(variant: ProductColorVariant | undefined, masterInStock: boolean): boolean {
+  if (!masterInStock) return false;
+  if (!variant) return true;
+  return variant.inStock !== false && (variant.stockQuantity === undefined || variant.stockQuantity > 0);
 }
 
 export const EDITORIAL_ASSETS = {

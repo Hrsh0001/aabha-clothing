@@ -32,5 +32,33 @@
     "paymentMethod": "CASH_ON_DELIVERY",
     "status": "PENDING_VERIFICATION",
     "createdAt": "2026-10-22T16:51:19.640Z"
+  },
+  {
+    "id": "ord_1792692194918_uktpr",
+    "orderNumber": "AB-25594",
+    "customerName": "Meera Rajput",
+    "phone": "9820099887",
+    "email": "patron.test.1792692177325@aabhaclothing.com",
+    "address": "14 Palace Road, Civil Lines",
+    "city": "Jaipur",
+    "state": "Rajasthan",
+    "pincode": "302006",
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "mapUrl": "https://www.google.com/maps?q=26.9124,75.7873",
+    "items": [
+      {
+        "productId": "anarkali-01",
+        "name": "Anarkali 01",
+        "size": "M",
+        "quantity": 1,
+        "price": 9490,
+        "image": ""
+      }
+    ],
+    "total": 9490,
+    "paymentMethod": "CASH_ON_DELIVERY",
+    "status": "DISPATCHED",
+    "createdAt": "2026-10-22T18:03:14.918Z"
   }
 ]

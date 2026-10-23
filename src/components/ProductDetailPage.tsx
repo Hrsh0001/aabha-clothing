@@ -205,8 +205,41 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     .filter((p) => p.id !== product.id && (p.category === product.category || p.isCurated))
     .slice(0, 4);
 
+  // Size-wise and Color-wise Stock Availability Checks
+  const isSelectedSizeInStock = React.useMemo(() => {
+    if (!product.inStock) return false;
+    if (!product.sizeStock) return true;
+    const entry = product.sizeStock[selectedSize];
+    if (!entry) return true;
+    return entry.inStock !== false && (entry.quantity === undefined || entry.quantity > 0);
+  }, [product.inStock, product.sizeStock, selectedSize]);
+
+  const matchedColorVariant = React.useMemo(() => {
+    return product.colors?.find(
+      (c) => c.name.toLowerCase() === selectedColor.toLowerCase()
+    );
+  }, [product.colors, selectedColor]);
+
+  const isSelectedColorInStock = React.useMemo(() => {
+    if (!product.inStock) return false;
+    if (!matchedColorVariant) return true;
+    return (
+      matchedColorVariant.inStock !== false &&
+      (matchedColorVariant.stockQuantity === undefined || matchedColorVariant.stockQuantity > 0)
+    );
+  }, [product.inStock, matchedColorVariant]);
+
+  const isPurchasable = product.inStock && isSelectedSizeInStock && isSelectedColorInStock;
+
+  const getSoldOutButtonText = () => {
+    if (!product.inStock) return 'Sold Out';
+    if (!isSelectedSizeInStock) return `Sold Out in Size ${selectedSize}`;
+    if (!isSelectedColorInStock) return `Sold Out in ${selectedColor}`;
+    return 'Sold Out';
+  };
+
   const handleAddClick = () => {
-    if (!product.inStock) return;
+    if (!isPurchasable) return;
     onAddToCart(product, selectedSize, quantity, selectedColor);
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1600);
@@ -401,12 +434,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <div className="flex items-center gap-3 pt-1">
                 {product.colors.map((c) => {
                   const isSelected = selectedColor === c.name;
+                  const cInStock = product.inStock && (c.inStock !== false && (c.stockQuantity === undefined || c.stockQuantity > 0));
                   return (
                     <button
                       key={c.name}
                       type="button"
                       onClick={() => handleColorClick(c)}
-                      title={`${c.name}${isSelected ? ' (Selected)' : ''}`}
+                      title={`${c.name}${!cInStock ? ' (Sold Out)' : ''}${isSelected ? ' (Selected)' : ''}`}
                       className={`relative p-0.5 rounded-full transition-all cursor-pointer ${
                         isSelected
                           ? 'ring-2 ring-[#1E1B18] ring-offset-2 ring-offset-[#FAF8F5]'
@@ -414,9 +448,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       }`}
                     >
                       <span
-                        className="w-7 h-7 rounded-full border border-[#1E1B18]/20 block shadow-xs"
+                        className="w-7 h-7 rounded-full border border-[#1E1B18]/20 block shadow-xs relative overflow-hidden"
                         style={{ backgroundColor: c.hex }}
-                      />
+                      >
+                        {!cInStock && (
+                          <span className="absolute inset-0 flex items-center justify-center" title="Color Sold Out">
+                            <span className="w-full h-0.5 bg-[#C62828] rotate-45 block"></span>
+                          </span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
@@ -429,6 +469,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs tracking-[0.12em] uppercase text-[#1E1B18]">
                 Size: <span className="text-[#7C736A] font-normal">{selectedSize}</span>
+                {!isSelectedSizeInStock && (
+                  <span className="ml-2 text-[10px] text-[#C62828] font-mono tracking-wider font-medium">
+                    (Sold Out)
+                  </span>
+                )}
               </span>
               <button
                 type="button"
@@ -480,18 +525,31 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <div className="flex flex-wrap gap-2">
               {availableSizes.map((size) => {
                 const active = selectedSize === size;
+                const sizeItem = product.sizeStock?.[size];
+                const inStock =
+                  product.inStock &&
+                  (!sizeItem ||
+                    (sizeItem.inStock !== false &&
+                      (sizeItem.quantity === undefined || sizeItem.quantity > 0)));
                 return (
                   <button
                     key={size}
                     type="button"
                     onClick={() => setSelectedSize(size)}
-                    className={`min-w-[52px] px-3.5 py-2.5 text-xs font-normal border transition-colors whitespace-nowrap cursor-pointer text-center ${
+                    className={`relative min-w-[54px] px-3.5 py-2.5 text-xs font-normal border transition-colors whitespace-nowrap cursor-pointer text-center ${
                       active
                         ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
-                        : 'bg-transparent text-[#1E1B18] border-[#E0D8CE] hover:border-[#1E1B18]'
+                        : inStock
+                        ? 'bg-transparent text-[#1E1B18] border-[#E0D8CE] hover:border-[#1E1B18]'
+                        : 'bg-[#F3EFEA] text-[#9E948A] border-[#D5CCC0] opacity-65'
                     }`}
                   >
-                    {size}
+                    <span className={!inStock ? 'line-through' : ''}>{size}</span>
+                    {!inStock && (
+                      <span className="block text-[8px] font-mono uppercase tracking-wider text-[#C62828] -mt-0.5">
+                        Sold Out
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -507,7 +565,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   aria-label="Decrease quantity"
-                  className="px-3.5 py-3.5 text-sm text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+                  disabled={!isPurchasable}
+                  className="px-3.5 py-3.5 text-sm text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer disabled:opacity-40"
                 >
                   −
                 </button>
@@ -518,7 +577,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   type="button"
                   onClick={() => setQuantity((q) => Math.min(10, q + 1))}
                   aria-label="Increase quantity"
-                  className="px-3.5 py-3.5 text-sm text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+                  disabled={!isPurchasable}
+                  className="px-3.5 py-3.5 text-sm text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer disabled:opacity-40"
                 >
                   +
                 </button>
@@ -527,12 +587,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               {/* Add to Cart Button */}
               <button
                 type="button"
-                disabled={!product.inStock}
+                disabled={!isPurchasable}
                 onClick={handleAddClick}
                 className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#14110E] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {!product.inStock ? (
-                  <span>Sold Out</span>
+                {!isPurchasable ? (
+                  <span>{getSoldOutButtonText()}</span>
                 ) : addedFeedback ? (
                   <>
                     <Check className="w-4 h-4 stroke-[1.5]" />
@@ -565,14 +625,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             {/* Buy Now Direct Checkout CTA */}
             <button
               type="button"
-              disabled={!product.inStock}
+              disabled={!isPurchasable}
               onClick={() => {
-                if (!product.inStock) return;
+                if (!isPurchasable) return;
                 onBuyNow(product, selectedSize, quantity, selectedColor);
               }}
               className="w-full py-4 px-6 border border-[#231F1D] bg-transparent text-[#1E1B18] text-xs font-medium tracking-[0.18em] uppercase hover:bg-[#231F1D] hover:text-[#FAF8F5] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {product.inStock ? 'Buy Now' : 'Currently Unavailable'}
+              {isPurchasable ? 'Buy Now' : getSoldOutButtonText()}
             </button>
 
             {/* Direct WhatsApp Quick Order CTA */}

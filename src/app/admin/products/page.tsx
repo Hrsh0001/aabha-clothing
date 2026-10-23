@@ -27,6 +27,7 @@ import {
   Eye,
   AlertTriangle,
   HardDrive,
+  Sliders,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -66,6 +67,14 @@ interface ProductItem {
   fabric?: string;
   description?: string;
   sizes: string[];
+  colors?: Array<{
+    name: string;
+    hex: string;
+    imageUrl?: string;
+    inStock?: boolean;
+    stockQuantity?: number;
+  }>;
+  sizeStock?: Record<string, { inStock: boolean; quantity?: number }>;
 }
 
 const STANDARD_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
@@ -77,6 +86,8 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+  const [matrixProduct, setMatrixProduct] = useState<ProductItem | null>(null);
+  const [updatingMatrix, setUpdatingMatrix] = useState(false);
 
   const getAuthHeaders = () => {
     const token =
@@ -677,6 +688,7 @@ export default function AdminProductsPage() {
         setProducts((prev) =>
           prev.map((item) => (item.id === p.id ? { ...item, inStock: !p.inStock } : item))
         );
+        setMatrixProduct((prev) => (prev && prev.id === p.id ? { ...prev, inStock: !p.inStock } : prev));
         showToast(
           `${p.name} marked as ${!p.inStock ? 'In Stock (Available)' : 'Out of Stock (Sold Out)'}`
         );
@@ -685,6 +697,128 @@ export default function AdminProductsPage() {
       }
     } catch (err) {
       showToast('Failed to toggle stock status');
+    }
+  };
+
+  const handleToggleSizeStock = async (product: ProductItem, sizeName: string) => {
+    try {
+      setUpdatingMatrix(true);
+      const currentSizeStock = product.sizeStock || {};
+      const currentItem = currentSizeStock[sizeName] || { inStock: true, quantity: 10 };
+      const nextInStock = !currentItem.inStock;
+
+      const res = await fetch('/api/products', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: product.id,
+          size: sizeName,
+          inStock: nextInStock,
+        }),
+      });
+      const data = await safeParseJsonResponse(res);
+      if (data.success && data.product) {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
+        );
+        setMatrixProduct((prev) => (prev ? { ...prev, ...data.product } : null));
+        showToast(`Size ${sizeName} set to ${nextInStock ? 'In Stock' : 'Sold Out'}`);
+      } else {
+        showToast(data.error || 'Failed to update size stock');
+      }
+    } catch {
+      showToast('Error updating size stock');
+    } finally {
+      setUpdatingMatrix(false);
+    }
+  };
+
+  const handleUpdateSizeQuantity = async (product: ProductItem, sizeName: string, quantity: number) => {
+    try {
+      setUpdatingMatrix(true);
+      const res = await fetch('/api/products', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: product.id,
+          size: sizeName,
+          quantity: Math.max(0, quantity),
+          inStock: quantity > 0,
+        }),
+      });
+      const data = await safeParseJsonResponse(res);
+      if (data.success && data.product) {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
+        );
+        setMatrixProduct((prev) => (prev ? { ...prev, ...data.product } : null));
+        showToast(`Size ${sizeName} inventory quantity updated to ${quantity}`);
+      }
+    } catch {
+      showToast('Error updating size quantity');
+    } finally {
+      setUpdatingMatrix(false);
+    }
+  };
+
+  const handleToggleColorStock = async (product: ProductItem, colorName: string) => {
+    try {
+      setUpdatingMatrix(true);
+      const colors = product.colors || [];
+      const match = colors.find((c) => c.name.toLowerCase() === colorName.toLowerCase());
+      const nextInStock = match ? !match.inStock : false;
+
+      const res = await fetch('/api/products', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: product.id,
+          colorName,
+          inStock: nextInStock,
+        }),
+      });
+      const data = await safeParseJsonResponse(res);
+      if (data.success && data.product) {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
+        );
+        setMatrixProduct((prev) => (prev ? { ...prev, ...data.product } : null));
+        showToast(`Color ${colorName} set to ${nextInStock ? 'In Stock' : 'Sold Out'}`);
+      } else {
+        showToast(data.error || 'Failed to update color stock');
+      }
+    } catch {
+      showToast('Error updating color stock');
+    } finally {
+      setUpdatingMatrix(false);
+    }
+  };
+
+  const handleUpdateColorQuantity = async (product: ProductItem, colorName: string, quantity: number) => {
+    try {
+      setUpdatingMatrix(true);
+      const res = await fetch('/api/products', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          id: product.id,
+          colorName,
+          quantity: Math.max(0, quantity),
+          inStock: quantity > 0,
+        }),
+      });
+      const data = await safeParseJsonResponse(res);
+      if (data.success && data.product) {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
+        );
+        setMatrixProduct((prev) => (prev ? { ...prev, ...data.product } : null));
+        showToast(`Color ${colorName} inventory quantity updated to ${quantity}`);
+      }
+    } catch {
+      showToast('Error updating color quantity');
+    } finally {
+      setUpdatingMatrix(false);
     }
   };
 
@@ -1017,6 +1151,15 @@ export default function AdminProductsPage() {
                                 <XCircle className="w-3.5 h-3.5" /> Out of Stock
                               </>
                             )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMatrixProduct(p)}
+                            className="mt-1.5 px-2 py-0.5 text-[10px] font-mono text-[#6E5043] hover:text-[#1E1B18] bg-[#FAF8F5] hover:bg-[#F3EFEA] border border-[#D5CCC0] rounded-xs flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Manage Size & Color Stock Matrix"
+                          >
+                            <Sliders className="w-3 h-3 text-[#A85A32]" />
+                            <span>Stock Matrix</span>
                           </button>
                         </td>
 
@@ -1781,6 +1924,324 @@ export default function AdminProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Inventory Matrix Modal */}
+      {matrixProduct && (
+        <div className="fixed inset-0 z-50 bg-[#1E1B18]/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#FAF8F5] border border-[#D5CCC0] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E0D8CE] bg-[#FAF8F5]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#EFE9E1] flex items-center justify-center border border-[#D5CCC0]">
+                  <Sliders className="w-4 h-4 text-[#A85A32]" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg text-[#1E1B18]">Stock Inventory Matrix</h3>
+                  <p className="text-[11px] text-[#7C736A]">
+                    Live real-time inventory and availability control per size & color variant
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMatrixProduct(null)}
+                className="p-1.5 text-[#7C736A] hover:text-[#1E1B18] border border-[#E0D8CE] bg-white cursor-pointer transition-colors"
+                title="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Product Summary Header Card */}
+              <div className="flex items-center gap-4 p-4 bg-white border border-[#E0D8CE] shadow-xs">
+                <img
+                  src={matrixProduct.primaryImage}
+                  alt={matrixProduct.name}
+                  className="w-16 h-20 object-cover border border-[#D5CCC0] rounded-xs bg-[#ECE6DD]"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-[#A85A32] tracking-wider uppercase font-semibold">
+                      SKU: {matrixProduct.sku}
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[10px] bg-[#FAF8F5] border border-[#E0D8CE] text-[#5C544D]">
+                      {matrixProduct.category}
+                    </span>
+                  </div>
+                  <h4 className="font-serif text-base text-[#1E1B18] truncate mt-0.5">{matrixProduct.name}</h4>
+                  <div className="font-mono text-sm font-semibold text-[#1E1B18] mt-1">
+                    {formatINR(matrixProduct.price)}
+                  </div>
+                </div>
+
+                <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-[#7C736A]">
+                    Master Availability
+                  </span>
+                  <button
+                    type="button"
+                    disabled={updatingMatrix}
+                    onClick={() => handleToggleStock(matrixProduct)}
+                    className={`px-3 py-1 text-xs font-medium cursor-pointer border flex items-center gap-1.5 transition-colors ${
+                      matrixProduct.inStock
+                        ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                        : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                    }`}
+                  >
+                    {matrixProduct.inStock ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5" /> In Stock
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3.5 h-3.5" /> Out of Stock
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Sizes Stock Matrix */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-[#1E1B18] flex items-center gap-2">
+                    <span>Size-Wise Inventory & Availability</span>
+                    <span className="text-[10px] text-[#7C736A] font-mono normal-case">
+                      ({(matrixProduct.sizes || STANDARD_SIZES).length} sizes)
+                    </span>
+                  </h4>
+                  {updatingMatrix && (
+                    <span className="text-[11px] font-mono text-[#A85A32] animate-pulse">
+                      Updating catalog...
+                    </span>
+                  )}
+                </div>
+
+                <div className="border border-[#E0D8CE] bg-white overflow-hidden shadow-xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-[#FAF8F5] border-b border-[#E0D8CE] text-[11px] font-mono uppercase tracking-wider text-[#7C736A]">
+                        <th className="py-2.5 px-4 font-medium">Size</th>
+                        <th className="py-2.5 px-4 font-medium">Status</th>
+                        <th className="py-2.5 px-4 font-medium">Stock Units</th>
+                        <th className="py-2.5 px-4 font-medium text-right">Quick Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#ECE6DD]">
+                      {(matrixProduct.sizes && matrixProduct.sizes.length > 0
+                        ? matrixProduct.sizes
+                        : STANDARD_SIZES
+                      ).map((sz) => {
+                        const stockObj = matrixProduct.sizeStock?.[sz] || {
+                          inStock: matrixProduct.inStock !== false,
+                          quantity: matrixProduct.inStock !== false ? 10 : 0,
+                        };
+                        const isInStock = stockObj.inStock;
+                        const qty = stockObj.quantity ?? (isInStock ? 10 : 0);
+
+                        return (
+                          <tr key={sz} className="hover:bg-[#FAF8F5]/60 transition-colors">
+                            <td className="py-2.5 px-4">
+                              <span className="font-mono font-bold text-xs px-2 py-0.5 bg-[#FAF8F5] border border-[#D5CCC0] text-[#1E1B18]">
+                                {sz}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium border ${
+                                  isInStock
+                                    ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                    : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                                }`}
+                              >
+                                {isInStock ? (
+                                  <>
+                                    <CheckCircle className="w-3 h-3" /> Available
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="w-3 h-3" /> Sold Out
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={9999}
+                                  key={`${sz}-${qty}`}
+                                  defaultValue={qty}
+                                  disabled={updatingMatrix}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (!isNaN(val) && val !== qty) {
+                                      handleUpdateSizeQuantity(matrixProduct, sz, val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className="w-20 px-2 py-1 font-mono text-xs border border-[#D5CCC0] bg-[#FAF8F5] text-[#1E1B18] focus:bg-white focus:outline-none focus:border-[#A85A32]"
+                                  title="Enter quantity and click outside (or press Enter) to save"
+                                />
+                                <span className="text-[11px] text-[#7C736A] font-mono">pcs</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-4 text-right">
+                              <button
+                                type="button"
+                                disabled={updatingMatrix}
+                                onClick={() => handleToggleSizeStock(matrixProduct, sz)}
+                                className={`px-2.5 py-1 text-[11px] font-medium border cursor-pointer transition-colors ${
+                                  isInStock
+                                    ? 'border-[#FFCDD2] text-[#C62828] bg-white hover:bg-[#FFF5F5]'
+                                    : 'border-[#C8E6C9] text-[#2E7D32] bg-white hover:bg-[#E8F5E9]'
+                                }`}
+                              >
+                                {isInStock ? 'Mark Sold Out' : 'Mark Available'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Colors Stock Matrix (if colors configured) */}
+              {matrixProduct.colors && matrixProduct.colors.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-[#1E1B18] flex items-center gap-2">
+                    <span>Color Variants Availability</span>
+                    <span className="text-[10px] text-[#7C736A] font-mono normal-case">
+                      ({matrixProduct.colors.length} shades)
+                    </span>
+                  </h4>
+
+                  <div className="border border-[#E0D8CE] bg-white overflow-hidden shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#FAF8F5] border-b border-[#E0D8CE] text-[11px] font-mono uppercase tracking-wider text-[#7C736A]">
+                          <th className="py-2.5 px-4 font-medium">Color Swatch</th>
+                          <th className="py-2.5 px-4 font-medium">Shade Name</th>
+                          <th className="py-2.5 px-4 font-medium">Status</th>
+                          <th className="py-2.5 px-4 font-medium">Stock Units</th>
+                          <th className="py-2.5 px-4 font-medium text-right">Toggle Availability</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#ECE6DD]">
+                        {matrixProduct.colors.map((c, cIdx) => {
+                          const isColorInStock = c.inStock !== false;
+                          const cQty = c.stockQuantity ?? (isColorInStock ? 10 : 0);
+
+                          return (
+                            <tr key={cIdx} className="hover:bg-[#FAF8F5]/60 transition-colors">
+                              <td className="py-2.5 px-4">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-5 h-5 rounded-full border border-[#D5CCC0] shadow-xs shrink-0"
+                                    style={{ backgroundColor: c.hex }}
+                                  />
+                                  <span className="font-mono text-[10px] text-[#7C736A]">
+                                    {c.hex}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span className="font-medium text-[#1E1B18]">{c.name}</span>
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium border ${
+                                    isColorInStock
+                                      ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                      : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                                  }`}
+                                >
+                                  {isColorInStock ? (
+                                    <>
+                                      <CheckCircle className="w-3 h-3" /> In Stock
+                                    </>
+                                  ) : (
+                                    <>
+                                      <XCircle className="w-3 h-3" /> Sold Out
+                                    </>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={9999}
+                                    key={`${c.name}-${cQty}`}
+                                    defaultValue={cQty}
+                                    disabled={updatingMatrix}
+                                    onBlur={(e) => {
+                                      const val = parseInt(e.target.value, 10);
+                                      if (!isNaN(val) && val !== cQty) {
+                                        handleUpdateColorQuantity(matrixProduct, c.name, val);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                    className="w-20 px-2 py-1 font-mono text-xs border border-[#D5CCC0] bg-[#FAF8F5] text-[#1E1B18] focus:bg-white focus:outline-none focus:border-[#A85A32]"
+                                    title="Enter color quantity and press Enter"
+                                  />
+                                  <span className="text-[11px] text-[#7C736A] font-mono">pcs</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-4 text-right">
+                                <button
+                                  type="button"
+                                  disabled={updatingMatrix}
+                                  onClick={() => handleToggleColorStock(matrixProduct, c.name)}
+                                  className={`px-2.5 py-1 text-[11px] font-medium border cursor-pointer transition-colors ${
+                                    isColorInStock
+                                      ? 'border-[#FFCDD2] text-[#C62828] bg-white hover:bg-[#FFF5F5]'
+                                      : 'border-[#C8E6C9] text-[#2E7D32] bg-white hover:bg-[#E8F5E9]'
+                                  }`}
+                                >
+                                  {isColorInStock ? 'Mark Sold Out' : 'Mark Available'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-3.5 bg-[#FAF8F5] border-t border-[#E0D8CE]">
+              <span className="text-[11px] text-[#7C736A]">
+                Changes are saved immediately and updated on the live storefront.
+              </span>
+              <button
+                type="button"
+                onClick={() => setMatrixProduct(null)}
+                className="px-5 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

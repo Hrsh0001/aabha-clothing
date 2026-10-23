@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { describe, test, expect, beforeAll, afterAll } from './jest-lite';
 import * as SettingsAPI from '../src/app/api/settings/route';
+import * as ProductsAPI from '../src/app/api/products/route';
 import { resetSettingsForTesting } from '../src/lib/site-settings';
 import { signJwt } from '../src/lib/jwt';
 import { validateBrandingForm } from '../src/lib/form-validation';
@@ -306,5 +307,193 @@ describe('Storefront Sections & Dynamic Content Management', () => {
     expect(data.settings.trustBadge1Title).toBe('Artisan Handcrafted');
 
     resetSettingsForTesting();
+  });
+
+  test('GET /api/settings returns header navLinks and footerColumns with expected presets', async () => {
+    const res = await SettingsAPI.GET();
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.settings.navLinks)).toBe(true);
+    expect(data.settings.navLinks.length).toBeGreaterThan(0);
+    expect(data.settings.navLinks.some((l: any) => l.label === 'Home')).toBe(true);
+    expect(data.settings.navLinks.some((l: any) => l.label === 'All Collection')).toBe(true);
+
+    expect(Array.isArray(data.settings.footerColumns)).toBe(true);
+    expect(data.settings.footerColumns.length).toBeGreaterThan(0);
+    expect(data.settings.footerColumns.some((c: any) => c.title === 'THE SILHOUETTES')).toBe(true);
+    expect(data.settings.footerColumns.some((c: any) => c.title === 'CLIENT CARE')).toBe(true);
+  });
+
+  test('POST /api/settings updates navLinks and footerColumns and persists them', async () => {
+    const customNavLinks = [
+      { id: 'custom-1', label: 'Bespoke Atelier', href: '/shop?category=Anarkali', visible: true },
+      { id: 'custom-2', label: 'Hidden Archive', href: '/archive', visible: false },
+    ];
+    const customFooterCols = [
+      {
+        id: 'col-custom-1',
+        title: 'ATELIER SPECIALS',
+        visible: true,
+        links: [
+          { id: 'fl-1', label: 'Festive Edit', href: '/shop', visible: true },
+        ],
+      },
+    ];
+
+    const postReq = createJsonRequest(
+      'http://localhost:3000/api/settings',
+      'POST',
+      {
+        navLinks: customNavLinks,
+        footerColumns: customFooterCols,
+      },
+      adminAuthHeaders
+    );
+    const postRes = await SettingsAPI.POST(postReq);
+    const postData = await postRes.json();
+
+    expect(postRes.status).toBe(200);
+    expect(postData.settings.navLinks.length).toBe(2);
+    expect(postData.settings.navLinks[0].label).toBe('Bespoke Atelier');
+    expect(postData.settings.footerColumns.length).toBe(1);
+    expect(postData.settings.footerColumns[0].title).toBe('ATELIER SPECIALS');
+
+    // Verify GET retrieves the persisted custom links
+    const getRes = await SettingsAPI.GET();
+    const getData = await getRes.json();
+    expect(getData.settings.navLinks.length).toBe(2);
+    expect(getData.settings.navLinks[0].label).toBe('Bespoke Atelier');
+    expect(getData.settings.footerColumns.length).toBe(1);
+
+    resetSettingsForTesting();
+  });
+
+  test('POST /api/settings allows empty navLinks array without reverting to defaults', async () => {
+    const postReq = createJsonRequest(
+      'http://localhost:3000/api/settings',
+      'POST',
+      {
+        navLinks: [],
+      },
+      adminAuthHeaders
+    );
+    const postRes = await SettingsAPI.POST(postReq);
+    const postData = await postRes.json();
+
+    expect(postRes.status).toBe(200);
+    expect(postData.settings.navLinks).toEqual([]);
+
+    // Verify GET returns empty array rather than wiping and restoring defaults
+    const getRes = await SettingsAPI.GET();
+    const getData = await getRes.json();
+    expect(getData.settings.navLinks).toEqual([]);
+
+    resetSettingsForTesting();
+  });
+
+  test('PATCH /api/products updates size-wise stock and inventory quantity', async () => {
+    // 1. Fetch available products
+    const listReq = new Request('http://localhost:3000/api/products');
+    const listRes = await ProductsAPI.GET(listReq);
+    const listData = await listRes.json();
+    expect(listData.success).toBe(true);
+    expect(listData.products.length).toBeGreaterThan(0);
+
+    const targetProduct = listData.products[0];
+
+    // 2. Mark Size 'M' as Sold Out with 0 quantity
+    const patchReq = createJsonRequest(
+      'http://localhost:3000/api/products',
+      'PATCH',
+      {
+        id: targetProduct.id,
+        size: 'M',
+        inStock: false,
+        quantity: 0,
+      },
+      adminAuthHeaders
+    );
+    const patchRes = await ProductsAPI.PATCH(patchReq);
+    const patchData = await patchRes.json();
+
+    expect(patchRes.status).toBe(200);
+    expect(patchData.success).toBe(true);
+    expect(patchData.product.sizeStock).toBeDefined();
+    expect(patchData.product.sizeStock.M.inStock).toBe(false);
+    expect(patchData.product.sizeStock.M.quantity).toBe(0);
+
+    // 3. Mark Size 'M' back to available with 15 units
+    const restoreReq = createJsonRequest(
+      'http://localhost:3000/api/products',
+      'PATCH',
+      {
+        id: targetProduct.id,
+        size: 'M',
+        inStock: true,
+        quantity: 15,
+      },
+      adminAuthHeaders
+    );
+    const restoreRes = await ProductsAPI.PATCH(restoreReq);
+    const restoreData = await restoreRes.json();
+
+    expect(restoreRes.status).toBe(200);
+    expect(restoreData.product.sizeStock.M.inStock).toBe(true);
+    expect(restoreData.product.sizeStock.M.quantity).toBe(15);
+  });
+
+  test('PATCH /api/products updates color variant stock and inventory quantity', async () => {
+    const listReq = new Request('http://localhost:3000/api/products');
+    const listRes = await ProductsAPI.GET(listReq);
+    const listData = await listRes.json();
+    const targetProduct = listData.products[0];
+
+    const colorName = targetProduct.colors?.[0]?.name || targetProduct.colorName || 'Ivory';
+
+    // Toggle color to Sold Out
+    const patchReq = createJsonRequest(
+      'http://localhost:3000/api/products',
+      'PATCH',
+      {
+        id: targetProduct.id,
+        colorName,
+        inStock: false,
+        quantity: 0,
+      },
+      adminAuthHeaders
+    );
+    const patchRes = await ProductsAPI.PATCH(patchReq);
+    const patchData = await patchRes.json();
+
+    expect(patchRes.status).toBe(200);
+    expect(patchData.success).toBe(true);
+    const matchedColor = patchData.product.colors?.find(
+      (c: any) => c.name.toLowerCase() === colorName.toLowerCase()
+    );
+    expect(matchedColor).toBeDefined();
+    expect(matchedColor.inStock).toBe(false);
+
+    // Restore color to In Stock with 12 units
+    const restoreReq = createJsonRequest(
+      'http://localhost:3000/api/products',
+      'PATCH',
+      {
+        id: targetProduct.id,
+        colorName,
+        inStock: true,
+        quantity: 12,
+      },
+      adminAuthHeaders
+    );
+    const restoreRes = await ProductsAPI.PATCH(restoreReq);
+    const restoreData = await restoreRes.json();
+    expect(restoreRes.status).toBe(200);
+    const restoredColor = restoreData.product.colors?.find(
+      (c: any) => c.name.toLowerCase() === colorName.toLowerCase()
+    );
+    expect(restoredColor.inStock).toBe(true);
+    expect(restoredColor.stockQuantity).toBe(12);
   });
 });
