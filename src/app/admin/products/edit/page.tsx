@@ -865,21 +865,21 @@ function ProductEditorContent() {
         type="file"
         ref={coverFileInputRef}
         onChange={handleCoverUpload}
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
         className="hidden"
       />
       <input
         type="file"
         ref={secondaryFileInputRef}
         onChange={handleSecondaryUpload}
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
         className="hidden"
       />
       <input
         type="file"
         ref={batchFileInputRef}
         onChange={handleBatchUpload}
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
         multiple
         className="hidden"
       />
@@ -887,7 +887,7 @@ function ProductEditorContent() {
         type="file"
         ref={replaceFileInputRef}
         onChange={handleExecuteReplace}
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
         className="hidden"
       />
 

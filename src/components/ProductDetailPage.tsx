@@ -205,6 +205,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     .filter((p) => p.id !== product.id && (p.category === product.category || p.isCurated))
     .slice(0, 4);
 
+  // Helper to safely get bust measurement from SIZE_CHART array
+  const getBustForSize = React.useCallback((sizeStr: string): string => {
+    const row = SIZE_CHART.find((r) => r.size === sizeStr);
+    return row ? row.bustIn.replace(/"/g, '') : '36';
+  }, []);
+
   // Size-wise and Color-wise Stock Availability Checks
   const isSelectedSizeInStock = React.useMemo(() => {
     if (!product.inStock) return false;
@@ -215,8 +221,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   }, [product.inStock, product.sizeStock, selectedSize]);
 
   const matchedColorVariant = React.useMemo(() => {
-    return product.colors?.find(
-      (c) => c.name.toLowerCase() === selectedColor.toLowerCase()
+    if (!product.colors || !selectedColor) return undefined;
+    return product.colors.find(
+      (c) => c?.name && c.name.toLowerCase() === selectedColor.toLowerCase()
     );
   }, [product.colors, selectedColor]);
 
@@ -493,7 +500,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     Select Your Bust Measurement:
                   </span>
                   <span className="text-[#6E5043] font-light">
-                    {selectedSize}: {SIZE_CHART[selectedSize].bust}&quot; Bust
+                    {selectedSize}: {getBustForSize(selectedSize)}&quot; Bust
                   </span>
                 </div>
                 <div className="grid grid-cols-6 gap-1.5">
@@ -511,7 +518,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                         }`}
                       >
                         <div className="text-[10px] text-[#7C736A]">{sz}</div>
-                        <div>{SIZE_CHART[sz].bust}&quot;</div>
+                        <div>{getBustForSize(sz)}&quot;</div>
                       </button>
                     );
                   })}
@@ -865,7 +872,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   onChange={(e) => setReviewSize(e.target.value as GarmentSize)}
                   className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#1E1B18]"
                 >
-                  {product.sizes.map((s) => (
+                  {availableSizes.map((s) => (
                     <option key={s} value={s}>
                       Size {s}
                     </option>

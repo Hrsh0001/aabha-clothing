@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -13,6 +14,37 @@ const nextConfig = {
       };
     }
     return config;
+  },
+  async headers() {
+    return [
+      {
+        source: '/images/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/api/images/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/logo.svg',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
   },
   async rewrites() {
     return [

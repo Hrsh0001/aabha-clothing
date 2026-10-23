@@ -146,16 +146,16 @@ export function isColorInStock(variant: ProductColorVariant | undefined, masterI
 }
 
 export const EDITORIAL_ASSETS = {
-  heroBanner: '/images/hero_editorial_banner_1791119088652.webp',
-  heroCoords: '/images/hero_slide_coords_1791228726563.webp',
-  heroEthnic: '/images/hero_slide_ethnic_1791228741882.webp',
-  brandStory: '/images/brand_story_editorial_1791119191742.webp',
-  kurtaIvory: '/images/product_kurta_ivory_1791119105107.webp',
-  kurtaOlive: '/images/product_kurta_olive_1791119121380.webp',
-  kurtaSetSand: '/images/product_kurtaset_sand_1791119136277.webp',
-  kurtaSetRosewood: '/images/product_kurtaset_rosewood_1791119152298.webp',
-  dressOchre: '/images/product_dress_ochre_1791119165890.webp',
-  coordsCharcoal: '/images/product_coords_charcoal_1791119178003.webp',
+  heroBanner: '/images/hero_editorial_banner_1791119088652.jpg',
+  heroCoords: '/images/hero_slide_coords_1791228726563.jpg',
+  heroEthnic: '/images/hero_slide_ethnic_1791228741882.jpg',
+  brandStory: '/images/brand_story_editorial_1791119191742.jpg',
+  kurtaIvory: '/images/product_kurta_ivory_1791119105107.jpg',
+  kurtaOlive: '/images/product_kurta_olive_1791119121380.jpg',
+  kurtaSetSand: '/images/product_kurtaset_sand_1791119136277.jpg',
+  kurtaSetRosewood: '/images/product_kurtaset_rosewood_1791119152298.jpg',
+  dressOchre: '/images/product_dress_ochre_1791119165890.jpg',
+  coordsCharcoal: '/images/product_coords_charcoal_1791119178003.jpg',
 };
 
 export interface CategoryInfo {

@@ -197,7 +197,7 @@ export default function App() {
     // 2. Preload the primary hero image for immediate 0s first paint on mobile
     if (typeof window !== 'undefined') {
       const preloadImg = new Image();
-      preloadImg.src = '/images/hero_editorial_banner_1791119088652.webp';
+      preloadImg.src = '/images/hero_editorial_banner_1791119088652.jpg';
     }
 
     // 3. Background revalidation from database API (non-blocking)

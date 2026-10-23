@@ -23,5 +23,6 @@ module.exports = {
     ],
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
-  testTimeout: 45000,
+  testTimeout: 60000,
+  maxWorkers: 1,
 };

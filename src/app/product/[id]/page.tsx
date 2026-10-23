@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Product, CollectionFilter, GarmentSize, ProductReview } from '@/src/data/products';
@@ -18,8 +18,15 @@ interface DynamicProductPageProps {
 
 export default function DynamicProductPage({ params }: DynamicProductPageProps) {
   const router = useRouter();
-  const resolvedParams = use(params);
-  const productId = resolvedParams.id;
+  const resolvedParams: any = typeof (params as any)?.then === 'function' ? {} : params;
+  const [productId, setProductId] = useState<string>((params as any)?.id ? decodeURIComponent((params as any).id) : '');
+  useEffect(() => {
+    if (params && typeof (params as any).then === 'function') {
+      Promise.resolve(params).then((p: any) => {
+        if (p?.id) setProductId(decodeURIComponent(p.id));
+      });
+    }
+  }, [params]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
