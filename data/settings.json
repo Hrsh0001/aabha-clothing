@@ -127,6 +127,7 @@
   "enableHeroAutoplay": true,
   "heroAutoplayInterval": 5,
   "enableImageZoomOnHover": true,
+  "animationTimingSpeed": "smooth",
   "shopHeaderTitle": "The Complete Collection",
   "shopHeaderSubtitle": "Artisan handlooms, airy Chanderi silks, and tailored silhouettes for everyday grace.",
   "showShopSort": true,

@@ -22,6 +22,8 @@ import {
   Palette,
   FileText,
   ChevronRight,
+  ChevronDown,
+  Plus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -45,6 +47,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [livePending, setLivePending] = useState(0);
   const [liveInquiries, setLiveInquiries] = useState(0);
+  const [pagesMenuExpanded, setPagesMenuExpanded] = useState(true);
+  const [sidebarCustomPages, setSidebarCustomPages] = useState<Array<{ id: string; slug: string; title: string }>>([
+    { id: 'page-our-craft', slug: 'our-craft', title: 'The Artisanal Weaves' },
+    { id: 'page-garment-care', slug: 'garment-care', title: 'Mulmul Care Guide' },
+  ]);
+  const [currentSelectedPage, setCurrentSelectedPage] = useState<string>('home');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('page') || 'home';
+      setCurrentSelectedPage(p);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (isInitialized && !isAdmin) {
@@ -72,6 +87,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       .then((data) => {
         if (data.success && typeof data.unreadCount === 'number') {
           setLiveInquiries(data.unreadCount);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.settings?.customPages) && data.settings.customPages.length > 0) {
+          setSidebarCustomPages(
+            data.settings.customPages.map((p: any) => ({
+              id: p.id,
+              slug: p.slug,
+              title: p.title,
+            }))
+          );
         }
       })
       .catch(() => {});
@@ -195,6 +225,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           </div>
           {navLinks.map((item) => {
             const Icon = item.icon;
+            const isPagesItem = item.href === '/admin/pages';
             const isTabMatch =
               item.href.includes('?tab=') &&
               typeof window !== 'undefined' &&
@@ -205,34 +236,135 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               (!item.href.includes('?') &&
                 (pathname === item.href ||
                   (item.href !== '/admin/dashboard' && pathname?.startsWith(item.href))));
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center justify-between px-3 py-2.5 text-xs font-medium tracking-wide transition-colors cursor-pointer border ${
-                  isActive
-                    ? 'bg-[#FAF8F5] text-[#1A1715] font-semibold border-[#FAF8F5] shadow-sm'
-                    : 'bg-transparent text-[#D5CCC0] border-transparent hover:bg-[#2A2521] hover:text-[#FAF8F5]'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Icon
-                    className={`w-4 h-4 shrink-0 stroke-[1.4] ${
-                      isActive ? 'text-[#1A1715]' : 'text-[#A69C91]'
-                    }`}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </div>
-                {item.badge !== null && item.badge !== undefined && (
-                  <span
-                    className={`ml-2 px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full ${
-                      item.badgeColor || 'bg-[#25211D] text-white'
-                    }`}
+              <div key={item.href} className="space-y-0.5">
+                <div
+                  className={`flex items-center justify-between px-3 py-2.5 text-xs font-medium tracking-wide transition-colors border ${
+                    isActive
+                      ? 'bg-[#FAF8F5] text-[#1A1715] font-semibold border-[#FAF8F5] shadow-sm'
+                      : 'bg-transparent text-[#D5CCC0] border-transparent hover:bg-[#2A2521] hover:text-[#FAF8F5]'
+                  }`}
+                >
+                  <Link
+                    href={item.href}
+                    className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
                   >
-                    {item.badge}
-                  </span>
+                    <Icon
+                      className={`w-4 h-4 shrink-0 stroke-[1.4] ${
+                        isActive ? 'text-[#1A1715]' : 'text-[#A69C91]'
+                      }`}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.badge !== null && item.badge !== undefined && (
+                      <span
+                        className={`px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full ${
+                          item.badgeColor || 'bg-[#25211D] text-white'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                    {isPagesItem && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPagesMenuExpanded(!pagesMenuExpanded);
+                        }}
+                        className="p-0.5 hover:bg-black/20 rounded cursor-pointer text-[#A69C91]"
+                        title={pagesMenuExpanded ? 'Collapse Pages List' : 'Expand Pages List'}
+                      >
+                        {pagesMenuExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submenu for Pages */}
+                {isPagesItem && pagesMenuExpanded && (
+                  <div className="ml-3 pl-3 py-1 space-y-0.5 border-l-2 border-[#3E3832] my-1">
+                    <div className="px-2 py-0.5 text-[9px] uppercase tracking-wider text-[#8C8075] font-semibold">
+                      Core Storefront
+                    </div>
+                    {[
+                      { key: 'home', label: 'Home Page (/)', href: '/admin/pages?page=home' },
+                      { key: 'shop', label: 'Shop All (/shop)', href: '/admin/pages?page=shop' },
+                      { key: 'about', label: 'About Atelier (/about)', href: '/admin/pages?page=about' },
+                      { key: 'contact', label: 'Contact Us (/contact)', href: '/admin/pages?page=contact' },
+                      { key: 'orders', label: 'Track Orders (/my-orders)', href: '/admin/pages?page=orders' },
+                      { key: 'policy', label: 'Policies & FAQ (/policy)', href: '/admin/pages?page=policy' },
+                    ].map((sub) => {
+                      const isSubActive =
+                        pathname === '/admin/pages' && currentSelectedPage === sub.key;
+                      return (
+                        <Link
+                          key={sub.key}
+                          href={sub.href}
+                          onClick={() => setCurrentSelectedPage(sub.key)}
+                          className={`flex items-center justify-between px-2 py-1.5 text-[11px] rounded transition-colors ${
+                            isSubActive
+                              ? 'bg-[#2A2521] text-[#D4AF37] font-semibold'
+                              : 'text-[#B8AEA3] hover:text-[#FAF8F5] hover:bg-[#25201C]'
+                          }`}
+                        >
+                          <span className="truncate">{sub.label}</span>
+                          {isSubActive && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                          )}
+                        </Link>
+                      );
+                    })}
+
+                    {sidebarCustomPages.length > 0 && (
+                      <>
+                        <div className="px-2 pt-2 pb-0.5 text-[9px] uppercase tracking-wider text-[#8C8075] font-semibold">
+                          Custom Pages
+                        </div>
+                        {sidebarCustomPages.map((cp) => {
+                          const isCpActive =
+                            pathname === '/admin/pages' && currentSelectedPage === cp.slug;
+                          return (
+                            <Link
+                              key={cp.id}
+                              href={`/admin/pages?page=${cp.slug}`}
+                              onClick={() => setCurrentSelectedPage(cp.slug)}
+                              className={`flex items-center justify-between px-2 py-1.5 text-[11px] rounded transition-colors ${
+                                isCpActive
+                                  ? 'bg-[#2A2521] text-[#D4AF37] font-semibold'
+                                  : 'text-[#B8AEA3] hover:text-[#FAF8F5] hover:bg-[#25201C]'
+                              }`}
+                            >
+                              <span className="truncate">{cp.title}</span>
+                              {isCpActive && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    <div className="pt-1.5">
+                      <Link
+                        href="/admin/pages?action=create"
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#A8E6CF] hover:text-white bg-[#1F2C23] hover:bg-[#2E4233] border border-[#2E4535] rounded font-medium transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Add New Page</span>
+                      </Link>
+                    </div>
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>
@@ -320,6 +452,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
               {navLinks.map((item) => {
                 const Icon = item.icon;
+                const isPagesItem = item.href === '/admin/pages';
                 const isTabMatch =
                   item.href.includes('?tab=') &&
                   typeof window !== 'undefined' &&
@@ -331,30 +464,125 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     (pathname === item.href ||
                       (item.href !== '/admin/dashboard' && pathname?.startsWith(item.href))));
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3 py-2.5 text-xs font-medium tracking-wide border ${
-                      isActive
-                        ? 'bg-[#FAF8F5] text-[#1A1715] font-semibold border-[#FAF8F5]'
-                        : 'bg-[#25211D] text-[#D5CCC0] border-[#332C26] hover:bg-[#2E2823] hover:text-[#FAF8F5]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge !== null && item.badge !== undefined && (
-                      <span
-                        className={`px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full ${
-                          item.badgeColor || 'bg-[#25211D] text-white'
-                        }`}
+                  <div key={item.href} className="space-y-0.5">
+                    <div
+                      className={`flex items-center justify-between px-3 py-2.5 text-xs font-medium tracking-wide border ${
+                        isActive
+                          ? 'bg-[#FAF8F5] text-[#1A1715] font-semibold border-[#FAF8F5]'
+                          : 'bg-[#25211D] text-[#D5CCC0] border-[#332C26] hover:bg-[#2E2823] hover:text-[#FAF8F5]'
+                      }`}
+                    >
+                      <Link
+                        href={item.href}
+                        onClick={() => !isPagesItem && setMobileMenuOpen(false)}
+                        className="flex items-center gap-2.5 flex-1"
                       >
-                        {item.badge}
-                      </span>
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </Link>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.badge !== null && item.badge !== undefined && (
+                          <span
+                            className={`px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full ${
+                              item.badgeColor || 'bg-[#25211D] text-white'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                        {isPagesItem && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPagesMenuExpanded(!pagesMenuExpanded);
+                            }}
+                            className="p-1 hover:bg-black/20 rounded cursor-pointer text-[#A69C91]"
+                          >
+                            {pagesMenuExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Submenu for Pages in Mobile Drawer */}
+                    {isPagesItem && pagesMenuExpanded && (
+                      <div className="ml-3 pl-3 py-1 space-y-0.5 border-l-2 border-[#3E3832] my-1">
+                        {[
+                          { key: 'home', label: 'Home Page (/)', href: '/admin/pages?page=home' },
+                          { key: 'shop', label: 'Shop All (/shop)', href: '/admin/pages?page=shop' },
+                          { key: 'about', label: 'About Atelier (/about)', href: '/admin/pages?page=about' },
+                          { key: 'contact', label: 'Contact Us (/contact)', href: '/admin/pages?page=contact' },
+                          { key: 'orders', label: 'Track Orders (/my-orders)', href: '/admin/pages?page=orders' },
+                          { key: 'policy', label: 'Policies & FAQ (/policy)', href: '/admin/pages?page=policy' },
+                        ].map((sub) => {
+                          const isSubActive =
+                            pathname === '/admin/pages' && currentSelectedPage === sub.key;
+                          return (
+                            <Link
+                              key={sub.key}
+                              href={sub.href}
+                              onClick={() => {
+                                setCurrentSelectedPage(sub.key);
+                                setMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center justify-between px-2 py-1.5 text-[11px] rounded transition-colors ${
+                                isSubActive
+                                  ? 'bg-[#2A2521] text-[#D4AF37] font-semibold'
+                                  : 'text-[#B8AEA3] hover:text-[#FAF8F5] hover:bg-[#25201C]'
+                              }`}
+                            >
+                              <span className="truncate">{sub.label}</span>
+                              {isSubActive && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                              )}
+                            </Link>
+                          );
+                        })}
+
+                        {sidebarCustomPages.map((cp) => {
+                          const isCpActive =
+                            pathname === '/admin/pages' && currentSelectedPage === cp.slug;
+                          return (
+                            <Link
+                              key={cp.id}
+                              href={`/admin/pages?page=${cp.slug}`}
+                              onClick={() => {
+                                setCurrentSelectedPage(cp.slug);
+                                setMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center justify-between px-2 py-1.5 text-[11px] rounded transition-colors ${
+                                isCpActive
+                                  ? 'bg-[#2A2521] text-[#D4AF37] font-semibold'
+                                  : 'text-[#B8AEA3] hover:text-[#FAF8F5] hover:bg-[#25201C]'
+                              }`}
+                            >
+                              <span className="truncate">{cp.title}</span>
+                              {isCpActive && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                              )}
+                            </Link>
+                          );
+                        })}
+
+                        <div className="pt-1">
+                          <Link
+                            href="/admin/pages?action=create"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#A8E6CF] bg-[#1F2C23] border border-[#2E4535] rounded font-medium"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>+ Add New Page</span>
+                          </Link>
+                        </div>
+                      </div>
                     )}
-                  </Link>
+                  </div>
                 );
               })}
             </nav>

@@ -28,8 +28,12 @@ export interface PageSectionItem {
   subtitle?: string;
   content?: string;
   imageUrl?: string;
+  mobileImageUrl?: string;
   buttonLabel?: string;
   buttonLink?: string;
+  blurPx?: number;
+  opacityPercent?: number;
+  animationType?: 'fade' | 'slide' | 'zoom' | 'none';
   visible?: boolean;
 }
 
@@ -39,6 +43,7 @@ export interface CustomPageItem {
   title: string;
   subtitle?: string;
   heroImage?: string;
+  heroImageMobile?: string;
   content: string;
   sections?: PageSectionItem[];
   published: boolean;
@@ -191,6 +196,7 @@ export interface SiteSettings {
   enableHeroAutoplay?: boolean;
   heroAutoplayInterval?: number; // 3, 5, 7 seconds
   enableImageZoomOnHover?: boolean;
+  animationTimingSpeed?: 'fast' | 'smooth' | 'cinematic';
 
   // 14. Shop Catalog & About Extended Fields
   shopHeaderTitle?: string;
@@ -396,6 +402,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   enableHeroAutoplay: true,
   heroAutoplayInterval: 5,
   enableImageZoomOnHover: true,
+  animationTimingSpeed: 'smooth',
 
   // 14. Shop Catalog & About Extended Defaults
   shopHeaderTitle: 'The Complete Collection',

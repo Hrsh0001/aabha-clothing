@@ -55,14 +55,19 @@ export const CustomPageView: React.FC<CustomPageViewProps> = ({
     <article className="min-h-screen bg-[#FAF8F5] text-[#1E1B18]">
       {/* 1. Hero Editorial Banner */}
       <section className="relative w-full bg-[#1A1715] text-[#FAF8F5] overflow-hidden min-h-[380px] sm:min-h-[460px] flex items-center">
-        {page.heroImage && (
+        {(page.heroImage || page.heroImageMobile) && (
           <div className="absolute inset-0 z-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={page.heroImage}
-              alt={page.title}
-              className="w-full h-full object-cover object-center brightness-[0.78]"
-            />
+            <picture>
+              {page.heroImageMobile && (
+                <source media="(max-width: 640px)" srcSet={page.heroImageMobile} />
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={page.heroImage || page.heroImageMobile}
+                alt={page.title}
+                className="w-full h-full object-cover object-center brightness-[0.78]"
+              />
+            </picture>
             <div className="absolute inset-0 bg-gradient-to-t from-[#1A1715] via-[#1A1715]/40 to-transparent" />
           </div>
         )}
@@ -132,14 +137,34 @@ export const CustomPageView: React.FC<CustomPageViewProps> = ({
                       {sec.subtitle}
                     </p>
                   )}
-                  {sec.imageUrl && (
-                    <div className="w-full h-64 sm:h-80 overflow-hidden rounded-xs border border-[#ECE6DD]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={sec.imageUrl}
-                        alt={sec.title || 'Page Section Image'}
-                        className="w-full h-full object-cover object-center"
-                      />
+                  {(sec.imageUrl || sec.mobileImageUrl) && (
+                    <div className="relative w-full h-64 sm:h-80 overflow-hidden rounded-xs border border-[#ECE6DD]">
+                      <picture>
+                        {sec.mobileImageUrl && (
+                          <source media="(max-width: 640px)" srcSet={sec.mobileImageUrl} />
+                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={sec.imageUrl || sec.mobileImageUrl}
+                          alt={sec.title || 'Page Section Image'}
+                          style={{
+                            filter: sec.blurPx ? `blur(${sec.blurPx}px)` : undefined,
+                          }}
+                          className={`w-full h-full object-cover object-center transition-all duration-500 ${
+                            sec.animationType === 'zoom'
+                              ? 'hover:scale-105'
+                              : sec.animationType === 'slide'
+                              ? 'motion-safe:animate-in motion-safe:slide-in-from-bottom-2'
+                              : ''
+                          }`}
+                        />
+                      </picture>
+                      {sec.opacityPercent && sec.opacityPercent > 0 ? (
+                        <div
+                          className="absolute inset-0 bg-black pointer-events-none transition-opacity"
+                          style={{ opacity: sec.opacityPercent / 100 }}
+                        />
+                      ) : null}
                     </div>
                   )}
                   {sec.content && (

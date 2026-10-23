@@ -64,10 +64,10 @@ export const describe: (name: string, fn: () => void) => void = (name, fn) => {
   return customDescribe(name, fn);
 };
 
-export const test: (name: string, fn: TestFn) => void = (name, fn) => {
+export const test: (name: string, fn: TestFn, timeout?: number) => void = (name, fn, timeout) => {
   const g = typeof globalThis !== 'undefined' ? (globalThis as any) : (global as any);
   if (typeof g.test === 'function' && g.test !== test) {
-    return g.test(name, fn);
+    return g.test(name, fn, timeout);
   }
   return customTest(name, fn);
 };
