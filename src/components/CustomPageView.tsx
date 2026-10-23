@@ -112,6 +112,57 @@ export const CustomPageView: React.FC<CustomPageViewProps> = ({
           ))}
         </div>
 
+        {/* Dynamic Custom Sections (if added via Admin Pages Manager) */}
+        {Array.isArray(page.sections) && page.sections.length > 0 && (
+          <div className="mt-16 space-y-12">
+            {page.sections
+              .filter((sec) => sec.visible !== false)
+              .map((sec) => (
+                <div
+                  key={sec.id}
+                  className="bg-[#F8F5F0] border border-[#ECE6DD] p-6 sm:p-8 space-y-4 rounded-xs"
+                >
+                  {sec.title && (
+                    <h3 className="font-serif text-2xl text-[#1E1B18] font-normal">
+                      {sec.title}
+                    </h3>
+                  )}
+                  {sec.subtitle && (
+                    <p className="text-xs uppercase tracking-widest text-[#7C736A] font-medium">
+                      {sec.subtitle}
+                    </p>
+                  )}
+                  {sec.imageUrl && (
+                    <div className="w-full h-64 sm:h-80 overflow-hidden rounded-xs border border-[#ECE6DD]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={sec.imageUrl}
+                        alt={sec.title || 'Page Section Image'}
+                        className="w-full h-full object-cover object-center"
+                      />
+                    </div>
+                  )}
+                  {sec.content && (
+                    <p className="text-sm text-[#3E3832] font-light leading-relaxed whitespace-pre-line">
+                      {sec.content}
+                    </p>
+                  )}
+                  {sec.buttonLabel && sec.buttonLink && (
+                    <div className="pt-2">
+                      <a
+                        href={sec.buttonLink}
+                        className="inline-flex items-center gap-2 px-5 py-2 bg-[#231F1D] text-white text-xs uppercase tracking-wider font-medium hover:bg-black transition-colors"
+                      >
+                        <span>{sec.buttonLabel}</span>
+                        <span>→</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        )}
+
         {/* Atelier Commitment Pillar */}
         <div className="mt-16 pt-12 border-t border-[#ECE6DD] grid grid-cols-1 sm:grid-cols-3 gap-6 bg-[#F3EFEA] p-6 sm:p-8">
           <div className="space-y-1.5">

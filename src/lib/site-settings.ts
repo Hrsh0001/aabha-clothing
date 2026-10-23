@@ -21,6 +21,18 @@ export interface FooterColumn {
   links: FooterLinkItem[];
 }
 
+export interface PageSectionItem {
+  id: string;
+  type: 'hero' | 'story' | 'products' | 'lookbook' | 'faq' | 'text' | 'banner';
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  imageUrl?: string;
+  buttonLabel?: string;
+  buttonLink?: string;
+  visible?: boolean;
+}
+
 export interface CustomPageItem {
   id: string;
   slug: string; // e.g. "our-craft", "care-guide", "festive-lookbook"
@@ -28,6 +40,7 @@ export interface CustomPageItem {
   subtitle?: string;
   heroImage?: string;
   content: string;
+  sections?: PageSectionItem[];
   published: boolean;
   metaTitle?: string;
   metaDescription?: string;

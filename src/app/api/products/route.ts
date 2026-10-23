@@ -373,10 +373,13 @@ export async function GET(request: Request) {
           const dbProducts = await prisma.product.findMany({
             orderBy: { createdAt: 'desc' },
           });
-          return NextResponse.json({
-            success: true,
-            products: dbProducts.map(normalizeProduct),
-          });
+          return NextResponse.json(
+            {
+              success: true,
+              products: dbProducts.map(normalizeProduct),
+            },
+            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+          );
         }
       } catch (e) {
         console.warn('Prisma fetch notice, falling back to local cache:', e);
@@ -389,12 +392,18 @@ export async function GET(request: Request) {
         (p: any) => p.id === id || p.sku?.toLowerCase() === id.toLowerCase()
       );
       if (matched) {
-        return NextResponse.json({ success: true, product: matched });
+        return NextResponse.json(
+          { success: true, product: matched },
+          { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+        );
       }
       return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, products: localProducts });
+    return NextResponse.json(
+      { success: true, products: localProducts },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch products' },

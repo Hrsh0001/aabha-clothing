@@ -26,7 +26,10 @@ export async function GET() {
             typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
           const merged: SiteSettings = { ...DEFAULT_SETTINGS, ...parsed };
           saveLocalSettings(merged);
-          return NextResponse.json({ success: true, settings: merged });
+          return NextResponse.json(
+            { success: true, settings: merged },
+            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+          );
         }
       } catch (dbErr) {
         if ((process.env.NODE_ENV as string) !== 'test') {
@@ -36,7 +39,10 @@ export async function GET() {
     }
 
     const settings = readLocalSettings();
-    return NextResponse.json({ success: true, settings });
+    return NextResponse.json(
+      { success: true, settings },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch {
     return NextResponse.json({ success: true, settings: DEFAULT_SETTINGS });
   }

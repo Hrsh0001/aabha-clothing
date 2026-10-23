@@ -24,7 +24,7 @@ import { CustomPageView } from './components/CustomPageView';
 import { Footer } from './components/Footer';
 import { AtelierSkeleton } from './components/AtelierSkeleton';
 import { useAuth } from './context/AuthContext';
-import type { SiteSettings } from './app/api/settings/route';
+import { type SiteSettings, DEFAULT_SETTINGS } from './lib/site-settings';
 
 const getInitialProducts = (): Product[] => {
   if (typeof window === 'undefined') return PRODUCTS;
@@ -43,21 +43,22 @@ const getInitialProducts = (): Product[] => {
   return PRODUCTS;
 };
 
-const getInitialSettings = (): SiteSettings | null => {
-  if (typeof window === 'undefined') return null;
+const getInitialSettings = (): SiteSettings => {
   try {
-    const local = localStorage.getItem('aabha_settings_cache_v2');
-    if (local) {
-      const s = JSON.parse(local);
-      if (s) return s;
-    }
-    const session = sessionStorage.getItem('aabha_settings_cache');
-    if (session) {
-      const s = JSON.parse(session);
-      if (s) return s;
+    if (typeof window !== 'undefined') {
+      const local = localStorage.getItem('aabha_settings_cache_v2');
+      if (local) {
+        const s = JSON.parse(local);
+        if (s) return { ...DEFAULT_SETTINGS, ...s };
+      }
+      const session = sessionStorage.getItem('aabha_settings_cache');
+      if (session) {
+        const s = JSON.parse(session);
+        if (s) return { ...DEFAULT_SETTINGS, ...s };
+      }
     }
   } catch {}
-  return null;
+  return DEFAULT_SETTINGS;
 };
 
 export default function App() {
@@ -72,7 +73,7 @@ export default function App() {
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(getInitialSettings);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(getInitialSettings);
   const [customPageSlug, setCustomPageSlug] = useState<string>('our-craft');
 
   const { setAuthModalOpen } = useAuth();
