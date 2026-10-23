@@ -56,6 +56,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [selectedColor, setSelectedColor] = useState<string>(
     product.colors && product.colors.length > 0 ? product.colors[0].name : product.colorName
   );
+  const [colorImageOverride, setColorImageOverride] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
@@ -175,10 +176,17 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const handleColorClick = (color: { name: string; hex: string; imageUrl?: string }) => {
     setSelectedColor(color.name);
     if (color.imageUrl) {
-      const idx = normalizedGallery.findIndex((g) => g.url === color.imageUrl);
+      setColorImageOverride(color.imageUrl);
+      const cleanTarget = color.imageUrl.trim().toLowerCase();
+      const idx = normalizedGallery.findIndex((g) => {
+        const cleanG = (g.url || '').trim().toLowerCase();
+        return cleanG === cleanTarget || cleanG.endsWith(cleanTarget) || cleanTarget.endsWith(cleanG);
+      });
       if (idx !== -1) {
         setActiveImageIndex(idx);
       }
+    } else {
+      setColorImageOverride(null);
     }
   };
 
@@ -329,7 +337,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   <button
                     key={`${item.label}-${idx}`}
                     type="button"
-                    onClick={() => setActiveImageIndex(idx)}
+                    onClick={() => {
+                      setActiveImageIndex(idx);
+                      setColorImageOverride(null);
+                    }}
                     className={`relative aspect-[3/4] w-18 sm:w-full shrink-0 overflow-hidden bg-[#F3EFEA] transition-opacity cursor-pointer ${
                       isSelected
                         ? 'opacity-100 ring-1 ring-[#1E1B18]'
@@ -351,12 +362,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             {/* Large Primary Gallery Frame */}
             <div className="order-1 sm:order-2 sm:col-span-10">
               <div
-                key={`${product.id}-${activeImageIndex}`}
+                key={`${product.id}-${activeImageIndex}-${colorImageOverride || 'std'}`}
                 className="relative aspect-[3/4] w-full bg-[#F3EFEA] overflow-hidden animate-page-fade"
               >
                 <EditorialImage
-                  src={currentGalleryItem.url}
-                  alt={`${product.name} — ${currentGalleryItem.label}`}
+                  src={colorImageOverride || currentGalleryItem.url}
+                  alt={`${product.name} — ${colorImageOverride ? `${selectedColor} Shade` : currentGalleryItem.label}`}
                   fallbackLabel={product.name}
                   priority={true}
                   containerClassName="w-full h-full"
@@ -366,7 +377,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 />
               </div>
               <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#7C736A]">
-                <span>{currentGalleryItem.label}</span>
+                <span>{colorImageOverride ? `${selectedColor} Shade` : currentGalleryItem.label}</span>
                 <span>{product.fabric}</span>
               </div>
             </div>
@@ -450,17 +461,24 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       title={`${c.name}${!cInStock ? ' (Sold Out)' : ''}${isSelected ? ' (Selected)' : ''}`}
                       className={`relative p-0.5 rounded-full transition-all cursor-pointer ${
                         isSelected
-                          ? 'ring-2 ring-[#1E1B18] ring-offset-2 ring-offset-[#FAF8F5]'
-                          : 'hover:opacity-80'
+                          ? 'ring-2 ring-[#1E1B18] ring-offset-2 ring-offset-[#FAF8F5] scale-105'
+                          : 'hover:opacity-85 hover:scale-105'
                       }`}
                     >
                       <span
-                        className="w-7 h-7 rounded-full border border-[#1E1B18]/20 block shadow-xs relative overflow-hidden"
+                        className="w-8 h-8 rounded-full border border-[#1E1B18]/25 block shadow-xs relative overflow-hidden"
                         style={{ backgroundColor: c.hex }}
                       >
+                        {c.imageUrl && (
+                          <img
+                            src={c.imageUrl}
+                            alt={c.name}
+                            className="w-full h-full object-cover opacity-85 hover:opacity-100 transition-opacity"
+                          />
+                        )}
                         {!cInStock && (
-                          <span className="absolute inset-0 flex items-center justify-center" title="Color Sold Out">
-                            <span className="w-full h-0.5 bg-[#C62828] rotate-45 block"></span>
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/45" title="Color Sold Out">
+                            <span className="w-full h-0.5 bg-[#EF5350] rotate-45 block"></span>
                           </span>
                         )}
                       </span>

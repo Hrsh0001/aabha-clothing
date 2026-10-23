@@ -118,6 +118,7 @@ function AdminPagesStudio() {
   // Live Preview Controls
   const [viewport, setViewport] = useState<ViewportMode>('desktop');
   const [previewReloadKey, setPreviewReloadKey] = useState<number>(Date.now());
+  const [expandedHomeSection, setExpandedHomeSection] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Add / Edit Section Modal
@@ -226,6 +227,11 @@ function AdminPagesStudio() {
       const data = await res.json();
       if (res.ok && data.success) {
         setSettings(payload);
+        try {
+          localStorage.removeItem('aabha_settings_cache_v2');
+          sessionStorage.removeItem('aabha_settings_cache');
+          window.dispatchEvent(new CustomEvent('aabha:settings_updated'));
+        } catch {}
         showToast('All page updates, sections, blur, and animation settings saved successfully!');
         // Refresh live preview iframe
         setPreviewReloadKey(Date.now());
@@ -846,170 +852,590 @@ function AdminPagesStudio() {
             <div className="space-y-5">
               {/* Home Page Dedicated Sections Manager */}
               {selectedPageKey === 'home' ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-5">
+                  {/* Top Control Bar with Quick Actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-[#ECE6DD] rounded-xs shadow-xs">
                     <div>
-                      <h3 className="font-serif text-lg text-[#1E1B18]">Storefront Home Sections</h3>
+                      <h3 className="font-serif text-lg text-[#1E1B18]">Storefront Home Sections &amp; Sequence</h3>
                       <p className="text-xs text-[#7C736A]">
-                        Toggle visibility, reorder and tune each section on the home page.
+                        Control live sequence order (#1 to #7), visibility, and section content on the homepage.
                       </p>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveSettings()}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>{saving ? 'Saving...' : 'Save All Changes'}</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* 1. Hero Carousel */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#D4AF37]" />
-                        <span className="font-serif text-base text-[#1E1B18]">Hero Editorial Carousel (3 Slides)</span>
+                  {/* Dynamic Ordered List of All 7 Home Sections */}
+                  {(() => {
+                    const homeSectionsList =
+                      settings.homeSectionsOrder && Array.isArray(settings.homeSectionsOrder) && settings.homeSectionsOrder.length > 0
+                        ? settings.homeSectionsOrder
+                        : ['hero', 'categories', 'new_arrivals', 'brand_story', 'curated', 'trust_badges', 'instagram'];
+
+                    const HOME_META: Record<string, { title: string; desc: string; isVisible: boolean; field: keyof SiteSettings }> = {
+                      hero: {
+                        title: 'Hero Editorial Carousel (3 Slides)',
+                        desc: 'Full-bleed responsive slider featuring Inaugural, Co-ord, and Festive silhouetted edits.',
+                        isVisible: settings.showHeroCarousel !== false,
+                        field: 'showHeroCarousel',
+                      },
+                      categories: {
+                        title: 'Shop By Category Showcase',
+                        desc: '4 signature silhouette cards (Anarkali, 3-Piece, Co-ords, Chikankari) with custom covers.',
+                        isVisible: settings.showCategorySection !== false,
+                        field: 'showCategorySection',
+                      },
+                      new_arrivals: {
+                        title: 'New Arrivals Showcase & Catalog',
+                        desc: 'Dynamic catalog displaying latest artisanal releases with quick-bag size selector.',
+                        isVisible: settings.showNewArrivals !== false,
+                        field: 'showNewArrivals',
+                      },
+                      brand_story: {
+                        title: 'Brand Story & Artisanal Ethos',
+                        desc: 'Editorial two-column narrative detailing handloom roots, French seam construction, and karigar ethos.',
+                        isVisible: settings.showBrandStory !== false,
+                        field: 'showBrandStory',
+                      },
+                      curated: {
+                        title: 'Curated Collection (House Signatures)',
+                        desc: 'Hand-picked editorial silhouettes selected from the collection.',
+                        isVisible: settings.showCuratedSection !== false,
+                        field: 'showCuratedSection',
+                      },
+                      trust_badges: {
+                        title: 'Heritage Trust Badges (4 Pillars)',
+                        desc: 'Handcrafted handloom, French seams, complimentary pan-India COD, and 14-day exchange guarantee.',
+                        isVisible: settings.showTrustBadges !== false,
+                        field: 'showTrustBadges',
+                      },
+                      instagram: {
+                        title: 'Living Atelier Instagram Feed',
+                        desc: 'Editorial photo mosaic showcasing real patrons, ateliers, and drape styling.',
+                        isVisible: settings.showInstagramSection !== false,
+                        field: 'showInstagramSection',
+                      },
+                    };
+
+                    const handleMoveHomeSection = (idx: number, direction: 'up' | 'down') => {
+                      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+                      if (targetIdx < 0 || targetIdx >= homeSectionsList.length) return;
+                      const newOrder = [...homeSectionsList];
+                      const temp = newOrder[idx];
+                      newOrder[idx] = newOrder[targetIdx];
+                      newOrder[targetIdx] = temp;
+                      const newSettings = { ...settings, homeSectionsOrder: newOrder };
+                      setSettings(newSettings);
+                      handleSaveSettings(newSettings);
+                      showToast(`Moved section ${direction === 'up' ? 'earlier' : 'later'} in page order`);
+                    };
+
+                    const handleToggleHomeSection = (field: keyof SiteSettings) => {
+                      const newSettings = { ...settings, [field]: settings[field] === false };
+                      setSettings(newSettings);
+                      handleSaveSettings(newSettings);
+                    };
+
+                    return (
+                      <div className="space-y-3">
+                        {homeSectionsList.map((secKey, idx) => {
+                          const meta = HOME_META[secKey] || {
+                            title: secKey.toUpperCase(),
+                            desc: 'Custom storefront section',
+                            isVisible: true,
+                            field: 'showHeroCarousel' as keyof SiteSettings,
+                          };
+                          const isExpanded = expandedHomeSection === secKey;
+
+                          return (
+                            <div
+                              key={secKey}
+                              className={`border rounded-xs transition-colors ${
+                                meta.isVisible
+                                  ? 'bg-[#FAF8F5] border-[#ECE6DD]'
+                                  : 'bg-[#F5F2EC] border-[#DDD5CA] opacity-80'
+                              }`}
+                            >
+                              {/* Section Row Header */}
+                              <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-start gap-3 min-w-0">
+                                  {/* Order Badge */}
+                                  <span className="px-2 py-1 bg-[#231F1D] text-[#D4AF37] text-[11px] font-mono font-bold rounded-xs shrink-0 shadow-2xs">
+                                    #{idx + 1}
+                                  </span>
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-serif text-base text-[#1E1B18] font-normal truncate">
+                                        {meta.title}
+                                      </h4>
+                                      <span
+                                        className={`px-1.5 py-0.5 text-[9px] uppercase font-mono font-semibold rounded-xs border shrink-0 ${
+                                          meta.isVisible
+                                            ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                            : 'bg-[#ECE6DD] text-[#7C736A] border-[#D5CCC0]'
+                                        }`}
+                                      >
+                                        {meta.isVisible ? 'Live' : 'Hidden'}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-[#7C736A] mt-0.5 line-clamp-1">{meta.desc}</p>
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                  {/* Move Up */}
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0}
+                                    onClick={() => handleMoveHomeSection(idx, 'up')}
+                                    className="p-1.5 bg-white border border-[#ECE6DD] hover:bg-[#231F1D] hover:text-white text-[#1E1B18] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer rounded-xs"
+                                    title="Move section up (earlier on page)"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Move Down */}
+                                  <button
+                                    type="button"
+                                    disabled={idx === homeSectionsList.length - 1}
+                                    onClick={() => handleMoveHomeSection(idx, 'down')}
+                                    className="p-1.5 bg-white border border-[#ECE6DD] hover:bg-[#231F1D] hover:text-white text-[#1E1B18] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer rounded-xs"
+                                    title="Move section down (later on page)"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Toggle Visibility */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleHomeSection(meta.field)}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border rounded-xs transition-colors cursor-pointer ${
+                                      meta.isVisible
+                                        ? 'bg-white border-[#C8E6C9] text-[#2E7D32] hover:bg-[#E8F5E9]'
+                                        : 'bg-[#ECE6DD] border-[#D5CCC0] text-[#7C736A] hover:bg-[#DDD5CA]'
+                                    }`}
+                                    title={meta.isVisible ? 'Hide from storefront' : 'Make visible on storefront'}
+                                  >
+                                    {meta.isVisible ? (
+                                      <>
+                                        <Eye className="w-3 h-3 text-[#2E7D32]" />
+                                        <span>Visible</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EyeOff className="w-3 h-3 text-[#7C736A]" />
+                                        <span>Hidden</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* Edit Content Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedHomeSection(isExpanded ? null : secKey)
+                                    }
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border rounded-xs transition-colors cursor-pointer ${
+                                      isExpanded
+                                        ? 'bg-[#231F1D] text-white border-[#231F1D]'
+                                        : 'bg-white border-[#ECE6DD] text-[#1E1B18] hover:bg-[#231F1D] hover:text-white'
+                                    }`}
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#D4AF37]" />
+                                    <span>{isExpanded ? 'Close' : 'Edit'}</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expandable Section Content Editor */}
+                              {isExpanded && (
+                                <div className="p-4 border-t border-[#ECE6DD] bg-white space-y-4">
+                                  {secKey === 'hero' && (
+                                    <div className="space-y-4 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Hero Editorial Carousel (3 Slides)
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {/* Slide 1 */}
+                                        <div className="p-3 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-2">
+                                          <span className="font-bold text-[#1E1B18] block">Slide 1: Inaugural Handloom</span>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Eyebrow:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide1Eyebrow ?? 'INAUGURAL EDIT · HANDLOOM'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide1Eyebrow: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Heading:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide1Heading ?? 'EFFORTLESSLY INDIAN.'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide1Heading: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Button Label:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide1ButtonLabel ?? 'SHOP THE COLLECTION'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide1ButtonLabel: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Slide 2 */}
+                                        <div className="p-3 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-2">
+                                          <span className="font-bold text-[#1E1B18] block">Slide 2: Co-ord Edit</span>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Eyebrow:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide2Eyebrow ?? 'THE CO-ORD EDIT'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide2Eyebrow: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Heading:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide2Heading ?? 'MODERN. EFFORTLESS. YOURS.'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide2Heading: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Button Label:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide2ButtonLabel ?? 'SHOP CO-ORDS'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide2ButtonLabel: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Slide 3 */}
+                                        <div className="p-3 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-2">
+                                          <span className="font-bold text-[#1E1B18] block">Slide 3: Festive Silk</span>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Eyebrow:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide3Eyebrow ?? 'TIMELESS INDIAN'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide3Eyebrow: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Heading:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide3Heading ?? 'MADE FOR EVERY MOMENT.'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide3Heading: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-[#7C736A]">Button Label:</label>
+                                            <input
+                                              type="text"
+                                              value={settings.heroSlide3ButtonLabel ?? 'EXPLORE THE COLLECTION'}
+                                              onChange={(e) => setSettings({ ...settings, heroSlide3ButtonLabel: e.target.value })}
+                                              className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'categories' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Shop By Category Header
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Eyebrow:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.categorySectionEyebrow || 'The Launch Silhouettes'}
+                                            onChange={(e) => setSettings({ ...settings, categorySectionEyebrow: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Heading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.categorySectionHeading || 'Shop By Category'}
+                                            onChange={(e) => setSettings({ ...settings, categorySectionHeading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'new_arrivals' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        New Arrivals Section
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Eyebrow:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.newArrivalsEyebrow || 'Inaugural Release'}
+                                            onChange={(e) => setSettings({ ...settings, newArrivalsEyebrow: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Heading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.newArrivalsHeading || 'New Arrivals'}
+                                            onChange={(e) => setSettings({ ...settings, newArrivalsHeading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Subheading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.newArrivalsSubheading || 'Discover the newest silhouettes'}
+                                            onChange={(e) => setSettings({ ...settings, newArrivalsSubheading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'brand_story' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Brand Story &amp; Ethos Narrative
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Eyebrow:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.brandStoryEyebrow || 'AABHA CLOTHING · Our Philosophy'}
+                                            onChange={(e) => setSettings({ ...settings, brandStoryEyebrow: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Title:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.brandStoryTitle || 'MADE FOR YOUR EVERYDAY ELEGANCE'}
+                                            onChange={(e) => setSettings({ ...settings, brandStoryTitle: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] text-[#7C736A] mb-1">Paragraph 1:</label>
+                                        <textarea
+                                          rows={2}
+                                          value={settings.brandStoryParagraph1 || ''}
+                                          onChange={(e) => setSettings({ ...settings, brandStoryParagraph1: e.target.value })}
+                                          className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] text-[#7C736A] mb-1">Paragraph 2:</label>
+                                        <textarea
+                                          rows={2}
+                                          value={settings.brandStoryParagraph2 || ''}
+                                          onChange={(e) => setSettings({ ...settings, brandStoryParagraph2: e.target.value })}
+                                          className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'curated' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Curated Collection Section
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Eyebrow:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.curatedEyebrow || 'House Signatures'}
+                                            onChange={(e) => setSettings({ ...settings, curatedEyebrow: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Heading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.curatedHeading || 'Curated Collection'}
+                                            onChange={(e) => setSettings({ ...settings, curatedHeading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Subheading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.curatedSubheading || 'Signature silhouettes selected from our collection'}
+                                            onChange={(e) => setSettings({ ...settings, curatedSubheading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'trust_badges' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Heritage Trust Badges (4 Pillars)
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="p-2.5 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-1">
+                                          <span className="font-bold text-[#1E1B18] block">Pillar 1</span>
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge1Title || 'Artisan Handcrafted'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge1Title: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge1Subtitle || 'Complimentary express delivery'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge1Subtitle: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-[11px] bg-white"
+                                          />
+                                        </div>
+
+                                        <div className="p-2.5 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-1">
+                                          <span className="font-bold text-[#1E1B18] block">Pillar 2</span>
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge2Title || 'French Seams & Mulmul Lining'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge2Title: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge2Subtitle || '14-day complimentary returns'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge2Subtitle: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-[11px] bg-white"
+                                          />
+                                        </div>
+
+                                        <div className="p-2.5 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-1">
+                                          <span className="font-bold text-[#1E1B18] block">Pillar 3</span>
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge3Title || 'Complimentary Express Delivery & COD'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge3Title: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge3Subtitle || 'Zero advance payment required'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge3Subtitle: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-[11px] bg-white"
+                                          />
+                                        </div>
+
+                                        <div className="p-2.5 bg-[#FAF8F5] border border-[#ECE6DD] rounded-xs space-y-1">
+                                          <span className="font-bold text-[#1E1B18] block">Pillar 4</span>
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge4Title || 'Dedicated Atelier Concierge'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge4Title: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={settings.trustBadge4Subtitle || 'Crafted in India with handlooms'}
+                                            onChange={(e) => setSettings({ ...settings, trustBadge4Subtitle: e.target.value })}
+                                            className="w-full px-2 py-1 border border-[#ECE6DD] text-[11px] bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {secKey === 'instagram' && (
+                                    <div className="space-y-3 text-xs">
+                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                        Living Atelier Instagram Gallery
+                                      </h5>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Section Heading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.igSectionHeading || 'In Quiet Motion'}
+                                            onChange={(e) => setSettings({ ...settings, igSectionHeading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1">Instagram Handle:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.instagramHandle || '@aabhaclothing'}
+                                            onChange={(e) => setSettings({ ...settings, instagramHandle: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="pt-2 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleSaveSettings(settings);
+                                        setExpandedHomeSection(null);
+                                      }}
+                                      className="px-4 py-1.5 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs cursor-pointer"
+                                    >
+                                      Done &amp; Save Section
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showHeroCarousel !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showHeroCarousel: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Full-bleed editorial banner with Slide 1 (Anarkali), Slide 2 (Co-ord Sets), and Slide 3 (Festive Silk).
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                      <div className="p-2.5 bg-white border border-[#ECE6DD] rounded-xs">
-                        <span className="font-medium text-[#1E1B18] block">Slide 1: {settings.heroSlide1Heading || 'The Anarkali Revival'}</span>
-                        <span className="text-[10px] text-[#7C736A] truncate block">{settings.heroBanner}</span>
-                      </div>
-                      <div className="p-2.5 bg-white border border-[#ECE6DD] rounded-xs">
-                        <span className="font-medium text-[#1E1B18] block">Slide 2: {settings.heroSlide2Heading || 'Architectural Co-ords'}</span>
-                        <span className="text-[10px] text-[#7C736A] truncate block">{settings.heroCoords}</span>
-                      </div>
-                      <div className="p-2.5 bg-white border border-[#ECE6DD] rounded-xs">
-                        <span className="font-medium text-[#1E1B18] block">Slide 3: {settings.heroSlide3Heading || 'Festive Chanderi Silk'}</span>
-                        <span className="text-[10px] text-[#7C736A] truncate block">{settings.heroEthnic}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Shop By Category Showcase */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-base text-[#1E1B18]">Category Showcase (Anarkali, 3-Piece, Co-ords, Chikankari)</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showCategorySection !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showCategorySection: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Interactive silhouette selector cards linking patrons to targeted wardrobe edits.
-                    </p>
-                  </div>
-
-                  {/* 3. New Arrivals Showcase */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-base text-[#1E1B18]">New Arrivals Showcase &amp; Carousel</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showNewArrivals !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showNewArrivals: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Dynamic carousel displaying latest artisanal releases with quick-bag drawer.
-                    </p>
-                  </div>
-
-                  {/* 4. Brand Story Editorial */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-base text-[#1E1B18]">Brand Story &amp; Artisanal Weaves Narrative</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showBrandStory !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showBrandStory: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Editorial two-column narrative detailing handloom roots, French seam construction, and karigar ethos.
-                    </p>
-                  </div>
-
-                  {/* 5. Heritage & 4 Trust Badges */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-base text-[#1E1B18]">Heritage Trust Badges (4 Pillars)</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showTrustBadges !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showTrustBadges: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Handcrafted handloom, French seams, complimentary pan-India COD, and 14-day exchange guarantee.
-                    </p>
-                  </div>
-
-                  {/* 6. Living Atelier Instagram Feed */}
-                  <div className="p-4 border border-[#ECE6DD] bg-[#FAF8F5] rounded-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-serif text-base text-[#1E1B18]">Living Atelier Instagram Feed</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.showInstagramSection !== false}
-                          onChange={(e) => {
-                            const newSettings = { ...settings, showInstagramSection: e.target.checked };
-                            setSettings(newSettings);
-                            handleSaveSettings(newSettings);
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#231F1D]" />
-                      </label>
-                    </div>
-                    <p className="text-xs text-[#7C736A]">
-                      Editorial photo mosaic showcasing real patrons, ateliers, and drape styling.
-                    </p>
-                  </div>
+                    );
+                  })()}
                 </div>
               ) : isCustomPage && activeCustomPage ? (
                 /* Dynamic Custom Page Sections Manager */
@@ -1148,70 +1574,201 @@ function AdminPagesStudio() {
                   </div>
 
                   {selectedPageKey === 'about' && (
-                    <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">About Hero Headline</label>
-                        <input
-                          type="text"
-                          value={settings.aboutHeroHeading || ''}
-                          onChange={(e) => setSettings({ ...settings, aboutHeroHeading: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
-                        />
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">About Hero Headline</label>
+                          <input
+                            type="text"
+                            value={settings.aboutHeroHeading || ''}
+                            onChange={(e) => setSettings({ ...settings, aboutHeroHeading: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Foundational Silhouettes Title</label>
+                          <input
+                            type="text"
+                            value={settings.aboutFoundationalTitle || 'Our Foundational Silhouettes'}
+                            onChange={(e) => setSettings({ ...settings, aboutFoundationalTitle: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
                       </div>
+
                       <div>
                         <label className="block text-xs font-medium text-[#1E1B18] mb-1">Artisanal Ethos Narrative</label>
                         <textarea
-                          rows={4}
+                          rows={3}
                           value={settings.aboutHeroLead || ''}
                           onChange={(e) => setSettings({ ...settings, aboutHeroLead: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
+                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">Foundational Craft Story</label>
+                        <textarea
+                          rows={3}
+                          value={settings.aboutFoundationalBody || ''}
+                          onChange={(e) => setSettings({ ...settings, aboutFoundationalBody: e.target.value })}
+                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                        />
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveSettings(settings)}
+                          className="px-5 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs cursor-pointer shadow-xs"
+                        >
+                          Save About Atelier
+                        </button>
                       </div>
                     </div>
                   )}
 
                   {selectedPageKey === 'shop' && (
-                    <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">Catalog Banner Title</label>
-                        <input
-                          type="text"
-                          value={settings.shopHeaderTitle || 'The Complete Collection'}
-                          onChange={(e) => setSettings({ ...settings, shopHeaderTitle: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
-                        />
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Catalog Banner Title</label>
+                          <input
+                            type="text"
+                            value={settings.shopHeaderTitle || 'The Complete Collection'}
+                            onChange={(e) => setSettings({ ...settings, shopHeaderTitle: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Catalog Subtitle</label>
+                          <input
+                            type="text"
+                            value={settings.shopHeaderSubtitle || 'Timeless handloom silhouettes handcrafted across India'}
+                            onChange={(e) => setSettings({ ...settings, shopHeaderSubtitle: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">Catalog Subtitle</label>
-                        <input
-                          type="text"
-                          value={settings.shopHeaderSubtitle || ''}
-                          onChange={(e) => setSettings({ ...settings, shopHeaderSubtitle: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
-                        />
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveSettings(settings)}
+                          className="px-5 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs cursor-pointer shadow-xs"
+                        >
+                          Save Shop Settings
+                        </button>
                       </div>
                     </div>
                   )}
 
                   {selectedPageKey === 'contact' && (
-                    <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">WhatsApp Concierge Number</label>
-                        <input
-                          type="text"
-                          value={settings.whatsappNumber || ''}
-                          onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
-                        />
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">WhatsApp Concierge</label>
+                          <input
+                            type="text"
+                            value={settings.whatsappNumber || ''}
+                            onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Support Email</label>
+                          <input
+                            type="email"
+                            value={settings.supportEmail || ''}
+                            onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Support Phone</label>
+                          <input
+                            type="text"
+                            value={settings.supportPhone || ''}
+                            onChange={(e) => setSettings({ ...settings, supportPhone: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-[#1E1B18] mb-1">Studio Physical Address</label>
-                        <input
-                          type="text"
-                          value={settings.storeAddress || ''}
-                          onChange={(e) => setSettings({ ...settings, storeAddress: e.target.value })}
-                          className="w-full px-3 py-2 text-xs border border-[#ECE6DD] rounded-xs"
-                        />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Studio Physical Address</label>
+                          <input
+                            type="text"
+                            value={settings.storeAddress || ''}
+                            onChange={(e) => setSettings({ ...settings, storeAddress: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1E1B18] mb-1">Studio Operating Hours</label>
+                          <input
+                            type="text"
+                            value={settings.storeHours || 'Mon – Sat: 10:00 AM – 7:30 PM IST'}
+                            onChange={(e) => setSettings({ ...settings, storeHours: e.target.value })}
+                            className="w-full px-3 py-2 text-xs border border-[#ECE6DD] bg-white rounded-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveSettings(settings)}
+                          className="px-5 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs cursor-pointer shadow-xs"
+                        >
+                          Save Contact Info
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPageKey === 'orders' && (
+                    <div className="space-y-4 pt-2">
+                      <div className="p-3.5 bg-white border border-[#ECE6DD] rounded-xs space-y-2 text-xs">
+                        <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                          Order Tracking &amp; Patron GST Invoices
+                        </h5>
+                        <p className="text-xs text-[#7C736A]">
+                          Patrons can look up order status, download GST-compliant tax invoices, and request size exchanges via WhatsApp helpline.
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <Link
+                          href="/admin/orders"
+                          className="px-5 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs"
+                        >
+                          Manage Live Orders &rarr;
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPageKey === 'policy' && (
+                    <div className="space-y-4 pt-2">
+                      <div className="p-3.5 bg-white border border-[#ECE6DD] rounded-xs space-y-2 text-xs">
+                        <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                          Policies &amp; FAQs Management
+                        </h5>
+                        <p className="text-xs text-[#7C736A]">
+                          Store policies cover Complimentary Pan-India Shipping, 14-day Doorstep Exchanges, and Cash on Delivery terms.
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <Link
+                          href="/policy?topic=shipping"
+                          target="_blank"
+                          className="px-5 py-2 bg-[#231F1D] text-white hover:bg-black text-xs font-medium uppercase tracking-wider rounded-xs"
+                        >
+                          View Policies on Boutique &rarr;
+                        </Link>
                       </div>
                     </div>
                   )}

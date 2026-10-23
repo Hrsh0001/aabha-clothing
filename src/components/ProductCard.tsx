@@ -24,6 +24,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [mobileSizesOpen, setMobileSizesOpen] = useState(false);
   const [addedSize, setAddedSize] = useState<GarmentSize | null>(null);
+  const [activeColor, setActiveColor] = useState<{ name: string; hex: string; imageUrl?: string } | null>(null);
 
   const discountPercent =
     product.originalPrice && product.originalPrice > product.price
@@ -46,6 +47,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       ? product.sizes
       : (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as GarmentSize[]);
 
+  const displayImage =
+    activeColor?.imageUrl ||
+    (isHovered && product.secondaryImage ? product.secondaryImage : product.primaryImage);
+  const displayColorName = activeColor ? activeColor.name : product.colorName;
+
   return (
     <article
       onClick={() => onSelectProduct(product)}
@@ -59,8 +65,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* 3:4 Portrait Image Frame */}
       <div className="relative aspect-[3/4] w-full bg-[#F3EFEA] overflow-hidden">
         <EditorialImage
-          src={product.primaryImage}
-          alt={product.name}
+          src={displayImage}
+          alt={`${product.name} — ${displayColorName}`}
           fallbackLabel={product.name}
           priority={priority}
           containerClassName="w-full h-full"
@@ -149,7 +155,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[#7C736A] tracking-wide mb-1">
           <span>{product.category}</span>
           <span aria-hidden="true">·</span>
-          <span className="truncate">{product.colorName}</span>
+          <span className="truncate">{displayColorName}</span>
         </div>
 
         {/* Product Title */}
@@ -157,19 +163,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {product.name}
         </h3>
 
-        {/* Mini Color Dots */}
+        {/* Interactive Color Swatches with Live Image Preview */}
         {product.colors && product.colors.length > 0 && (
-          <div className="flex items-center gap-1.5 mt-1.5 mb-0.5">
-            {product.colors.map((c, i) => (
-              <span
-                key={`${c.name}-${i}`}
-                title={c.name}
-                className="w-2.5 h-2.5 rounded-full border border-[#1E1B18]/20 shrink-0 inline-block shadow-2xs"
-                style={{ backgroundColor: c.hex }}
-              />
-            ))}
-            <span className="text-[10px] text-[#7C736A] ml-1 font-mono">
-              {product.colors.length} {product.colors.length === 1 ? 'color' : 'colors'}
+          <div
+            className="flex items-center gap-1.5 mt-2 mb-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {product.colors.map((c, i) => {
+              const isSelected = activeColor
+                ? activeColor.name === c.name
+                : (product.colorName === c.name || i === 0);
+              return (
+                <button
+                  key={`${c.name}-${i}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveColor(c);
+                  }}
+                  onMouseEnter={() => {
+                    if (c.imageUrl) setActiveColor(c);
+                  }}
+                  title={`${c.name}${c.inStock === false ? ' (Sold Out)' : ''}`}
+                  className={`w-3.5 h-3.5 rounded-full border transition-all cursor-pointer relative shrink-0 ${
+                    isSelected
+                      ? 'ring-2 ring-[#1E1B18] ring-offset-1 ring-offset-[#FAF8F5] scale-110'
+                      : 'border-[#1E1B18]/30 hover:scale-110 hover:border-[#1E1B18]'
+                  }`}
+                  style={{ backgroundColor: c.hex }}
+                />
+              );
+            })}
+            <span className="text-[10px] text-[#7C736A] ml-1 font-mono truncate max-w-[130px]">
+              {displayColorName}
             </span>
           </div>
         )}

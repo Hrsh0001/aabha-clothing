@@ -206,11 +206,30 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  return (
-    <div className="space-y-24 sm:space-y-36 pb-24 sm:pb-32">
-      {/* 1. 3-Slide Swipeable Editorial Hero Carousel */}
-      {siteSettings?.showHeroCarousel !== false && (
+  const activeSectionsOrder = useMemo(() => {
+    const defaultOrder = [
+      'hero',
+      'categories',
+      'new_arrivals',
+      'brand_story',
+      'curated',
+      'trust_badges',
+      'instagram',
+    ];
+    if (Array.isArray(siteSettings?.homeSectionsOrder) && siteSettings.homeSectionsOrder.length > 0) {
+      const validKeys = new Set(defaultOrder);
+      const configured = siteSettings.homeSectionsOrder.filter((k) => validKeys.has(k));
+      const missing = defaultOrder.filter((k) => !configured.includes(k));
+      return [...configured, ...missing];
+    }
+    return defaultOrder;
+  }, [siteSettings?.homeSectionsOrder]);
+
+  const renderHeroCarousel = () => {
+    if (siteSettings?.showHeroCarousel === false) return null;
+    return (
       <section
+        key="hero"
         aria-roledescription="carousel"
         aria-label="Featured Collections"
         onMouseEnter={() => setIsPaused(true)}
@@ -421,11 +440,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 2. Shop By Category — Exact 4 Categories with Dynamic Product Thumbnails & Counts */}
-      {siteSettings?.showCategorySection !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderCategoriesSection = () => {
+    if (siteSettings?.showCategorySection === false) return null;
+    return (
+      <section key="categories" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14">
           <div>
             <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -498,11 +519,14 @@ export const HomePage: React.FC<HomePageProps> = ({
           })}
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 3. New Arrivals (Dynamic Database Catalog) */}
-      {siteSettings?.showNewArrivals !== false && (
+  const renderNewArrivalsSection = () => {
+    if (siteSettings?.showNewArrivals === false) return null;
+    return (
       <section
+        key="new_arrivals"
         id="new-arrivals"
         className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 scroll-mt-24"
       >
@@ -577,11 +601,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 4. Brand Story — Generous Editorial Rest Section */}
-      {siteSettings?.showBrandStory !== false && (
-      <section id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
+  const renderBrandStorySection = () => {
+    if (siteSettings?.showBrandStory === false) return null;
+    return (
+      <section key="brand_story" id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
         <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
@@ -634,11 +660,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 5. Curated Collection */}
-      {siteSettings?.showCuratedSection !== false && curatedProducts.length > 0 && (
-        <section id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderCuratedSection = () => {
+    if (siteSettings?.showCuratedSection === false || curatedProducts.length === 0) return null;
+    return (
+      <section key="curated" id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
             <div>
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -666,11 +694,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             ))}
           </div>
         </section>
-      )}
+      );
+    };
 
-      {/* 6. Instagram-Style Fashion Gallery */}
-      {siteSettings?.showInstagramSection !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+    const renderInstagramSection = () => {
+      if (siteSettings?.showInstagramSection === false) return null;
+      return (
+        <section key="instagram" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-12">
             <div>
@@ -711,11 +741,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 7. Heritage & Trust Badges (4 Pillars) */}
-      {siteSettings?.showTrustBadges !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderTrustBadgesSection = () => {
+    if (siteSettings?.showTrustBadges === false) return null;
+    return (
+      <section key="trust_badges" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="border-t border-[#ECE6DD] pt-14 sm:pt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
           <div className="space-y-2">
             <Truck className="w-5 h-5 text-[#6E5043] stroke-[1.3]" />
@@ -758,7 +790,31 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
+
+  return (
+    <div className="space-y-24 sm:space-y-36 pb-24 sm:pb-32">
+      {activeSectionsOrder.map((sectionKey) => {
+        switch (sectionKey) {
+          case 'hero':
+            return renderHeroCarousel();
+          case 'categories':
+            return renderCategoriesSection();
+          case 'new_arrivals':
+            return renderNewArrivalsSection();
+          case 'brand_story':
+            return renderBrandStorySection();
+          case 'curated':
+            return renderCuratedSection();
+          case 'trust_badges':
+            return renderTrustBadgesSection();
+          case 'instagram':
+            return renderInstagramSection();
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 };

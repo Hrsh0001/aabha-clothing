@@ -378,7 +378,13 @@ export async function GET(request: Request) {
               success: true,
               products: dbProducts.map(normalizeProduct),
             },
-            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+            {
+              headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+            }
           );
         }
       } catch (e) {
@@ -394,7 +400,13 @@ export async function GET(request: Request) {
       if (matched) {
         return NextResponse.json(
           { success: true, product: matched },
-          { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          }
         );
       }
       return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
@@ -402,7 +414,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       { success: true, products: localProducts },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   } catch (error) {
     return NextResponse.json(

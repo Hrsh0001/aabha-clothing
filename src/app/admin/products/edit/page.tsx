@@ -23,6 +23,7 @@ import {
   X,
   Info,
   Palette,
+  Edit2,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
@@ -88,10 +89,15 @@ function ProductEditorContent() {
   const [description, setDescription] = useState('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
   const [customSizeInput, setCustomSizeInput] = useState('');
-  const [colors, setColors] = useState<Array<{ name: string; hex: string; imageUrl?: string }>>([]);
+  const [colors, setColors] = useState<Array<{ name: string; hex: string; imageUrl?: string; inStock?: boolean; stockQuantity?: number }>>([]);
   const [newColorName, setNewColorName] = useState('');
   const [newColorHex, setNewColorHex] = useState('#6E5043');
   const [newColorImageUrl, setNewColorImageUrl] = useState('');
+  const [uploadingNewColor, setUploadingNewColor] = useState(false);
+  const [uploadingSwatchIdx, setUploadingSwatchIdx] = useState<number | null>(null);
+  const [editingSwatchIdx, setEditingSwatchIdx] = useState<number | null>(null);
+  const [editingSwatchData, setEditingSwatchData] = useState<{ name: string; hex: string; imageUrl?: string; inStock?: boolean; stockQuantity?: number } | null>(null);
+  const newColorFileRef = useRef<HTMLInputElement>(null);
 
   // Image states
   const [primaryImage, setPrimaryImage] = useState('');
@@ -614,6 +620,99 @@ function ProductEditorContent() {
     setCustomSizeInput('');
   };
 
+  const handleUploadNewColorFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      showToast(check.error || 'Invalid image file', 'error');
+      return;
+    }
+    setUploadingNewColor(true);
+    try {
+      const data = await uploadAdminImage(file, getUploadHeaders());
+      if (data.success && data.imageUrl) {
+        setNewColorImageUrl(data.imageUrl);
+        showToast('Color swatch photo uploaded successfully!');
+      } else {
+        showToast(data.error || 'Failed to upload swatch photo', 'error');
+      }
+    } catch {
+      showToast('Error uploading swatch photo', 'error');
+    } finally {
+      setUploadingNewColor(false);
+      if (newColorFileRef.current) newColorFileRef.current.value = '';
+    }
+  };
+
+  const handleUploadExistingSwatchFile = async (idx: number, file?: File | null) => {
+    if (!file) return;
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      showToast(check.error || 'Invalid image file', 'error');
+      return;
+    }
+    setUploadingSwatchIdx(idx);
+    try {
+      const data = await uploadAdminImage(file, getUploadHeaders());
+      if (data.success && data.imageUrl) {
+        setColors((prev) =>
+          prev.map((c, i) => (i === idx ? { ...c, imageUrl: data.imageUrl } : c))
+        );
+        showToast(`Updated photo for "${colors[idx]?.name || 'swatch'}"`);
+      } else {
+        showToast(data.error || 'Failed to upload photo', 'error');
+      }
+    } catch {
+      showToast('Error uploading photo', 'error');
+    } finally {
+      setUploadingSwatchIdx(null);
+    }
+  };
+
+  const handleMoveSwatch = (idx: number, direction: 'up' | 'down') => {
+    setColors((prev) => {
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[idx];
+      copy[idx] = copy[targetIdx];
+      copy[targetIdx] = temp;
+      return copy;
+    });
+  };
+
+  const handleToggleSwatchStock = (idx: number) => {
+    setColors((prev) =>
+      prev.map((c, i) => (i === idx ? { ...c, inStock: c.inStock === false ? true : false } : c))
+    );
+    showToast(`Toggled availability for "${colors[idx]?.name}"`);
+  };
+
+  const handleStartEditSwatch = (idx: number) => {
+    setEditingSwatchIdx(idx);
+    setEditingSwatchData({ ...colors[idx] });
+  };
+
+  const handleSaveEditSwatch = () => {
+    if (editingSwatchIdx === null || !editingSwatchData) return;
+    if (!editingSwatchData.name.trim()) {
+      showToast('Swatch name cannot be empty', 'error');
+      return;
+    }
+    setColors((prev) =>
+      prev.map((c, i) => (i === editingSwatchIdx ? editingSwatchData : c))
+    );
+    setEditingSwatchIdx(null);
+    setEditingSwatchData(null);
+    showToast('Color swatch updated');
+  };
+
+  const handleCancelEditSwatch = () => {
+    setEditingSwatchIdx(null);
+    setEditingSwatchData(null);
+  };
+
   const handleAddColor = () => {
     if (!newColorName.trim()) {
       showToast('Please enter a color name (e.g. "Rani Rose")', 'error');
@@ -623,6 +722,8 @@ function ProductEditorContent() {
       name: newColorName.trim(),
       hex: newColorHex || '#6E5043',
       ...(newColorImageUrl.trim() ? { imageUrl: newColorImageUrl.trim() } : {}),
+      inStock: true,
+      stockQuantity: 10,
     };
     setColors((prev) => [...prev, newSwatch]);
     setNewColorName('');
@@ -632,6 +733,10 @@ function ProductEditorContent() {
 
   const handleRemoveColor = (index: number) => {
     setColors((prev) => prev.filter((_, idx) => idx !== index));
+    if (editingSwatchIdx === index) {
+      setEditingSwatchIdx(null);
+      setEditingSwatchData(null);
+    }
     showToast('Removed color swatch');
   };
 
@@ -738,6 +843,11 @@ function ProductEditorContent() {
         });
         const data = await safeParseJsonResponse(res);
         if (data.success) {
+          try {
+            localStorage.removeItem('aabha_products_cache_v2');
+            sessionStorage.removeItem('aabha_products_cache');
+            window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+          } catch {}
           showToast(`Updated "${name}" & all ${gallery.length} photos successfully!`, 'success');
           setTimeout(() => {
             router.push('/admin/products');
@@ -759,6 +869,11 @@ function ProductEditorContent() {
         });
         const data = await safeParseJsonResponse(res);
         if (data.success) {
+          try {
+            localStorage.removeItem('aabha_products_cache_v2');
+            sessionStorage.removeItem('aabha_products_cache');
+            window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+          } catch {}
           showToast(`Created "${name}" with all ${gallery.length} photos!`, 'success');
           setTimeout(() => {
             router.push('/admin/products');
@@ -1711,36 +1826,282 @@ function ProductEditorContent() {
 
               {/* Existing Swatches */}
               {colors.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {colors.map((c, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-[#FAF8F5] border border-[#D5CCC0] p-3 flex items-center justify-between gap-3 shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className="w-7 h-7 rounded-full shrink-0 border border-black/15 shadow-inner"
-                          style={{ backgroundColor: c.hex }}
-                          title={c.name}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-[#1E1B18] truncate">{c.name}</p>
-                          <p className="text-[10px] font-mono text-[#7C736A]">{c.hex}</p>
-                          {c.imageUrl && (
-                            <p className="text-[9px] text-[#2E7D32] truncate">Photo linked</p>
-                          )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {colors.map((c, idx) => {
+                    const isEditing = editingSwatchIdx === idx;
+                    const isUploading = uploadingSwatchIdx === idx;
+                    const isInStock = c.inStock !== false;
+
+                    if (isEditing && editingSwatchData) {
+                      return (
+                        <div
+                          key={idx}
+                          className="bg-white border-2 border-[#1E1B18] p-3.5 space-y-3 rounded-xs shadow-md"
+                        >
+                          <div className="flex items-center justify-between border-b border-[#ECE6DD] pb-2">
+                            <span className="text-xs font-semibold text-[#1E1B18] uppercase tracking-wider">
+                              Editing Swatch #{idx + 1}
+                            </span>
+                            <span
+                              className="w-5 h-5 rounded-full border border-black/20"
+                              style={{ backgroundColor: editingSwatchData.hex }}
+                            />
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
+                                Color Name
+                              </label>
+                              <input
+                                type="text"
+                                value={editingSwatchData.name}
+                                onChange={(e) =>
+                                  setEditingSwatchData({ ...editingSwatchData, name: e.target.value })
+                                }
+                                className="w-full bg-[#FAF8F5] border border-[#D5CCC0] px-2.5 py-1.5 text-xs text-[#1E1B18]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
+                                Hex Code
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={editingSwatchData.hex}
+                                  onChange={(e) =>
+                                    setEditingSwatchData({ ...editingSwatchData, hex: e.target.value })
+                                  }
+                                  className="w-8 h-8 rounded border border-[#D5CCC0] p-0.5 cursor-pointer bg-transparent"
+                                />
+                                <input
+                                  type="text"
+                                  value={editingSwatchData.hex}
+                                  onChange={(e) =>
+                                    setEditingSwatchData({ ...editingSwatchData, hex: e.target.value })
+                                  }
+                                  className="flex-1 bg-[#FAF8F5] border border-[#D5CCC0] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18]"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
+                                Swatch Photo (Upload or URL)
+                              </label>
+                              <div className="flex items-center gap-2">
+                                {editingSwatchData.imageUrl ? (
+                                  <div className="relative w-10 h-12 bg-[#ECE6DD] border border-[#D5CCC0] shrink-0 overflow-hidden rounded-xs">
+                                    <img
+                                      src={editingSwatchData.imageUrl}
+                                      alt="Preview"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="w-10 h-12 bg-[#F3EFEA] border border-dashed border-[#D5CCC0] flex items-center justify-center text-[9px] text-[#7C736A] shrink-0">
+                                    No Pic
+                                  </div>
+                                )}
+                                <div className="flex-1 space-y-1">
+                                  <input
+                                    type="text"
+                                    value={editingSwatchData.imageUrl || ''}
+                                    onChange={(e) =>
+                                      setEditingSwatchData({ ...editingSwatchData, imageUrl: e.target.value })
+                                    }
+                                    placeholder="https://... or upload photo below"
+                                    className="w-full bg-[#FAF8F5] border border-[#D5CCC0] px-2 py-1 text-[11px] font-mono text-[#1E1B18]"
+                                  />
+                                  <label className="inline-flex items-center gap-1 px-2 py-1 bg-[#231F1D] text-white text-[10px] font-medium cursor-pointer hover:bg-black rounded-xs">
+                                    <Upload className="w-3 h-3 text-[#D4AF37]" />
+                                    <span>{isUploading ? 'Uploading...' : 'Upload Image File'}</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      disabled={isUploading}
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const check = validateImageFile(file);
+                                        if (!check.valid) {
+                                          showToast(check.error || 'Invalid file', 'error');
+                                          return;
+                                        }
+                                        setUploadingSwatchIdx(idx);
+                                        try {
+                                          const data = await uploadAdminImage(file, getUploadHeaders());
+                                          if (data.success && data.imageUrl) {
+                                            setEditingSwatchData((prev) =>
+                                              prev ? { ...prev, imageUrl: data.imageUrl } : null
+                                            );
+                                            showToast('Photo uploaded for swatch!');
+                                          }
+                                        } finally {
+                                          setUploadingSwatchIdx(null);
+                                        }
+                                      }}
+                                      className="sr-only"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#ECE6DD]">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditSwatch}
+                              className="px-3 py-1 border border-[#D5CCC0] text-xs text-[#7C736A] hover:bg-[#F3EFEA] cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveEditSwatch}
+                              className="px-4 py-1 bg-[#231F1D] text-white text-xs font-medium uppercase tracking-wider hover:bg-black cursor-pointer shadow-xs"
+                            >
+                              Save Swatch
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-[#FAF8F5] border border-[#D5CCC0] p-3 rounded-xs space-y-2.5 shadow-2xs hover:border-[#A89F91] transition-colors"
+                      >
+                        {/* Swatch Header: Circle, Name, Hex & Stock Badge */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className="w-7 h-7 rounded-full shrink-0 border border-black/15 shadow-xs"
+                              style={{ backgroundColor: c.hex }}
+                              title={c.name}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-[#1E1B18] truncate">{c.name}</p>
+                              <p className="text-[10px] font-mono text-[#7C736A]">{c.hex}</p>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`px-1.5 py-0.5 text-[9px] font-mono uppercase font-semibold rounded-xs border ${
+                              isInStock
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {isInStock ? 'In Stock' : 'Sold Out'}
+                          </span>
+                        </div>
+
+                        {/* Linked Photo Thumbnail & Upload/Change Action */}
+                        <div className="p-2 bg-white border border-[#ECE6DD] rounded-xs flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {c.imageUrl ? (
+                              <div className="relative w-9 h-11 bg-[#ECE6DD] border border-[#D5CCC0] shrink-0 overflow-hidden rounded-xs">
+                                <img
+                                  src={c.imageUrl}
+                                  alt={c.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-9 h-11 bg-[#F3EFEA] border border-dashed border-[#D5CCC0] flex items-center justify-center text-[9px] text-[#A69C91] shrink-0 text-center leading-tight p-0.5">
+                                No Photo
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[11px] font-medium text-[#1E1B18] block truncate">
+                                {c.imageUrl ? 'Photo Attached' : 'No Photo Linked'}
+                              </span>
+                              <span className="text-[9px] text-[#7C736A] block truncate max-w-[130px]">
+                                {c.imageUrl || 'Patrons see primary photo'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick File Upload Trigger */}
+                          <label className="inline-flex items-center gap-1 px-2 py-1 bg-[#FAF8F5] hover:bg-[#231F1D] hover:text-white border border-[#D5CCC0] text-[10px] font-medium transition-colors cursor-pointer shrink-0">
+                            <Upload className="w-2.5 h-2.5 text-[#D4AF37]" />
+                            <span>{isUploading ? 'Uploading...' : c.imageUrl ? 'Replace' : 'Upload'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploading}
+                              onChange={(e) =>
+                                handleUploadExistingSwatchFile(idx, e.target.files?.[0])
+                              }
+                              className="sr-only"
+                            />
+                          </label>
+                        </div>
+
+                        {/* Action Buttons: Reorder, Stock Toggle, Edit, Delete */}
+                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-[#ECE6DD] text-xs">
+                          {/* Reorder Buttons */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveSwatch(idx, 'up')}
+                              className="p-1 hover:bg-[#ECE6DD] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-[#4A433D]"
+                              title="Move Swatch Earlier"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === colors.length - 1}
+                              onClick={() => handleMoveSwatch(idx, 'down')}
+                              className="p-1 hover:bg-[#ECE6DD] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-[#4A433D]"
+                              title="Move Swatch Later"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Actions: Stock Toggle, Edit, Delete */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSwatchStock(idx)}
+                              className={`px-2 py-0.5 text-[10px] font-medium border rounded-xs transition-colors cursor-pointer ${
+                                isInStock
+                                  ? 'border-[#C8E6C9] text-[#2E7D32] hover:bg-[#E8F5E9]'
+                                  : 'border-[#FFCDD2] text-[#C62828] hover:bg-[#FFEBEE]'
+                              }`}
+                              title="Toggle Swatch Stock Availability"
+                            >
+                              {isInStock ? 'In Stock' : 'Sold Out'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditSwatch(idx)}
+                              className="p-1 hover:bg-[#ECE6DD] text-[#4A433D] cursor-pointer"
+                              title={`Edit ${c.name} details`}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveColor(idx)}
+                              className="p-1 hover:bg-[#FFEBEE] text-[#C62828] cursor-pointer"
+                              title={`Remove ${c.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveColor(idx)}
-                        className="text-[#C62828] hover:bg-[#FFEBEE] p-1 transition-colors cursor-pointer"
-                        title={`Remove ${c.name}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-[11px] text-[#7C736A] italic">
@@ -1749,11 +2110,17 @@ function ProductEditorContent() {
               )}
 
               {/* Add New Color Swatch Form */}
-              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-3.5 space-y-3">
-                <span className="block text-[11px] font-semibold text-[#1E1B18] uppercase tracking-wider">
-                  + Add Color Swatch
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-3.5 rounded-xs">
+                <div className="flex items-center justify-between">
+                  <span className="block text-xs font-semibold text-[#1E1B18] uppercase tracking-wider">
+                    + Add New Color Swatch
+                  </span>
+                  <span className="text-[10px] text-[#7C736A]">
+                    Upload swatch photo or enter URL
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
                       Color Name:
@@ -1763,7 +2130,7 @@ function ProductEditorContent() {
                       value={newColorName}
                       onChange={(e) => setNewColorName(e.target.value)}
                       placeholder="e.g. Rani Rose, Royal Emerald..."
-                      className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                      className="w-full bg-white border border-[#D5CCC0] px-2.5 py-1.5 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
                     />
                   </div>
 
@@ -1776,33 +2143,45 @@ function ProductEditorContent() {
                         type="color"
                         value={newColorHex}
                         onChange={(e) => setNewColorHex(e.target.value)}
-                        className="w-8 h-8 rounded border border-[#E0D8CE] p-0.5 cursor-pointer bg-transparent"
+                        className="w-8 h-8 rounded border border-[#D5CCC0] p-0.5 cursor-pointer bg-transparent"
                       />
                       <input
                         type="text"
                         value={newColorHex}
                         onChange={(e) => setNewColorHex(e.target.value)}
                         placeholder="#6E5043"
-                        className="flex-1 bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                        className="flex-1 bg-white border border-[#D5CCC0] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
                       />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-medium">
-                      Swatch Photo URL (Optional):
+                      Swatch Photo:
                     </label>
-                    <input
-                      type="text"
-                      value={newColorImageUrl}
-                      onChange={(e) => setNewColorImageUrl(e.target.value)}
-                      placeholder="https://... or /images/..."
-                      className="w-full bg-[#FAF8F5] border border-[#E0D8CE] px-2.5 py-1.5 text-xs font-mono text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
-                    />
+                    <div className="flex items-center gap-2">
+                      {newColorImageUrl ? (
+                        <div className="relative w-8 h-8 rounded shrink-0 bg-[#ECE6DD] border border-[#D5CCC0] overflow-hidden">
+                          <img src={newColorImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      ) : null}
+                      <label className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#231F1D] hover:text-white border border-[#D5CCC0] text-xs font-medium text-[#1E1B18] transition-colors cursor-pointer">
+                        <Upload className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>{uploadingNewColor ? 'Uploading...' : 'Upload Image File'}</span>
+                        <input
+                          ref={newColorFileRef}
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingNewColor}
+                          onChange={handleUploadNewColorFile}
+                          className="sr-only"
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#ECE6DD]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#ECE6DD]">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] text-[#7C736A]">Quick Presets:</span>
                     {[
@@ -1811,6 +2190,8 @@ function ProductEditorContent() {
                       { name: 'Ivory Gold', hex: '#E6D7B9' },
                       { name: 'Ochre Rust', hex: '#B86B35' },
                       { name: 'Midnight Indigo', hex: '#1C2A39' },
+                      { name: 'Rosewood', hex: '#8C4343' },
+                      { name: 'Warm Sand', hex: '#D6C5B3' },
                     ].map((preset) => (
                       <button
                         key={preset.name}
@@ -1819,7 +2200,7 @@ function ProductEditorContent() {
                           setNewColorName(preset.name);
                           setNewColorHex(preset.hex);
                         }}
-                        className="px-2 py-0.5 bg-[#FAF8F5] border border-[#D5CCC0] text-[10px] text-[#5C544D] hover:border-[#1E1B18] transition-colors cursor-pointer flex items-center gap-1"
+                        className="px-2 py-0.5 bg-white border border-[#D5CCC0] text-[10px] text-[#5C544D] hover:border-[#1E1B18] transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: preset.hex }} />
                         {preset.name}
@@ -1830,9 +2211,9 @@ function ProductEditorContent() {
                   <button
                     type="button"
                     onClick={handleAddColor}
-                    className="inline-flex items-center gap-1 px-4 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer shadow-xs"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
                     <span>Add Swatch</span>
                   </button>
                 </div>

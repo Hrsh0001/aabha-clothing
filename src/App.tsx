@@ -201,34 +201,53 @@ export default function App() {
       preloadImg.src = bannerToPreload;
     }
 
-    // 3. Background revalidation from database API (non-blocking)
-    fetch('/api/products')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
-          try {
-            localStorage.setItem('aabha_products_cache_v2', JSON.stringify(data.products));
-            sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products));
-          } catch {}
-        }
-      })
-      .catch((err) => {
-        console.warn('Live products sync notice:', err);
-      });
+    // 3. Background revalidation from database API (non-blocking, always fresh)
+    const refreshLiveCatalog = () => {
+      fetch('/api/products?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products);
+            try {
+              localStorage.setItem('aabha_products_cache_v2', JSON.stringify(data.products));
+              sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products));
+            } catch {}
+          }
+        })
+        .catch((err) => {
+          console.warn('Live products sync notice:', err);
+        });
 
-    fetch('/api/settings')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.settings) {
-          setSiteSettings(data.settings);
-          try {
-            localStorage.setItem('aabha_settings_cache_v2', JSON.stringify(data.settings));
-            sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings));
-          } catch {}
-        }
-      })
-      .catch((err) => console.warn('Live settings sync notice:', err));
+      fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.settings) {
+            setSiteSettings(data.settings);
+            try {
+              localStorage.setItem('aabha_settings_cache_v2', JSON.stringify(data.settings));
+              sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings));
+            } catch {}
+          }
+        })
+        .catch((err) => console.warn('Live settings sync notice:', err));
+    };
+
+    refreshLiveCatalog();
+
+    // Listen for live updates dispatched by admin panel (products or settings saved)
+    const handleLiveUpdate = () => {
+      refreshLiveCatalog();
+    };
+
+    window.addEventListener('aabha:products_updated', handleLiveUpdate);
+    window.addEventListener('aabha:settings_updated', handleLiveUpdate);
+    window.addEventListener('storage', handleLiveUpdate);
+
+    return () => {
+      window.removeEventListener('aabha:products_updated', handleLiveUpdate);
+      window.removeEventListener('aabha:settings_updated', handleLiveUpdate);
+      window.removeEventListener('storage', handleLiveUpdate);
+    };
   }, []);
 
   const showToast = (msg: string) => {

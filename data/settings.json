@@ -75,6 +75,15 @@
   "aboutHeroLead": "AABHA was founded with a singular conviction: Indian textiles do not belong locked inside occasion trunks. Handwoven Chanderi silk, breathable linen, kora cotton, and fine khadi deserve to be inhabited every single day—cut with architectural clarity, deep pockets, and unhurried grace.",
   "aboutFoundationalTitle": "Handcrafted Foundational Silhouettes.",
   "aboutFoundationalBody": "Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.",
+  "homeSectionsOrder": [
+    "hero",
+    "categories",
+    "new_arrivals",
+    "brand_story",
+    "curated",
+    "trust_badges",
+    "instagram"
+  ],
   "showAnnouncementBar": true,
   "showHeroCarousel": true,
   "showCategorySection": true,

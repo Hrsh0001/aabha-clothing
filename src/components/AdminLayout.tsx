@@ -164,9 +164,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       badgeColor: 'bg-[#6E5043] text-white',
     },
     {
-      label: 'Page Studio & Themes',
-      href: '/admin/branding',
-      icon: Sliders,
+      label: 'Theme & Brand Colors',
+      href: '/admin/branding?tab=themes',
+      icon: Palette,
     },
     {
       label: 'Inquiries',

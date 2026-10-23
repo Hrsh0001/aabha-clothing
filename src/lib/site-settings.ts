@@ -137,7 +137,8 @@ export interface SiteSettings {
   aboutFoundationalTitle?: string;
   aboutFoundationalBody?: string;
 
-  // Section Visibility / Add & Remove Flags
+  // Section Visibility / Add & Remove Flags & Sequence Order
+  homeSectionsOrder?: string[];
   showAnnouncementBar?: boolean;
   showHeroCarousel?: boolean;
   showCategorySection?: boolean;
@@ -344,6 +345,15 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   aboutFoundationalBody: 'Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.',
 
   // Section Visibility Defaults (all true by default)
+  homeSectionsOrder: [
+    'hero',
+    'categories',
+    'new_arrivals',
+    'brand_story',
+    'curated',
+    'trust_badges',
+    'instagram',
+  ],
   showAnnouncementBar: true,
   showHeroCarousel: true,
   showCategorySection: true,

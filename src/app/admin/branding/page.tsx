@@ -383,6 +383,11 @@ export default function AdminBrandingPage() {
       if (data.success) {
         setSettings(payload);
         setFieldUploadErrors({});
+        try {
+          localStorage.removeItem('aabha_settings_cache_v2');
+          sessionStorage.removeItem('aabha_settings_cache');
+          window.dispatchEvent(new CustomEvent('aabha:settings_updated'));
+        } catch {}
         showToast('All storefront sections & branding saved successfully!');
       } else {
         const msg = data.error || 'Failed to save settings';

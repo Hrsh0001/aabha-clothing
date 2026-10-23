@@ -789,6 +789,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -819,6 +824,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -850,6 +860,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -880,6 +895,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );

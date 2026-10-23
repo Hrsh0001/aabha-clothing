@@ -28,7 +28,13 @@ export async function GET() {
           saveLocalSettings(merged);
           return NextResponse.json(
             { success: true, settings: merged },
-            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+            {
+              headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+            }
           );
         }
       } catch (dbErr) {
@@ -41,7 +47,13 @@ export async function GET() {
     const settings = readLocalSettings();
     return NextResponse.json(
       { success: true, settings },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   } catch {
     return NextResponse.json({ success: true, settings: DEFAULT_SETTINGS });
