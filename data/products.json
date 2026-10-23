@@ -1,1 +1,96 @@
-[]
+[
+  {
+    "id": "prod_1792656986359_zw2f",
+    "sku": "AB-ANA-148",
+    "name": "Dusty Pink Kurta Pant Set with Dupatta",
+    "subtitle": "Pure Handloom Chanderi Silk 3-Piece Dresses silhouette",
+    "category": "3-Piece Dresses",
+    "price": 1399,
+    "originalPrice": 1799,
+    "colorName": "Pure Handloom",
+    "colorHex": "#6E5043",
+    "colors": [
+      {
+        "name": "Dusty Pink",
+        "hex": "#D3A1B8",
+        "imageUrl": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
+        "inStock": true,
+        "stockQuantity": 12
+      }
+    ],
+    "sizeStock": {
+      "M": {
+        "inStock": true,
+        "quantity": 15
+      },
+      "L": {
+        "inStock": true,
+        "quantity": 10
+      },
+      "XL": {
+        "inStock": true,
+        "quantity": 10
+      },
+      "XXL": {
+        "inStock": true,
+        "quantity": 10
+      }
+    },
+    "fabric": "Pure Handloom Chanderi Silk",
+    "isNewArrival": true,
+    "isCurated": false,
+    "inStock": true,
+    "sizes": [
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "primaryImage": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
+    "secondaryImage": "/api/images/garment_Lilac_dupatta_with_gold_bands-4_1792656780913.webp",
+    "gallery": [
+      {
+        "url": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
+        "label": "Full Studio Silhouette",
+        "focalClass": "object-center"
+      },
+      {
+        "url": "/api/images/garment_Lilac_dupatta_with_gold_bands-4_1792656780913.webp",
+        "label": "Editorial Daylight Drape",
+        "focalClass": "object-center"
+      },
+      {
+        "url": "/api/images/garment_Lilac_Dupatta_with_Repeating_Gol_1792656807672.webp",
+        "label": "Studio Angle 4",
+        "focalClass": "object-center"
+      },
+      {
+        "url": "/api/images/garment_b407437e-9b89-42e8-9d6b-c83d48de_1792656973158.webp",
+        "label": "Studio Angle 4",
+        "focalClass": "object-center"
+      },
+      {
+        "url": "/api/images/garment_Lilac_dupatta_with_geometric_gol_1792656978394.webp",
+        "label": "Studio Angle 5",
+        "focalClass": "object-center"
+      }
+    ],
+    "description": "Dusty pink kurta set with matching pants and dupatta. The straight kurta has a round neckline with silver-tone floral detailing, front buttons and three-quarter sleeves. Small motifs are scattered across the kurta. The matching dupatta features gold-tone lines across the fabric and a scalloped edge.\n\nThe set includes one kurta, one pair of pants and one dupatta.\n\ndusty pink kurta set, pink kurta pant set, kurta set with dupatta, women’s pink suit, three piece suit, festive kurta set",
+    "highlights": [
+      "Handcrafted detailing",
+      "Breathable luxury weave",
+      "Side seam pockets"
+    ],
+    "fabricAndCare": [
+      "Dry clean only",
+      "Store in cotton muslin bag"
+    ],
+    "sizeAndFit": [
+      "Relaxed tailored silhouette",
+      "Model is 5'8\" (173 cm) and wears size S"
+    ],
+    "deliveryInfo": "Complimentary insured express shipping across India. Dispatched within 24–48 business hours.",
+    "returnsInfo": "Complimentary 14-day easy returns and doorstep size exchanges.",
+    "reviews": []
+  }
+]

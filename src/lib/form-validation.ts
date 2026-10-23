@@ -4,15 +4,17 @@ export const MAX_GALLERY_PHOTOS = 10;
 export const MAX_PAYLOAD_SIZE_BYTES = Math.floor(3.5 * 1024 * 1024); // 3.5 MB safe serverless payload cap
 
 export const IMAGE_UPLOAD_LIMIT_BADGE =
-  'Max 5 MB per photo · JPG, PNG, WebP · Max 10 photos · Auto-compressed to <150 KB';
+  'Max 5 MB per photo · JPEG, PNG, WebP, AVIF, SVG, GIF · 100% Original High Fidelity';
 
 export const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
+  'image/pjpeg',
   'image/png',
   'image/webp',
   'image/gif',
   'image/svg+xml',
+  'image/avif',
 ]);
 
 export const ALLOWED_IMAGE_EXTENSIONS = new Set([
@@ -22,6 +24,7 @@ export const ALLOWED_IMAGE_EXTENSIONS = new Set([
   '.webp',
   '.gif',
   '.svg',
+  '.avif',
 ]);
 
 export interface FileLike {
@@ -81,13 +84,13 @@ export function validateImageFile(
     if (!allowSvg && mime === 'image/svg+xml') {
       return {
         valid: false,
-        error: `"${fileName}": SVG files are not permitted here. Allowed formats: JPG, PNG, WebP, GIF.`,
+        error: `"${fileName}": SVG files are not permitted here. Allowed formats: JPG, PNG, WebP, AVIF, GIF.`,
       };
     }
     if (!ALLOWED_IMAGE_MIME_TYPES.has(mime)) {
       return {
         valid: false,
-        error: `"${fileName}" has unsupported file type (${mime}). Allowed formats: JPG, PNG, WebP, GIF${allowSvg ? ', SVG' : ''}.`,
+        error: `"${fileName}" has unsupported file type (${mime}). Allowed formats: JPG, PNG, WebP, AVIF, GIF${allowSvg ? ', SVG' : ''}.`,
       };
     }
   }
@@ -98,13 +101,13 @@ export function validateImageFile(
     if (!allowSvg && ext === '.svg') {
       return {
         valid: false,
-        error: `"${fileName}": SVG extension is not permitted here. Allowed formats: JPG, PNG, WebP, GIF.`,
+        error: `"${fileName}": SVG extension is not permitted here. Allowed formats: JPG, PNG, WebP, AVIF, GIF.`,
       };
     }
     if (!ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
       return {
         valid: false,
-        error: `"${fileName}" has an unsupported file extension (${ext}). Allowed: .jpg, .jpeg, .png, .webp, .gif${allowSvg ? ', .svg' : ''}.`,
+        error: `"${fileName}" has an unsupported file extension (${ext}). Allowed: .jpg, .jpeg, .png, .webp, .avif, .gif${allowSvg ? ', .svg' : ''}.`,
       };
     }
   } else if (!mime) {

@@ -262,6 +262,7 @@ describe('API 3 & 4: /api/upload & /api/images/[id] (5 MB Limit, Format Check & 
     expect(res.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.imageUrl).toBeDefined();
+    expect(data.url).toBe(data.imageUrl);
     uploadedImageUrl = data.imageUrl;
 
     if (uploadedImageUrl.startsWith('/api/images/')) {
@@ -299,6 +300,40 @@ describe('API 3 & 4: /api/upload & /api/images/[id] (5 MB Limit, Format Check & 
     const missingData = await missingRes.json();
     expect(missingRes.status).toBe(404);
     expect(missingData.success).toBe(false);
+  });
+
+  test('POST /api/upload accepts AVIF and JPEG studio photos preserving full fidelity', async () => {
+    // 1. Test AVIF upload
+    const avifBuffer = Buffer.from('mock-avif-studio-photo-bytes-high-res');
+    const avifFormData = new FormData();
+    avifFormData.append('file', new File([avifBuffer], 'lookbook.avif', { type: 'image/avif' }));
+    const avifReq = new Request('http://localhost:3000/api/upload', {
+      method: 'POST',
+      headers: adminAuthHeaders,
+      body: avifFormData,
+    });
+    const avifRes = await UploadAPI.POST(avifReq);
+    const avifData = await avifRes.json();
+    expect(avifRes.status).toBe(200);
+    expect(avifData.success).toBe(true);
+    expect(avifData.imageUrl).toBeDefined();
+    expect(avifData.url).toBe(avifData.imageUrl);
+
+    // 2. Test JPEG upload
+    const jpegBuffer = Buffer.from('mock-jpeg-studio-photo-bytes-high-res');
+    const jpegFormData = new FormData();
+    jpegFormData.append('file', new File([jpegBuffer], 'zari_detail.jpg', { type: 'image/jpeg' }));
+    const jpegReq = new Request('http://localhost:3000/api/upload', {
+      method: 'POST',
+      headers: adminAuthHeaders,
+      body: jpegFormData,
+    });
+    const jpegRes = await UploadAPI.POST(jpegReq);
+    const jpegData = await jpegRes.json();
+    expect(jpegRes.status).toBe(200);
+    expect(jpegData.success).toBe(true);
+    expect(jpegData.imageUrl).toBeDefined();
+    expect(jpegData.url).toBe(jpegData.imageUrl);
   });
 });
 

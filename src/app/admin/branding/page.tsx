@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Upload,
   CheckCircle,
@@ -25,10 +26,34 @@ import {
   BookOpen,
   Award,
   Sliders,
+  Compass,
+  Smartphone,
+  Tablet,
+  Monitor,
+  ArrowUp,
+  ArrowDown,
+  RotateCcw,
+  Palette,
+  FileText,
+  Edit2,
+  Globe,
+  Check,
+  Tag,
+  X,
+  Copy,
 } from 'lucide-react';
 import { AdminLayout } from '@/src/components/AdminLayout';
 import { useAuth } from '@/src/context/AuthContext';
 import type { SiteSettings } from '../../api/settings/route';
+import {
+  NavLinkItem,
+  FooterLinkItem,
+  FooterColumn,
+  CustomPageItem,
+  DEFAULT_NAV_LINKS,
+  DEFAULT_FOOTER_COLUMNS,
+  DEFAULT_CUSTOM_PAGES,
+} from '@/src/lib/site-settings';
 import { CATEGORIES, CollectionFilter } from '@/src/data/products';
 import {
   uploadAdminImage,
@@ -37,23 +62,107 @@ import {
 } from '@/src/lib/image-upload';
 import {
   MAX_IMAGE_FILE_SIZE_MB,
+  IMAGE_UPLOAD_LIMIT_BADGE,
   validateImageFile,
   validateBrandingForm,
   validateJsonPayloadSize,
   type BrandingFormErrors,
 } from '@/src/lib/form-validation';
 
-type BrandingTab = 'hero' | 'categories' | 'arrivals_trust' | 'story_about' | 'contact_social' | 'layout_manager';
+const DESTINATION_PRESETS = [
+  { label: 'Home Page (/)', value: '/' },
+  { label: 'New Arrivals Edit (/#new-arrivals)', value: '/#new-arrivals' },
+  { label: 'All Collection Catalog (/shop)', value: '/shop' },
+  { label: 'Anarkali Suits (/shop?category=Anarkali)', value: '/shop?category=Anarkali' },
+  { label: '3-Piece Ensembles (/shop?category=3-Piece Dresses)', value: '/shop?category=3-Piece Dresses' },
+  { label: 'Co-ord Twin Sets (/shop?category=Co-ord Sets)', value: '/shop?category=Co-ord Sets' },
+  { label: 'Chikankari Handloom (/shop?category=Chikankari Suit)', value: '/shop?category=Chikankari Suit' },
+  { label: 'About Atelier (/about)', value: '/about' },
+  { label: 'Contact Concierge (/contact)', value: '/contact' },
+  { label: 'Track Orders & Bills (/my-orders)', value: '/my-orders' },
+  { label: 'WhatsApp Concierge (Direct Chat)', value: 'whatsapp' },
+  { label: 'Customer Support Email', value: 'email' },
+  { label: 'Shipping Policy (/policy?topic=shipping)', value: '/policy?topic=shipping' },
+  { label: 'Returns & Exchange Policy (/policy?topic=returns)', value: '/policy?topic=returns' },
+  { label: 'FAQ (/policy?topic=faq)', value: '/policy?topic=faq' },
+  { label: 'Privacy Policy (/policy?topic=privacy)', value: '/policy?topic=privacy' },
+  { label: 'Terms & Conditions (/policy?topic=terms)', value: '/policy?topic=terms' },
+  { label: 'Custom Destination URL...', value: '__CUSTOM__' },
+];
+
+type BrandingTab =
+  | 'pages_manager'
+  | 'nav_footer'
+  | 'hero'
+  | 'categories'
+  | 'arrivals_trust'
+  | 'story_about'
+  | 'contact_social'
+  | 'themes'
+  | 'layout_manager'
+  | 'preview';
 
 export default function AdminBrandingPage() {
   const { adminToken } = useAuth();
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<BrandingTab>('hero');
+  const [activeTab, setActiveTab] = useState<BrandingTab>('nav_footer');
+
+  // Synchronize active tab with URL query parameter ?tab=
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (
+        tabParam &&
+        [
+          'pages_manager',
+          'nav_footer',
+          'hero',
+          'categories',
+          'arrivals_trust',
+          'story_about',
+          'contact_social',
+          'themes',
+          'layout_manager',
+          'preview',
+        ].includes(tabParam)
+      ) {
+        setActiveTab(tabParam as BrandingTab);
+      }
+    }
+  }, []);
+
+  const switchTab = (tab: BrandingTab) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
   const [toast, setToast] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
+  const [previewPage, setPreviewPage] = useState<string>('/');
+  const [iframeKey, setIframeKey] = useState<number>(0);
+
+  // Dynamic Pages Manager State
+  const [pageModalOpen, setPageModalOpen] = useState(false);
+  const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [pageForm, setPageForm] = useState<CustomPageItem>({
+    id: '',
+    slug: '',
+    title: '',
+    subtitle: '',
+    heroImage: '',
+    content: '',
+    published: true,
+    metaTitle: '',
+    metaDescription: '',
+  });
 
   // Simultaneous validation & inline upload error state
   const [errors, setErrors] = useState<BrandingFormErrors>({});
@@ -100,6 +209,24 @@ export default function AdminBrandingPage() {
 
   useEffect(() => {
     fetchSettings();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as BrandingTab;
+      const validTabs: BrandingTab[] = [
+        'nav_footer',
+        'hero',
+        'categories',
+        'arrivals_trust',
+        'story_about',
+        'contact_social',
+        'themes',
+        'layout_manager',
+        'preview',
+      ];
+      if (tabParam && validTabs.includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
   }, []);
 
   const triggerFileUpload = (fieldKey: string) => {
@@ -143,6 +270,11 @@ export default function AdminBrandingPage() {
     try {
       const data = await uploadAdminImage(file, getUploadHeaders());
       if (data.success && data.imageUrl) {
+        if (fieldKey === 'custom_page_hero') {
+          setPageForm((prev) => ({ ...prev, heroImage: data.imageUrl }));
+          showToast('Page hero photo uploaded!');
+          return;
+        }
         let nextSettings: SiteSettings;
         if (fieldKey.startsWith('igPhoto_')) {
           const index = parseInt(fieldKey.split('_')[1], 10);
@@ -302,6 +434,329 @@ export default function AdminBrandingPage() {
     ...Object.values(fieldUploadErrors).filter(Boolean),
   ];
 
+  // Dynamic Destination Presets (System pages + Admin custom pages)
+  const dynamicDestinationPresets = React.useMemo(() => {
+    const list = [...DESTINATION_PRESETS];
+    if (settings?.customPages && settings.customPages.length > 0) {
+      const customItems = settings.customPages.map((cp) => ({
+        label: `📄 ${cp.title} (/pages/${cp.slug})`,
+        value: `/pages/${cp.slug}`,
+      }));
+      list.splice(list.length - 1, 0, ...customItems);
+    }
+    return list;
+  }, [settings?.customPages]);
+
+  // Custom Dynamic Pages Manager Helpers
+  const currentCustomPages: CustomPageItem[] = settings?.customPages || DEFAULT_CUSTOM_PAGES;
+
+  const handleOpenCreatePage = () => {
+    setEditingPageId(null);
+    setPageForm({
+      id: `page_${Date.now()}`,
+      slug: '',
+      title: '',
+      subtitle: '',
+      heroImage: '/images/brand_story_editorial_1791119191742.jpg',
+      content: '',
+      published: true,
+      metaTitle: '',
+      metaDescription: '',
+    });
+    setPageModalOpen(true);
+  };
+
+  const handleOpenEditPage = (page: CustomPageItem) => {
+    setEditingPageId(page.id);
+    setPageForm({ ...page });
+    setPageModalOpen(true);
+  };
+
+  const handleDuplicateCustomPage = (page: CustomPageItem) => {
+    setEditingPageId(null);
+    setPageForm({
+      ...page,
+      id: `page_${Date.now()}`,
+      slug: `${page.slug}-copy`,
+      title: `${page.title} (Copy)`,
+      published: false,
+    });
+    setPageModalOpen(true);
+    showToast(`Cloned "${page.title}". Review details and save to create.`);
+  };
+
+  const handleSaveCustomPage = () => {
+    if (!pageForm.title.trim()) {
+      showToast('Page Title is required', 'error');
+      return;
+    }
+    const cleanSlug = (pageForm.slug || pageForm.title)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    if (!cleanSlug) {
+      showToast('A valid URL slug is required', 'error');
+      return;
+    }
+
+    if (!settings) return;
+    const currentList = Array.isArray(settings.customPages)
+      ? [...settings.customPages]
+      : [...DEFAULT_CUSTOM_PAGES];
+    const now = new Date().toISOString().split('T')[0];
+
+    const finalizedItem: CustomPageItem = {
+      ...pageForm,
+      id: pageForm.id || `page_${Date.now()}`,
+      slug: cleanSlug,
+      updatedAt: now,
+      createdAt: pageForm.createdAt || now,
+    };
+
+    let updatedList: CustomPageItem[];
+    if (editingPageId) {
+      updatedList = currentList.map((p) => (p.id === editingPageId ? finalizedItem : p));
+    } else {
+      updatedList = [finalizedItem, ...currentList.filter((p) => p.slug !== cleanSlug)];
+    }
+
+    setSettings({
+      ...settings,
+      customPages: updatedList,
+    });
+
+    setPageModalOpen(false);
+    showToast(editingPageId ? 'Page updated. Click "Save All Changes" to publish.' : 'New page created. Click "Save All Changes" to publish.');
+  };
+
+  const handleDeleteCustomPage = (pageId: string) => {
+    if (!settings) return;
+    const target = (settings.customPages || DEFAULT_CUSTOM_PAGES).find((p) => p.id === pageId);
+    const title = target ? `"${target.title}"` : 'this page';
+    if (!window.confirm(`Are you sure you want to delete ${title}? This action cannot be undone.`)) {
+      return;
+    }
+    const updated = (settings.customPages || DEFAULT_CUSTOM_PAGES).filter((p) => p.id !== pageId);
+    setSettings({
+      ...settings,
+      customPages: updated,
+    });
+    showToast(`Page deleted. Click "Save All Changes" to commit.`);
+  };
+
+  const handleTogglePublishCustomPage = (pageId: string) => {
+    if (!settings) return;
+    const updated = (settings.customPages || DEFAULT_CUSTOM_PAGES).map((p) =>
+      p.id === pageId ? { ...p, published: !p.published } : p
+    );
+    setSettings({
+      ...settings,
+      customPages: updated,
+    });
+    showToast('Page publish status toggled');
+  };
+
+  const handleAddCustomPageToNavbar = (page: CustomPageItem) => {
+    if (!settings) return;
+    const links = [...(settings.navLinks || DEFAULT_NAV_LINKS)];
+    const pageHref = `/pages/${page.slug}`;
+    if (links.some((l) => l.href === pageHref)) {
+      showToast(`"${page.title}" is already in the navigation menu.`);
+      return;
+    }
+    const newItem: NavLinkItem = {
+      id: `nav_${page.slug}_${Date.now()}`,
+      label: page.title,
+      href: pageHref,
+      visible: true,
+    };
+    setSettings({ ...settings, navLinks: [...links, newItem] });
+    showToast(`Added "${page.title}" to Header Navigation!`);
+  };
+
+  const handleAddCustomPageToFooter = (page: CustomPageItem) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const pageHref = `/pages/${page.slug}`;
+    const targetIdx = cols.findIndex((c) => c.id === 'col-house') >= 0 ? cols.findIndex((c) => c.id === 'col-house') : 0;
+    if (cols[targetIdx]) {
+      cols[targetIdx] = {
+        ...cols[targetIdx],
+        links: [
+          ...cols[targetIdx].links,
+          {
+            id: `fl_${page.slug}_${Date.now()}`,
+            label: page.title,
+            href: pageHref,
+            visible: true,
+          },
+        ],
+      };
+      setSettings({ ...settings, footerColumns: cols });
+      showToast(`Added "${page.title}" to Footer!`);
+    }
+  };
+
+  // Navbar Links Helpers
+  const currentNavLinks: NavLinkItem[] = settings?.navLinks || DEFAULT_NAV_LINKS;
+
+  const updateNavLink = (id: string, updates: Partial<NavLinkItem>) => {
+    if (!settings) return;
+    const links = [...(settings.navLinks || DEFAULT_NAV_LINKS)];
+    const idx = links.findIndex((l) => l.id === id);
+    if (idx !== -1) {
+      links[idx] = { ...links[idx], ...updates };
+      setSettings({ ...settings, navLinks: links });
+    }
+  };
+
+  const addNavLink = () => {
+    if (!settings) return;
+    const links = [...(settings.navLinks || DEFAULT_NAV_LINKS)];
+    const newItem: NavLinkItem = {
+      id: `nav_${Date.now()}`,
+      label: 'New Link',
+      href: '/shop',
+      visible: true,
+    };
+    setSettings({ ...settings, navLinks: [...links, newItem] });
+    showToast('New navbar link added');
+  };
+
+  const removeNavLink = (id: string) => {
+    if (!settings) return;
+    const links = (settings.navLinks || DEFAULT_NAV_LINKS).filter((l) => l.id !== id);
+    setSettings({ ...settings, navLinks: links });
+    showToast('Navbar link removed');
+  };
+
+  const moveNavLink = (index: number, direction: 'up' | 'down') => {
+    if (!settings) return;
+    const links = [...(settings.navLinks || DEFAULT_NAV_LINKS)];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= links.length) return;
+    const temp = links[index];
+    links[index] = links[target];
+    links[target] = temp;
+    setSettings({ ...settings, navLinks: links });
+  };
+
+  const resetNavLinks = () => {
+    if (!settings) return;
+    setSettings({ ...settings, navLinks: [...DEFAULT_NAV_LINKS] });
+    showToast('Storefront navbar reset to defaults');
+  };
+
+  // Footer Columns Helpers
+  const currentFooterColumns: FooterColumn[] = settings?.footerColumns || DEFAULT_FOOTER_COLUMNS;
+
+  const updateFooterColumn = (colId: string, updates: Partial<FooterColumn>) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const idx = cols.findIndex((c) => c.id === colId);
+    if (idx !== -1) {
+      cols[idx] = { ...cols[idx], ...updates };
+      setSettings({ ...settings, footerColumns: cols });
+    }
+  };
+
+  const addFooterColumn = () => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const newCol: FooterColumn = {
+      id: `col_${Date.now()}`,
+      title: 'NEW SECTION',
+      visible: true,
+      links: [
+        { id: `fl_${Date.now()}_1`, label: 'All Silhouettes', href: '/shop', visible: true },
+      ],
+    };
+    setSettings({ ...settings, footerColumns: [...cols, newCol] });
+    showToast('New footer column added');
+  };
+
+  const removeFooterColumn = (colId: string) => {
+    if (!settings) return;
+    const cols = (settings.footerColumns || DEFAULT_FOOTER_COLUMNS).filter((c) => c.id !== colId);
+    setSettings({ ...settings, footerColumns: cols });
+    showToast('Footer column removed');
+  };
+
+  const moveFooterColumn = (index: number, direction: 'up' | 'down') => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= cols.length) return;
+    const temp = cols[index];
+    cols[index] = cols[target];
+    cols[target] = temp;
+    setSettings({ ...settings, footerColumns: cols });
+  };
+
+  const addFooterLink = (colId: string) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const col = cols.find((c) => c.id === colId);
+    if (col) {
+      col.links = [
+        ...(col.links || []),
+        { id: `fl_${Date.now()}`, label: 'New Link', href: '/shop', visible: true },
+      ];
+      setSettings({ ...settings, footerColumns: cols });
+      showToast('Footer link added');
+    }
+  };
+
+  const updateFooterLink = (colId: string, linkId: string, updates: Partial<FooterLinkItem>) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const col = cols.find((c) => c.id === colId);
+    if (col && col.links) {
+      const lIdx = col.links.findIndex((l) => l.id === linkId);
+      if (lIdx !== -1) {
+        col.links[lIdx] = { ...col.links[lIdx], ...updates };
+        setSettings({ ...settings, footerColumns: cols });
+      }
+    }
+  };
+
+  const removeFooterLink = (colId: string, linkId: string) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const col = cols.find((c) => c.id === colId);
+    if (col && col.links) {
+      col.links = col.links.filter((l) => l.id !== linkId);
+      setSettings({ ...settings, footerColumns: cols });
+      showToast('Footer link removed');
+    }
+  };
+
+  const moveFooterLink = (colId: string, linkIndex: number, direction: 'up' | 'down') => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const col = cols.find((c) => c.id === colId);
+    if (col && col.links) {
+      const target = direction === 'up' ? linkIndex - 1 : linkIndex + 1;
+      if (target < 0 || target >= col.links.length) return;
+      const temp = col.links[linkIndex];
+      col.links[linkIndex] = col.links[target];
+      col.links[target] = temp;
+      setSettings({ ...settings, footerColumns: cols });
+    }
+  };
+
+  const resetFooterColumns = () => {
+    if (!settings) return;
+    setSettings({
+      ...settings,
+      footerColumns: [...DEFAULT_FOOTER_COLUMNS],
+      footerTagline: 'Premium Indian women’s ethnic wear crafted in small handloom batches with modern silhouettes and timeless elegance.',
+      footerCopyright: '© 2026 AABHA CLOTHING. All rights reserved.',
+    });
+    showToast('Footer layout restored to defaults');
+  };
+
   const renderSectionHeader = (
     title: string,
     eyebrow: string,
@@ -405,7 +860,7 @@ export default function AdminBrandingPage() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/avif,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg"
         className="hidden"
       />
 
@@ -434,15 +889,34 @@ export default function AdminBrandingPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Quick Dedicated Pages Hub Link */}
+          <div className="bg-[#1A1715] text-[#FAF8F5] p-3 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border border-[#2C2723]">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#A8E6CF] animate-pulse"></span>
+              <span className="font-serif tracking-wide text-sm">Dedicated Pages &amp; Navigation Manager Available</span>
+              <span className="text-[#A69C91] text-[11px]">— Manage all system &amp; custom lookbook pages in a dedicated view</span>
+            </div>
+            <Link
+              href="/admin/pages"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#D4AF37] hover:bg-[#C29D26] text-[#1A1715] font-semibold text-[11px] uppercase tracking-wider shrink-0"
+            >
+              <span>Open Dedicated Pages Manager →</span>
+            </Link>
+          </div>
+
           {/* Top Tabs Navigation */}
           <div className="flex flex-wrap items-center gap-2 border-b border-[#ECE6DD] pb-2 bg-[#FAF8F5] p-2">
             {[
-              { id: 'hero', label: '1. Hero & Notice Bar', icon: Layers },
-              { id: 'categories', label: '2. Category & Curated', icon: ShoppingBag },
-              { id: 'arrivals_trust', label: '3. New Arrivals & Pillars', icon: Award },
-              { id: 'story_about', label: '4. Brand Story & About Page', icon: BookOpen },
-              { id: 'contact_social', label: '5. Concierge, Trust & Conversion', icon: MessageCircle },
-              { id: 'layout_manager', label: '6. Page Sections Add/Remove', icon: Sliders },
+              { id: 'pages_manager', label: '0. Custom Pages & Actions', icon: FileText },
+              { id: 'nav_footer', label: '1. Navbar & Footer Manager', icon: Compass },
+              { id: 'hero', label: '2. Hero & Notice Bar', icon: Layers },
+              { id: 'categories', label: '3. Category & Curated', icon: ShoppingBag },
+              { id: 'arrivals_trust', label: '4. New Arrivals & Pillars', icon: Award },
+              { id: 'story_about', label: '5. Brand Story & About Page', icon: BookOpen },
+              { id: 'contact_social', label: '6. Concierge, PDP & Orders', icon: MessageCircle },
+              { id: 'themes', label: '7. Themes, Blur & Opacity', icon: Palette },
+              { id: 'layout_manager', label: '8. Page Sections Add/Remove', icon: Sliders },
+              { id: 'preview', label: '9. Live Device Preview', icon: Smartphone },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -450,7 +924,7 @@ export default function AdminBrandingPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as BrandingTab)}
+                  onClick={() => switchTab(tab.id as BrandingTab)}
                   className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer border ${
                     isActive
                       ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D] shadow-sm'
@@ -506,6 +980,741 @@ export default function AdminBrandingPage() {
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+
+          {/* TAB 0: MASTER DYNAMIC PAGES & ACTIONS MANAGER */}
+          {activeTab === 'pages_manager' && (
+            <div className="space-y-10 animate-fadeIn">
+              {/* Header Banner */}
+              <div className="bg-[#F3EFEA] p-6 border border-[#ECE6DD] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <FileText className="w-5 h-5 text-[#6E5043]" />
+                    <h2 className="font-serif text-2xl text-[#1E1B18]">
+                      Master Custom Pages &amp; Editorial Actions Manager
+                    </h2>
+                  </div>
+                  <p className="text-xs text-[#5C544D] leading-relaxed max-w-2xl">
+                    Create unlimited custom pages for lookbooks, artisan craft stories, press notes, or customer guides. Publish or unpublish with 1 click, or delete with confirmation. Automatically add any page to Header Navbar or Footer. Click &ldquo;Save All Changes&rdquo; above to persist everything.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenCreatePage}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#231F1D] text-[#FAF8F5] text-xs uppercase tracking-wider font-medium hover:bg-[#14110E] transition-colors cursor-pointer shrink-0 shadow-sm"
+                >
+                  <Plus className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Create New Custom Page</span>
+                </button>
+              </div>
+
+              {/* 1. Core System Pages */}
+              <div className="bg-white p-6 border border-[#ECE6DD] space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#ECE6DD]">
+                  <div>
+                    <h3 className="font-serif text-lg text-[#1E1B18]">Standard Boutique Pages</h3>
+                    <p className="text-xs text-[#7C736A]">Built-in core pages always active on the storefront.</p>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 bg-[#F3EFEA] text-[#6E5043] border border-[#ECE6DD]">
+                    System Default
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { title: 'Home Page', path: '/', desc: 'Hero carousel, categories, new arrivals, brand story', tab: 'hero' },
+                    { title: 'All Collection Catalog', path: '/shop', desc: 'Garment catalog, silhouette filters, sorting', tab: 'categories' },
+                    { title: 'About Atelier', path: '/about', desc: 'Atelier story, foundational silhouettes narrative', tab: 'story_about' },
+                    { title: 'Contact Concierge', path: '/contact', desc: 'WhatsApp, helpline, studio location, inquiry form', tab: 'contact_social' },
+                    { title: 'COD Tracking & GST Bills', path: '/my-orders', desc: 'Customer phone order lookup & printable invoices', tab: 'contact_social' },
+                    { title: 'Legal & Shipping Policies', path: '/policy', desc: 'Shipping, 14-day exchange, FAQ, Privacy, Terms', tab: 'nav_footer' },
+                  ].map((p) => (
+                    <div key={p.path} className="p-4 bg-[#FAF8F5] border border-[#E0D8CE] flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-serif text-base text-[#1E1B18]">{p.title}</span>
+                          <span className="text-[10px] font-mono text-[#2E7D32] bg-[#E8F5E9] px-2 py-0.5 rounded-full font-bold">
+                            ACTIVE
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono text-[#7C736A] block mt-0.5">{p.path}</span>
+                        <p className="text-xs text-[#5C544D] mt-1.5">{p.desc}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#ECE6DD]">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab(p.tab as BrandingTab)}
+                          className="px-2.5 py-1 text-[11px] uppercase tracking-wider font-medium text-[#231F1D] bg-white border border-[#D5CCC0] hover:bg-[#231F1D] hover:text-white transition-colors cursor-pointer"
+                        >
+                          Configure
+                        </button>
+                        <a
+                          href={p.path}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2 py-1 text-[11px] text-[#7C736A] hover:text-[#1E1B18] inline-flex items-center gap-1"
+                        >
+                          <span>Live ↗</span>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Custom Dynamic Pages Created by Admin */}
+              <div className="bg-white p-6 border border-[#ECE6DD] space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#ECE6DD]">
+                  <div>
+                    <h3 className="font-serif text-lg text-[#1E1B18]">
+                      Custom Atelier Pages ({currentCustomPages.length})
+                    </h3>
+                    <p className="text-xs text-[#7C736A]">
+                      Admin-created bespoke editorial pages accessible via <code className="font-mono text-[#6E5043]">/pages/[slug]</code>.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenCreatePage}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] text-xs font-medium text-[#1E1B18] hover:bg-[#231F1D] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Another Page</span>
+                  </button>
+                </div>
+
+                {currentCustomPages.length === 0 ? (
+                  <div className="py-12 text-center bg-[#FAF8F5] border border-dashed border-[#D5CCC0] space-y-3">
+                    <FileText className="w-8 h-8 text-[#7C736A] mx-auto opacity-50" />
+                    <p className="font-serif text-lg text-[#1E1B18]">No custom pages created yet</p>
+                    <p className="text-xs text-[#7C736A] max-w-sm mx-auto">
+                      Create your first custom page (e.g. Lookbook, Silk Handloom Care, or Karigar Legacy).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleOpenCreatePage}
+                      className="px-4 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs uppercase tracking-wider font-medium"
+                    >
+                      Create Custom Page
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentCustomPages.map((page) => {
+                      const isPublished = page.published !== false;
+                      const pageUrl = `/pages/${page.slug}`;
+                      return (
+                        <div
+                          key={page.id}
+                          className="p-4 bg-[#FAF8F5] border border-[#E0D8CE] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors hover:border-[#1E1B18]"
+                        >
+                          <div className="flex items-start gap-4 min-w-0">
+                            {page.heroImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={page.heroImage}
+                                alt={page.title}
+                                className="w-16 h-16 object-cover border border-[#ECE6DD] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 bg-[#ECE6DD] flex items-center justify-center text-[#7C736A] shrink-0">
+                                <FileText className="w-6 h-6" />
+                              </div>
+                            )}
+
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-serif text-base text-[#1E1B18] font-normal truncate">
+                                  {page.title}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider font-bold rounded-full ${
+                                    isPublished
+                                      ? 'bg-[#E8F5E9] text-[#2E7D32]'
+                                      : 'bg-[#ECE6DD] text-[#7C736A]'
+                                  }`}
+                                >
+                                  {isPublished ? 'PUBLISHED' : 'DRAFT'}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-xs font-mono text-[#6E5043]">
+                                <span>{pageUrl}</span>
+                                <span className="text-[#A69C91]">·</span>
+                                <span className="text-[11px] text-[#7C736A] font-sans">
+                                  Updated: {page.updatedAt || 'Recently'}
+                                </span>
+                              </div>
+
+                              {page.subtitle && (
+                                <p className="text-xs text-[#5C544D] line-clamp-1 italic font-light">
+                                  {page.subtitle}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditPage(page)}
+                              className="px-2.5 py-1.5 text-xs font-medium text-[#1E1B18] bg-white border border-[#D5CCC0] hover:bg-[#231F1D] hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Edit Page Content & Details"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateCustomPage(page)}
+                              className="px-2.5 py-1.5 text-xs font-medium text-[#6E5043] bg-white border border-[#D5CCC0] hover:bg-[#231F1D] hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Duplicate / Clone Page"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Clone</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePublishCustomPage(page.id)}
+                              className={`px-2.5 py-1.5 text-xs font-medium border transition-colors cursor-pointer inline-flex items-center gap-1 ${
+                                isPublished
+                                  ? 'bg-white text-[#7C736A] border-[#D5CCC0] hover:bg-[#ECE6DD]'
+                                  : 'bg-[#2E7D32] text-white border-[#2E7D32]'
+                              }`}
+                              title={isPublished ? 'Unpublish page to Draft' : 'Publish page to live site'}
+                            >
+                              {isPublished ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              <span>{isPublished ? 'Draft' : 'Publish'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddCustomPageToNavbar(page)}
+                              className="px-2.5 py-1.5 text-xs font-medium text-[#1E1B18] bg-white border border-[#D5CCC0] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+                              title="Add link to Header Navbar"
+                            >
+                              + Navbar
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddCustomPageToFooter(page)}
+                              className="px-2.5 py-1.5 text-xs font-medium text-[#1E1B18] bg-white border border-[#D5CCC0] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+                              title="Add link to Footer"
+                            >
+                              + Footer
+                            </button>
+
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-[#7C736A] hover:text-[#1E1B18] hover:bg-white border border-transparent hover:border-[#D5CCC0] transition-colors"
+                              title="View page live in new tab"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomPage(page.id)}
+                              className="p-1.5 text-[#C62828] hover:bg-[#FFEBEE] border border-transparent hover:border-[#FFCDD2] transition-colors cursor-pointer"
+                              title="Delete this custom page"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: HEADER NAV & FOOTER MANAGER */}
+          {activeTab === 'nav_footer' && (
+            <div className="space-y-10 animate-fadeIn">
+              {/* Header Banner */}
+              <div className="bg-[#F3EFEA] p-6 border border-[#ECE6DD]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Compass className="w-5 h-5 text-[#6E5043]" />
+                  <h2 className="font-serif text-2xl text-[#1E1B18]">
+                    Header Navigation &amp; Footer Layout Manager
+                  </h2>
+                </div>
+                <p className="text-xs text-[#5C544D] leading-relaxed max-w-3xl">
+                  Manage all storefront navigation links in real time. Add custom links, edit labels, choose page or category destinations, toggle visibility, and organize footer columns. Click &ldquo;Save All Branding &amp; Media&rdquo; at the bottom to apply changes to the live storefront.
+                </p>
+              </div>
+
+              {/* 1. HEADER NAVBAR LINKS MANAGER */}
+              <div className="bg-white border border-[#ECE6DD] p-6 space-y-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#ECE6DD] pb-4">
+                  <div>
+                    <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#7C736A] block">
+                      STOREFRONT TOP HEADER
+                    </span>
+                    <h3 className="font-serif text-xl text-[#1E1B18] font-normal mt-0.5">
+                      Navbar Links &amp; Menu Manager
+                    </h3>
+                    <p className="text-xs text-[#7C736A] mt-0.5">
+                      Controls the links displayed across the desktop top navigation and mobile slide drawer.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={resetNavLinks}
+                      className="px-3 py-1.5 text-xs text-[#7C736A] hover:text-[#1E1B18] border border-[#ECE6DD] hover:bg-[#F3EFEA] transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Reset storefront navbar to default links"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addNavLink}
+                      className="px-3.5 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Nav Item</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Navbar Visual Simulation Bar */}
+                <div className="p-4 bg-[#FAF8F5] border border-[#ECE6DD]">
+                  <p className="text-[11px] uppercase tracking-wider font-semibold text-[#7C736A] mb-2.5">
+                    Live Navbar Preview (Active items visible to shoppers):
+                  </p>
+                  <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-1 text-xs">
+                    <span className="font-serif font-medium text-sm text-[#1E1B18] shrink-0 pr-3 border-r border-[#ECE6DD]">
+                      AABHA
+                    </span>
+                    {currentNavLinks.filter((l) => l.visible !== false).map((item) => (
+                      <span
+                        key={item.id}
+                        className="px-2.5 py-1 bg-white border border-[#E0D8CE] text-[#1E1B18] whitespace-nowrap text-[11px] font-medium tracking-wide flex items-center gap-1 shrink-0"
+                      >
+                        <span>{item.label}</span>
+                        <span className="text-[9px] text-[#7C736A] font-mono">({item.href})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Items List */}
+                <div className="divide-y divide-[#ECE6DD]">
+                  {currentNavLinks.map((item, index) => {
+                    const isVisible = item.visible !== false;
+                    const isPreset = DESTINATION_PRESETS.some((p) => p.value === item.href);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                      >
+                        {/* Left: Reorder controls + Index */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="w-6 text-center font-mono text-xs text-[#7C736A]">
+                            #{index + 1}
+                          </span>
+                          <div className="flex flex-col">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => moveNavLink(index, 'up')}
+                              className="p-1 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-30 cursor-pointer"
+                              title="Move up"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === currentNavLinks.length - 1}
+                              onClick={() => moveNavLink(index, 'down')}
+                              className="p-1 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-30 cursor-pointer"
+                              title="Move down"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mid: Inputs (Label + Destination) */}
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-3">
+                          {/* Label input */}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] uppercase font-semibold text-[#7C736A] mb-1">
+                              Link Label
+                            </label>
+                            <input
+                              type="text"
+                              value={item.label}
+                              onChange={(e) => updateNavLink(item.id, { label: e.target.value })}
+                              placeholder="e.g. Anarkali Suits"
+                              className="w-full px-3 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] focus:border-[#231F1D] text-xs text-[#1E1B18] font-medium"
+                            />
+                          </div>
+
+                          {/* Destination preset */}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] uppercase font-semibold text-[#7C736A] mb-1">
+                              Destination Page / Action
+                            </label>
+                            <select
+                              value={isPreset ? item.href : '__CUSTOM__'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val !== '__CUSTOM__') {
+                                  updateNavLink(item.id, { href: val });
+                                } else {
+                                  updateNavLink(item.id, { href: '' });
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] focus:border-[#231F1D] text-xs text-[#1E1B18]"
+                            >
+                              {dynamicDestinationPresets.map((p) => (
+                                <option key={p.value} value={p.value}>
+                                  {p.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Custom URL or Exact Path input */}
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] uppercase font-semibold text-[#7C736A] mb-1">
+                              Target URL / Path
+                            </label>
+                            <input
+                              type="text"
+                              value={item.href}
+                              onChange={(e) => updateNavLink(item.id, { href: e.target.value })}
+                              placeholder="e.g. /shop or https://..."
+                              className="w-full px-3 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] focus:border-[#231F1D] text-xs font-mono text-[#1E1B18]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Right: Visibility Toggle & Delete */}
+                        <div className="flex items-center gap-2 shrink-0 pt-2 lg:pt-0">
+                          <label className="flex items-center gap-1.5 text-[11px] text-[#7C736A] mr-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(item.openInNewTab)}
+                              onChange={(e) => updateNavLink(item.id, { openInNewTab: e.target.checked })}
+                              className="accent-[#231F1D]"
+                            />
+                            <span>New Tab</span>
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => updateNavLink(item.id, { visible: !isVisible })}
+                            className={`px-2.5 py-1 text-xs font-medium uppercase tracking-wider border flex items-center gap-1.5 cursor-pointer ${
+                              isVisible
+                                ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                            }`}
+                          >
+                            {isVisible ? (
+                              <>
+                                <Eye className="w-3.5 h-3.5" /> Visible
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5" /> Hidden
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => removeNavLink(item.id)}
+                            className="p-1.5 text-[#C62828] hover:text-[#B71C1C] border border-[#FFCDD2] bg-[#FFF5F5] cursor-pointer"
+                            title="Remove navbar item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. FOOTER LAYOUT & COLUMNS MANAGER */}
+              <div className="bg-white border border-[#ECE6DD] p-6 space-y-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#ECE6DD] pb-4">
+                  <div>
+                    <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#7C736A] block">
+                      STOREFRONT FOOTER
+                    </span>
+                    <h3 className="font-serif text-xl text-[#1E1B18] font-normal mt-0.5">
+                      Footer Columns &amp; Links Manager
+                    </h3>
+                    <p className="text-xs text-[#7C736A] mt-0.5">
+                      Customize footer columns (e.g. THE SILHOUETTES, THE HOUSE, CLIENT CARE), manage destination links, and edit brand statements.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={resetFooterColumns}
+                      className="px-3 py-1.5 text-xs text-[#7C736A] hover:text-[#1E1B18] border border-[#ECE6DD] hover:bg-[#F3EFEA] transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Reset footer to default columns"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addFooterColumn}
+                      className="px-3.5 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add New Column</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer Brand Statement & Copyright text inputs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-[#FAF8F5] border border-[#ECE6DD]">
+                  <div>
+                    <label className="block text-[10px] uppercase font-semibold text-[#7C736A] mb-1">
+                      Footer Brand Tagline (Under Atelier Logo)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.footerTagline || ''}
+                      onChange={(e) => setSettings({ ...settings, footerTagline: e.target.value })}
+                      placeholder="e.g. Premium Indian women’s ethnic wear crafted in small handloom batches..."
+                      className="w-full px-3 py-1.5 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-xs text-[#1E1B18]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-semibold text-[#7C736A] mb-1">
+                      Copyright Notice Text (Bottom Row)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.footerCopyright || ''}
+                      onChange={(e) => setSettings({ ...settings, footerCopyright: e.target.value })}
+                      placeholder="e.g. © 2026 AABHA CLOTHING. All rights reserved."
+                      className="w-full px-3 py-1.5 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-xs text-[#1E1B18]"
+                    />
+                  </div>
+                </div>
+
+                {/* Columns List */}
+                <div className="space-y-6">
+                  {currentFooterColumns.map((col, colIdx) => {
+                    const isColVisible = col.visible !== false;
+
+                    return (
+                      <div
+                        key={col.id}
+                        className="bg-[#FAF8F5] border border-[#E0D8CE] p-5 space-y-4 shadow-2xs"
+                      >
+                        {/* Column Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#ECE6DD] pb-3">
+                          <div className="flex items-center gap-2.5 flex-1 max-w-lg">
+                            <span className="text-xs font-mono font-bold text-[#7C736A]">
+                              Col #{colIdx + 1}
+                            </span>
+                            <div className="flex-1">
+                              <label className="sr-only">Column Title</label>
+                              <input
+                                type="text"
+                                value={col.title}
+                                onChange={(e) => updateFooterColumn(col.id, { title: e.target.value })}
+                                placeholder="e.g. THE SILHOUETTES"
+                                className="w-full px-3 py-1 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-sm font-semibold uppercase tracking-wider text-[#1E1B18]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              disabled={colIdx === 0}
+                              onClick={() => moveFooterColumn(colIdx, 'up')}
+                              className="p-1.5 text-[#7C736A] hover:text-[#1E1B18] border border-[#ECE6DD] bg-white disabled:opacity-30 cursor-pointer"
+                              title="Move column left"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5 rotate-[-90deg]" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={colIdx === currentFooterColumns.length - 1}
+                              onClick={() => moveFooterColumn(colIdx, 'down')}
+                              className="p-1.5 text-[#7C736A] hover:text-[#1E1B18] border border-[#ECE6DD] bg-white disabled:opacity-30 cursor-pointer"
+                              title="Move column right"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5 rotate-[-90deg]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateFooterColumn(col.id, { visible: !isColVisible })}
+                              className={`px-2.5 py-1 text-xs font-medium uppercase tracking-wider border flex items-center gap-1.5 cursor-pointer ${
+                                isColVisible
+                                  ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                  : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                              }`}
+                            >
+                              {isColVisible ? (
+                                <>
+                                  <Eye className="w-3 h-3" /> Active
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="w-3 h-3" /> Hidden
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeFooterColumn(col.id)}
+                              className="p-1 text-[#C62828] hover:text-[#B71C1C] border border-[#FFCDD2] bg-white cursor-pointer"
+                              title="Delete column"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => addFooterLink(col.id)}
+                              className="px-3 py-1 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium tracking-wide uppercase hover:bg-[#14110E] transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>+ Add Link</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Column Links List */}
+                        <div className="space-y-2">
+                          {(col.links || []).length === 0 ? (
+                            <p className="text-xs text-[#7C736A] italic py-2">
+                              No links in this column yet. Click &ldquo;+ Add Link&rdquo; to add items.
+                            </p>
+                          ) : (
+                            col.links.map((link, lIdx) => {
+                              const isLinkVis = link.visible !== false;
+                              const isPreset = DESTINATION_PRESETS.some((p) => p.value === link.href);
+
+                              return (
+                                <div
+                                  key={link.id}
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2.5 border border-[#ECE6DD]"
+                                >
+                                  {/* Reorder link */}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="w-5 text-[11px] font-mono text-[#7C736A]">
+                                      .{lIdx + 1}
+                                    </span>
+                                    <div className="flex items-center">
+                                      <button
+                                        type="button"
+                                        disabled={lIdx === 0}
+                                        onClick={() => moveFooterLink(col.id, lIdx, 'up')}
+                                        className="p-0.5 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-30 cursor-pointer"
+                                        title="Move up"
+                                      >
+                                        <ArrowUp className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={lIdx === col.links.length - 1}
+                                        onClick={() => moveFooterLink(col.id, lIdx, 'down')}
+                                        className="p-0.5 text-[#7C736A] hover:text-[#1E1B18] disabled:opacity-30 cursor-pointer"
+                                        title="Move down"
+                                      >
+                                        <ArrowDown className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Inputs */}
+                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                    <input
+                                      type="text"
+                                      value={link.label}
+                                      onChange={(e) =>
+                                        updateFooterLink(col.id, link.id, { label: e.target.value })
+                                      }
+                                      placeholder="Link label"
+                                      className="sm:col-span-4 px-2.5 py-1 bg-[#FAF8F5] border border-[#D5CCC0] text-xs font-medium text-[#1E1B18]"
+                                    />
+                                    <select
+                                      value={isPreset ? link.href : '__CUSTOM__'}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val !== '__CUSTOM__') {
+                                          updateFooterLink(col.id, link.id, { href: val });
+                                        } else {
+                                          updateFooterLink(col.id, link.id, { href: '' });
+                                        }
+                                      }}
+                                      className="sm:col-span-4 px-2 py-1 bg-[#FAF8F5] border border-[#D5CCC0] text-xs text-[#1E1B18]"
+                                    >
+                                      {dynamicDestinationPresets.map((p) => (
+                                        <option key={p.value} value={p.value}>
+                                          {p.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      type="text"
+                                      value={link.href}
+                                      onChange={(e) =>
+                                        updateFooterLink(col.id, link.id, { href: e.target.value })
+                                      }
+                                      placeholder="URL / action"
+                                      className="sm:col-span-4 px-2 py-1 bg-[#FAF8F5] border border-[#D5CCC0] text-xs font-mono text-[#1E1B18]"
+                                    />
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        updateFooterLink(col.id, link.id, { visible: !isLinkVis })
+                                      }
+                                      className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider border cursor-pointer ${
+                                        isLinkVis
+                                          ? 'bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]'
+                                          : 'bg-[#FFEBEE] text-[#C62828] border-[#FFCDD2]'
+                                      }`}
+                                    >
+                                      {isLinkVis ? 'Visible' : 'Hidden'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeFooterLink(col.id, link.id)}
+                                      className="p-1 text-[#C62828] hover:text-[#B71C1C] cursor-pointer"
+                                      title="Delete link"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -2349,6 +3558,362 @@ export default function AdminBrandingPage() {
             </div>
           )}
 
+          {/* TAB: VISUAL THEMES & MEDIA STYLING */}
+          {activeTab === 'themes' && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="bg-[#F3EFEA] p-6 border border-[#ECE6DD]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette className="w-5 h-5 text-[#6E5043]" />
+                  <h2 className="font-serif text-2xl text-[#1E1B18]">
+                    Visual Themes, Media Sizing &amp; Design Styling
+                  </h2>
+                </div>
+                <p className="text-xs text-[#5C544D] leading-relaxed max-w-3xl">
+                  Configure storefront hero dimensions, glassmorphism blur intensity, color tint palettes, and micro-interactions.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Hero Height & Focal Alignment */}
+                <div className="bg-white border border-[#ECE6DD] p-6 space-y-4">
+                  <h3 className="font-serif text-lg text-[#1E1B18]">Hero Dimensions &amp; Focal Alignment</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Banner Height Mode
+                      </label>
+                      <select
+                        value={settings.heroBannerHeight || 'standard'}
+                        onChange={(e) => setSettings({ ...settings, heroBannerHeight: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#D5CCC0] text-xs text-[#1E1B18]"
+                      >
+                        <option value="standard">Standard Atelier (80vh / 750px)</option>
+                        <option value="fullscreen">Full Screen Editorial (100vh)</option>
+                        <option value="compact">Compact Lookbook (60vh / 550px)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Image Focal Alignment
+                      </label>
+                      <select
+                        value={settings.heroFocalAlignment || 'center'}
+                        onChange={(e) => setSettings({ ...settings, heroFocalAlignment: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#D5CCC0] text-xs text-[#1E1B18]"
+                      >
+                        <option value="center">Center / Balanced</option>
+                        <option value="top">Top (Portrait / Head &amp; Neckline Focus)</option>
+                        <option value="bottom">Bottom (Hemline / Kalidar Flare Focus)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Darkening Overlay Opacity: {settings.heroOverlayOpacity ?? 25}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="90"
+                        step="5"
+                        value={settings.heroOverlayOpacity ?? 25}
+                        onChange={(e) => setSettings({ ...settings, heroOverlayOpacity: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Image Background Blur: {settings.heroBannerBlur ?? 0}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="1"
+                        value={settings.heroBannerBlur ?? 0}
+                        onChange={(e) => setSettings({ ...settings, heroBannerBlur: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                      <span className="text-[10px] text-[#7C736A] block mt-0.5">
+                        0px (Crisp Sharp) · 4px (Soft Focus) · 12px (Editorial Depth)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Hero Overlay Frosted Glass Blur: {settings.heroBackdropBlur ?? 0}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="1"
+                        value={settings.heroBackdropBlur ?? 0}
+                        onChange={(e) => setSettings({ ...settings, heroBackdropBlur: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Glassmorphism & Micro-Interactions */}
+                <div className="bg-white border border-[#ECE6DD] p-6 space-y-4">
+                  <h3 className="font-serif text-lg text-[#1E1B18]">Header Blur, Opacity &amp; Atmosphere</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Top Header Background Opacity: {settings.headerOpacity ?? 95}%
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        value={settings.headerOpacity ?? 95}
+                        onChange={(e) => setSettings({ ...settings, headerOpacity: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Top Header Glass Backdrop Blur: {settings.headerBlur ?? 8}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="24"
+                        step="2"
+                        value={settings.headerBlur ?? 8}
+                        onChange={(e) => setSettings({ ...settings, headerBlur: Number(e.target.value) })}
+                        className="w-full accent-[#231F1D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Glass Blur Intensity Preset
+                      </label>
+                      <select
+                        value={settings.glassBlurIntensity || 'subtle'}
+                        onChange={(e) => setSettings({ ...settings, glassBlurIntensity: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#D5CCC0] text-xs text-[#1E1B18]"
+                      >
+                        <option value="none">None (Crisp Solid Backgrounds)</option>
+                        <option value="subtle">Subtle Atelier (Optimized for Mobile)</option>
+                        <option value="rich">Rich Frosted Glass (Desktop High-End)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Storefront Background Tint
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={settings.storefrontBgTint || '#FAF8F5'}
+                          onChange={(e) => setSettings({ ...settings, storefrontBgTint: e.target.value })}
+                          className="w-8 h-8 rounded border border-[#ECE6DD] cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={settings.storefrontBgTint || '#FAF8F5'}
+                          onChange={(e) => setSettings({ ...settings, storefrontBgTint: e.target.value })}
+                          className="flex-1 px-3 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] text-xs font-mono text-[#1E1B18]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase font-semibold text-[#7C736A] mb-1">
+                        Primary Atelier Accent Color
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={settings.storefrontAccentColor || '#6E5043'}
+                          onChange={(e) => setSettings({ ...settings, storefrontAccentColor: e.target.value })}
+                          className="w-8 h-8 rounded border border-[#ECE6DD] cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={settings.storefrontAccentColor || '#6E5043'}
+                          onChange={(e) => setSettings({ ...settings, storefrontAccentColor: e.target.value })}
+                          className="flex-1 px-3 py-1.5 bg-[#FAF8F5] border border-[#D5CCC0] text-xs font-mono text-[#1E1B18]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Animations & Slideshow Timing */}
+                <div className="bg-white border border-[#ECE6DD] p-6 space-y-4 md:col-span-2">
+                  <h3 className="font-serif text-lg text-[#1E1B18]">Animations &amp; Editorial Performance</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label className="flex items-center gap-2.5 p-3 bg-[#FAF8F5] border border-[#ECE6DD] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.enableHeroAutoplay !== false}
+                        onChange={(e) => setSettings({ ...settings, enableHeroAutoplay: e.target.checked })}
+                        className="accent-[#231F1D]"
+                      />
+                      <div>
+                        <span className="text-xs font-medium text-[#1E1B18] block">Hero Carousel Autoplay</span>
+                        <span className="text-[10px] text-[#7C736A]">Smooth auto-transition between 3 slides</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 p-3 bg-[#FAF8F5] border border-[#ECE6DD] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.enableImageZoomOnHover !== false}
+                        onChange={(e) => setSettings({ ...settings, enableImageZoomOnHover: e.target.checked })}
+                        className="accent-[#231F1D]"
+                      />
+                      <div>
+                        <span className="text-xs font-medium text-[#1E1B18] block">Interactive Image Zoom</span>
+                        <span className="text-[10px] text-[#7C736A]">Hover micro-zoom on garment cards &amp; PDP</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 p-3 bg-[#FAF8F5] border border-[#ECE6DD] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.enablePageAnimations !== false}
+                        onChange={(e) => setSettings({ ...settings, enablePageAnimations: e.target.checked })}
+                        className="accent-[#231F1D]"
+                      />
+                      <div>
+                        <span className="text-xs font-medium text-[#1E1B18] block">60 FPS Page Fade Transitions</span>
+                        <span className="text-[10px] text-[#7C736A]">Silky fade transitions across navigation</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: LIVE DEVICE STOREFRONT PREVIEW */}
+          {activeTab === 'preview' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="bg-[#F3EFEA] p-6 border border-[#ECE6DD]">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Smartphone className="w-5 h-5 text-[#6E5043]" />
+                      <h2 className="font-serif text-2xl text-[#1E1B18]">
+                        Live Device Storefront Preview
+                      </h2>
+                    </div>
+                    <p className="text-xs text-[#5C544D]">
+                      Inspect how your branding, navbar links, and footer look across different screen viewports.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Page selector dropdown */}
+                    <div className="flex items-center gap-1.5 bg-white border border-[#D5CCC0] px-2.5 py-1">
+                      <span className="text-[10px] uppercase font-semibold text-[#7C736A]">Page:</span>
+                      <select
+                        value={previewPage}
+                        onChange={(e) => setPreviewPage(e.target.value)}
+                        className="text-xs bg-transparent text-[#1E1B18] font-medium focus:outline-none cursor-pointer"
+                      >
+                        <option value="/">Home Page (/)</option>
+                        <option value="/?page=shop">Shop Catalog (/shop)</option>
+                        <option value="/?page=shop&category=Anarkali">Anarkali Suits (/shop?category=Anarkali)</option>
+                        <option value="/?page=about">About Atelier (/about)</option>
+                        <option value="/?page=contact">Contact Concierge (/contact)</option>
+                        <option value="/?page=policy">Policies (/policy)</option>
+                        <option value="/my-orders">Track Orders (/my-orders)</option>
+                        <option value="/product/anarkali-01">Product Detail Page (Sample PDP)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIframeKey((k) => k + 1)}
+                      className="px-2.5 py-1.5 text-xs font-medium text-[#7C736A] hover:text-[#1E1B18] bg-white border border-[#D5CCC0] hover:bg-[#F3EFEA] transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Reload preview iframe"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reload</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('mobile')}
+                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider flex items-center gap-1.5 border cursor-pointer ${
+                        previewDevice === 'mobile'
+                          ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
+                          : 'bg-white text-[#5C544D] border-[#D5CCC0] hover:text-[#1E1B18]'
+                      }`}
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Mobile (375px)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('tablet')}
+                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider flex items-center gap-1.5 border cursor-pointer ${
+                        previewDevice === 'tablet'
+                          ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
+                          : 'bg-white text-[#5C544D] border-[#D5CCC0] hover:text-[#1E1B18]'
+                      }`}
+                    >
+                      <Tablet className="w-3.5 h-3.5" />
+                      <span>Tablet (768px)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('desktop')}
+                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wider flex items-center gap-1.5 border cursor-pointer ${
+                        previewDevice === 'desktop'
+                          ? 'bg-[#231F1D] text-[#FAF8F5] border-[#231F1D]'
+                          : 'bg-white text-[#5C544D] border-[#D5CCC0] hover:text-[#1E1B18]'
+                      }`}
+                    >
+                      <Monitor className="w-3.5 h-3.5" />
+                      <span>Desktop (Full)</span>
+                    </button>
+                    <a
+                      href={previewPage}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 text-xs font-medium text-[#6E5043] bg-white border border-[#D5CCC0] hover:bg-[#231F1D] hover:text-[#FAF8F5] hover:border-[#231F1D] transition-colors flex items-center gap-1.5 cursor-pointer ml-1"
+                    >
+                      <span>Open Page</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Viewport Frame */}
+              <div className="flex justify-center p-4 bg-[#E5DFD5] border border-[#D5CCC0] min-h-[700px] overflow-auto">
+                <div
+                  className={`bg-white shadow-2xl transition-all duration-300 border border-[#231F1D]/20 overflow-hidden ${
+                    previewDevice === 'mobile'
+                      ? 'w-[375px] h-[750px] rounded-[36px] border-[10px] border-[#231F1D]'
+                      : previewDevice === 'tablet'
+                      ? 'w-[768px] h-[850px] rounded-[24px] border-[10px] border-[#231F1D]'
+                      : 'w-full max-w-[1400px] h-[850px] rounded-md'
+                  }`}
+                >
+                  <iframe
+                    key={iframeKey}
+                    src={previewPage}
+                    title="Live Storefront Preview"
+                    className="w-full h-full border-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Bottom Floating Save Bar */}
           <div className="pt-6 border-t border-[#ECE6DD] flex justify-between items-center">
             <span className="text-xs text-[#7C736A]">
@@ -2363,6 +3928,182 @@ export default function AdminBrandingPage() {
               <Save className="w-4 h-4" />
               {saving ? 'Saving Changes...' : 'Save All Branding & Media'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MODAL: CREATE / EDIT CUSTOM PAGE */}
+      {pageModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-[#FAF8F5] border border-[#231F1D] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col justify-between">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-[#ECE6DD] bg-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[#6E5043] block">
+                  ATELIER EDITORIAL CMS
+                </span>
+                <h3 className="font-serif text-2xl text-[#1E1B18] mt-0.5">
+                  {editingPageId ? 'Edit Custom Page' : 'Create New Custom Page'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPageModalOpen(false)}
+                className="p-2 text-[#7C736A] hover:text-[#1E1B18] hover:bg-[#F3EFEA] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Content */}
+            <div className="p-6 space-y-5 flex-1">
+              {/* Page Title */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#1E1B18] mb-1.5">
+                  Page Title *
+                </label>
+                <input
+                  type="text"
+                  value={pageForm.title}
+                  onChange={(e) => {
+                    const title = e.target.value;
+                    const autoSlug =
+                      !editingPageId && !pageForm.slug
+                        ? title
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-|-$/g, '')
+                        : pageForm.slug;
+                    setPageForm({ ...pageForm, title, slug: autoSlug });
+                  }}
+                  placeholder="e.g. The Artisanal Weaves of AABHA"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-sm text-[#1E1B18] font-medium"
+                />
+              </div>
+
+              {/* URL Slug */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#1E1B18] mb-1.5">
+                  URL Slug * (Destination link)
+                </label>
+                <div className="flex items-center">
+                  <span className="px-3 py-2.5 bg-[#ECE6DD] border border-r-0 border-[#D5CCC0] text-xs font-mono text-[#5C544D]">
+                    /pages/
+                  </span>
+                  <input
+                    type="text"
+                    value={pageForm.slug}
+                    onChange={(e) =>
+                      setPageForm({
+                        ...pageForm,
+                        slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''),
+                      })
+                    }
+                    placeholder="our-craft"
+                    className="flex-1 px-3.5 py-2.5 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-sm text-[#1E1B18] font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-[#7C736A] mt-1">
+                  Accessible directly via{' '}
+                  <code className="font-mono text-[#6E5043]">
+                    https://aabhaclothing.in/pages/{pageForm.slug || 'your-slug'}
+                  </code>
+                </p>
+              </div>
+
+              {/* Subtitle / Eyebrow */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#1E1B18] mb-1.5">
+                  Subtitle / Editorial Tagline
+                </label>
+                <input
+                  type="text"
+                  value={pageForm.subtitle || ''}
+                  onChange={(e) => setPageForm({ ...pageForm, subtitle: e.target.value })}
+                  placeholder="e.g. Preserving handloom craftsmanship across Rajasthan & Bengal"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-xs text-[#1E1B18]"
+                />
+              </div>
+
+              {/* Hero Banner Image */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#1E1B18] mb-1.5">
+                  Hero Banner Photo URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pageForm.heroImage || ''}
+                    onChange={(e) => setPageForm({ ...pageForm, heroImage: e.target.value })}
+                    placeholder="/images/brand_story_editorial_1791119191742.jpg"
+                    className="flex-1 px-3.5 py-2 bg-white border border-[#D5CCC0] text-xs text-[#1E1B18] font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentFieldToUpload('custom_page_hero');
+                      fileInputRef.current?.click();
+                    }}
+                    className="px-3 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs uppercase tracking-wider font-medium hover:bg-[#14110E] transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Page Body Content */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#1E1B18] mb-1.5">
+                  Editorial Body Content (Multi-paragraph) *
+                </label>
+                <textarea
+                  rows={8}
+                  value={pageForm.content}
+                  onChange={(e) => setPageForm({ ...pageForm, content: e.target.value })}
+                  placeholder="Write your editorial story, lookbook narrative, or garment guide. Use blank lines to separate paragraphs."
+                  className="w-full p-3 bg-white border border-[#D5CCC0] focus:border-[#231F1D] text-xs leading-relaxed text-[#1E1B18]"
+                />
+                <p className="text-[11px] text-[#7C736A] mt-1">
+                  Paragraph breaks are automatically rendered as luxury atelier typography.
+                </p>
+              </div>
+
+              {/* Publish Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-white border border-[#ECE6DD]">
+                <input
+                  type="checkbox"
+                  id="pagePublished"
+                  checked={pageForm.published !== false}
+                  onChange={(e) => setPageForm({ ...pageForm, published: e.target.checked })}
+                  className="w-4 h-4 accent-[#231F1D] cursor-pointer"
+                />
+                <label
+                  htmlFor="pagePublished"
+                  className="text-xs font-medium text-[#1E1B18] cursor-pointer"
+                >
+                  Publish this page immediately (Accessible to storefront visitors)
+                </label>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-white border-t border-[#ECE6DD] flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setPageModalOpen(false)}
+                className="px-4 py-2 text-xs font-medium uppercase tracking-wider text-[#7C736A] hover:text-[#1E1B18] border border-[#D5CCC0] bg-white transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomPage}
+                className="px-6 py-2 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer shadow-sm"
+              >
+                {editingPageId ? 'Update Page' : 'Create & Apply Page'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -106,5 +106,254 @@
   "codTrustPillar2Desc": "Pay courier conveniently via Cash, GPay, PhonePe, or Paytm.",
   "codTrustPillar3Title": "14-Day Free Exchange",
   "codTrustPillar3Desc": "Doorstep size replacement or exchange if fit needs adjusting.",
-  "showOrderSelfService": true
+  "showOrderSelfService": true,
+  "showBagDrawerWhatsAppOrder": true,
+  "heroBannerHeight": "standard",
+  "heroFocalAlignment": "center",
+  "heroOverlayOpacity": 25,
+  "heroBannerBlur": 0,
+  "heroBackdropBlur": 0,
+  "headerOpacity": 95,
+  "headerBlur": 8,
+  "drawerBackdropBlur": 4,
+  "drawerBackdropOpacity": 60,
+  "enableGlassBlur": true,
+  "glassBlurIntensity": "subtle",
+  "storefrontBgTint": "#FAF8F5",
+  "storefrontAccentColor": "#6E5043",
+  "announcementBgColor": "#231F1D",
+  "announcementTextColor": "#FAF8F5",
+  "enablePageAnimations": true,
+  "enableHeroAutoplay": true,
+  "heroAutoplayInterval": 5,
+  "enableImageZoomOnHover": true,
+  "animationTimingSpeed": "smooth",
+  "shopHeaderTitle": "The Complete Collection",
+  "shopHeaderSubtitle": "Artisan handlooms, airy Chanderi silks, and tailored silhouettes for everyday grace.",
+  "showShopSort": true,
+  "aboutFoundationalPhoto": "/images/brand_story_editorial_1791119191742.jpg",
+  "navLinks": [
+    {
+      "id": "nav-home",
+      "label": "Home",
+      "href": "/",
+      "visible": true
+    },
+    {
+      "id": "nav-new-arrivals",
+      "label": "New Arrivals",
+      "href": "/#new-arrivals",
+      "visible": true
+    },
+    {
+      "id": "nav-shop",
+      "label": "All Collection",
+      "href": "/shop",
+      "visible": true
+    },
+    {
+      "id": "nav-anarkali",
+      "label": "Anarkali",
+      "href": "/shop?category=Anarkali",
+      "visible": true
+    },
+    {
+      "id": "nav-3piece",
+      "label": "3-Piece Dresses",
+      "href": "/shop?category=3-Piece Dresses",
+      "visible": true
+    },
+    {
+      "id": "nav-coord",
+      "label": "Co-ord Sets",
+      "href": "/shop?category=Co-ord Sets",
+      "visible": true
+    },
+    {
+      "id": "nav-chikankari",
+      "label": "Chikankari Suit",
+      "href": "/shop?category=Chikankari Suit",
+      "visible": true
+    },
+    {
+      "id": "nav-about",
+      "label": "About",
+      "href": "/about",
+      "visible": true
+    },
+    {
+      "id": "nav-contact",
+      "label": "Contact",
+      "href": "/contact",
+      "visible": true
+    },
+    {
+      "id": "nav-orders",
+      "label": "Track Orders",
+      "href": "/my-orders",
+      "visible": true
+    }
+  ],
+  "footerColumns": [
+    {
+      "id": "col-silhouettes",
+      "title": "THE SILHOUETTES",
+      "visible": true,
+      "links": [
+        {
+          "id": "fl-all",
+          "label": "All Collection",
+          "href": "/shop",
+          "visible": true
+        },
+        {
+          "id": "fl-anarkali",
+          "label": "Anarkali",
+          "href": "/shop?category=Anarkali",
+          "visible": true
+        },
+        {
+          "id": "fl-3piece",
+          "label": "3-Piece Dresses",
+          "href": "/shop?category=3-Piece Dresses",
+          "visible": true
+        },
+        {
+          "id": "fl-coord",
+          "label": "Co-ord Sets",
+          "href": "/shop?category=Co-ord Sets",
+          "visible": true
+        },
+        {
+          "id": "fl-chikankari",
+          "label": "Chikankari Suit",
+          "href": "/shop?category=Chikankari Suit",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "id": "col-house",
+      "title": "THE HOUSE",
+      "visible": true,
+      "links": [
+        {
+          "id": "fl-about",
+          "label": "About Atelier",
+          "href": "/about",
+          "visible": true
+        },
+        {
+          "id": "fl-contact",
+          "label": "Contact Atelier",
+          "href": "/contact",
+          "visible": true
+        },
+        {
+          "id": "fl-story",
+          "label": "Brand Philosophy",
+          "href": "/#brand-story",
+          "visible": true
+        },
+        {
+          "id": "fl-curated",
+          "label": "Curated Signatures",
+          "href": "/#curated",
+          "visible": true
+        },
+        {
+          "id": "fl-ig",
+          "label": "Instagram Lookbook",
+          "href": "https://instagram.com/aabhaclothing",
+          "visible": true,
+          "openInNewTab": true
+        }
+      ]
+    },
+    {
+      "id": "col-care",
+      "title": "CLIENT CARE",
+      "visible": true,
+      "links": [
+        {
+          "id": "fl-track",
+          "label": "Track Orders & GST Bills",
+          "href": "/my-orders",
+          "visible": true
+        },
+        {
+          "id": "fl-whatsapp",
+          "label": "WhatsApp Concierge",
+          "href": "whatsapp",
+          "visible": true
+        },
+        {
+          "id": "fl-email",
+          "label": "care@aabhaclothing.com",
+          "href": "email",
+          "visible": true
+        },
+        {
+          "id": "fl-shipping",
+          "label": "Shipping Policy",
+          "href": "/policy?topic=shipping",
+          "visible": true
+        },
+        {
+          "id": "fl-returns",
+          "label": "14-Day Exchanges & Returns",
+          "href": "/policy?topic=returns",
+          "visible": true
+        },
+        {
+          "id": "fl-faq",
+          "label": "FAQ",
+          "href": "/policy?topic=faq",
+          "visible": true
+        },
+        {
+          "id": "fl-privacy",
+          "label": "Privacy Policy",
+          "href": "/policy?topic=privacy",
+          "visible": true
+        },
+        {
+          "id": "fl-terms",
+          "label": "Terms & Conditions",
+          "href": "/policy?topic=terms",
+          "visible": true
+        }
+      ]
+    }
+  ],
+  "footerTagline": "Premium Indian women’s ethnic wear crafted in small handloom batches with modern silhouettes and timeless elegance.",
+  "footerCopyright": "© 2026 AABHA CLOTHING. All rights reserved.",
+  "customPages": [
+    {
+      "id": "page-our-craft",
+      "slug": "our-craft",
+      "title": "The Artisanal Weaves of AABHA",
+      "subtitle": "Preserving handloom craftsmanship across Rajasthan & Bengal",
+      "heroImage": "/images/brand_story_editorial_1791119191742.jpg",
+      "content": "Each garment at AABHA is conceived as a living homage to indigenous Indian textile art. From hand-spun Chanderi silk to delicate Mulmul cotton, our karigars spend weeks perfecting each silhouette.\n\nWe employ pure French seams, hand-rolled hems, and skin-friendly natural dyes so that every piece feels effortless against your skin from morning celebrations to midnight soirees.",
+      "published": true,
+      "metaTitle": "Our Craft & Heritage | AABHA CLOTHING",
+      "metaDescription": "Discover the artisanal craftsmanship and handloom heritage behind AABHA ethnic wear.",
+      "createdAt": "2026-01-01",
+      "updatedAt": "2026-10-22"
+    },
+    {
+      "id": "page-garment-care",
+      "slug": "garment-care",
+      "title": "Garment Longevity & Mulmul Care Guide",
+      "subtitle": "Nurturing your handloom ensembles for years of grace",
+      "heroImage": "/images/hero_slide_ethnic_1791228741882.jpg",
+      "content": "Natural fibers like Mulmul, Chanderi, and organza are delicate treasures. We recommend gentle hand-washing in cold water with mild organic detergent, or professional dry cleaning for embroidered and zari garments.\n\nAlways air dry in shade to preserve color brilliance, and iron inside out on a low-to-medium silk setting.",
+      "published": true,
+      "metaTitle": "Garment Care & Longevity Guide | AABHA CLOTHING",
+      "metaDescription": "Best practices for caring for your hand-spun Chanderi, Mulmul, and artisanal ensembles.",
+      "createdAt": "2026-01-01",
+      "updatedAt": "2026-10-22"
+    }
+  ]
 }

@@ -4,8 +4,17 @@ import { Search, Heart, ShoppingBag, ChevronDown, Menu, X, User, Shield } from '
 import { CollectionFilter, Product } from '../data/products';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from '../context/AuthContext';
+import { NavLinkItem, DEFAULT_NAV_LINKS, SiteSettings } from '../lib/site-settings';
 
-export type ActivePage = 'home' | 'shop' | 'product' | 'about' | 'contact' | 'checkout' | 'policy';
+export type ActivePage =
+  | 'home'
+  | 'shop'
+  | 'product'
+  | 'about'
+  | 'contact'
+  | 'checkout'
+  | 'policy'
+  | 'custom';
 
 interface HeaderProps {
   activePage: ActivePage;
@@ -18,6 +27,8 @@ interface HeaderProps {
   onNavigateShopCategory: (category: CollectionFilter) => void;
   onNavigateAbout: () => void;
   onNavigateContact: () => void;
+  onNavigatePolicy?: (topic: any) => void;
+  onNavigateCustomPage?: (slug: string) => void;
   onOpenSearch: () => void;
   onOpenWishlist: () => void;
   onOpenCart: () => void;
@@ -26,6 +37,8 @@ interface HeaderProps {
   announcementText?: string;
   showAnnouncementBar?: boolean;
   showNewArrivals?: boolean;
+  navLinks?: NavLinkItem[];
+  siteSettings?: SiteSettings | any;
 }
 
 const SHOP_CATEGORIES: Array<{ label: CollectionFilter; count: number }> = [
@@ -47,6 +60,8 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigateShopCategory,
   onNavigateAbout,
   onNavigateContact,
+  onNavigatePolicy,
+  onNavigateCustomPage,
   onOpenSearch,
   onOpenWishlist,
   onOpenCart,
@@ -55,6 +70,8 @@ export const Header: React.FC<HeaderProps> = ({
   announcementText,
   showAnnouncementBar = true,
   showNewArrivals = true,
+  navLinks,
+  siteSettings,
 }) => {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -85,6 +102,136 @@ export const Header: React.FC<HeaderProps> = ({
     setMobileMenuOpen(false);
   };
 
+  const configuredNavLinks = useMemo<NavLinkItem[]>(() => {
+    const raw = navLinks !== undefined ? navLinks : siteSettings?.navLinks;
+    if (Array.isArray(raw)) {
+      return raw.filter((l) => l.visible !== false);
+    }
+    return DEFAULT_NAV_LINKS.filter((l) => l.visible !== false);
+  }, [navLinks, siteSettings?.navLinks]);
+
+  const handleLinkNavigate = (item: NavLinkItem, e?: React.MouseEvent) => {
+    const href = item.href || '/';
+    if (item.openInNewTab || href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, item.openInNewTab ? '_blank' : '_self', 'noopener,noreferrer');
+      setMobileMenuOpen(false);
+      return;
+    }
+
+    if (e) e.preventDefault();
+    setMobileMenuOpen(false);
+
+    // 1. WhatsApp concierge shortcut
+    if (href === 'whatsapp' || href.includes('wa.me')) {
+      const waNumber = (siteSettings?.whatsappNumber || '919876543210').replace(/[^0-9]/g, '');
+      const waUrl = href.startsWith('http')
+        ? href
+        : `https://wa.me/${waNumber}?text=${encodeURIComponent('Namaste AABHA, I have an inquiry regarding garments and orders.')}`;
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // 2. Email shortcut
+    if (href === 'email' || href.startsWith('mailto:')) {
+      const emailAddr = href.startsWith('mailto:')
+        ? href
+        : `mailto:${siteSettings?.supportEmail || 'care@aabhaclothing.com'}`;
+      window.location.href = emailAddr;
+      return;
+    }
+
+    // 3. Home
+    if (href === '/' || href === '#top' || href === '#home') {
+      onNavigateHome();
+      return;
+    }
+
+    // 4. Hash section anchors (e.g. /#new-arrivals, /#brand-story, /#curated)
+    if (href.startsWith('/#') || href.startsWith('#')) {
+      const targetId = href.replace('/#', '').replace('#', '');
+      if (activePage !== 'home') {
+        onNavigateHome();
+        setTimeout(() => {
+          const el = document.getElementById(targetId);
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 120);
+      } else {
+        const el = document.getElementById(targetId);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (href === '/shop') {
+      onNavigateShopCategory('All Collection');
+      return;
+    }
+
+    if (href.startsWith('/shop?category=') || href.startsWith('category:')) {
+      const catParam = href.replace('/shop?category=', '').replace('category:', '');
+      const decoded = decodeURIComponent(catParam) as CollectionFilter;
+      onNavigateShopCategory(decoded);
+      return;
+    }
+
+    if (href === '/about' || href === '?page=about') {
+      onNavigateAbout();
+      return;
+    }
+
+    if (href === '/contact' || href === '?page=contact') {
+      onNavigateContact();
+      return;
+    }
+
+    if (href.startsWith('/policy') || href.startsWith('?page=policy')) {
+      if (onNavigatePolicy) {
+        const match = href.match(/topic=([a-z]+)/);
+        onNavigatePolicy((match ? match[1] : 'shipping') as any);
+        return;
+      }
+    }
+
+    if (href.startsWith('/pages/') || href.startsWith('/page/') || href.includes('page=custom')) {
+      const slugMatch = href.match(/\/pages?\/([^?#/]+)/) || href.match(/slug=([^&#]+)/);
+      const slug = slugMatch ? slugMatch[1] : 'our-craft';
+      if (onNavigateCustomPage) {
+        onNavigateCustomPage(slug);
+        return;
+      }
+    }
+
+    window.location.href = href;
+  };
+
+  const isLinkActive = (item: NavLinkItem): boolean => {
+    const href = item.href || '/';
+    const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (href === '/#new-arrivals' || href === '#new-arrivals') {
+      return activePage === 'home' && currentHash === '#new-arrivals';
+    }
+    if (href === '/' || href === '#top' || href === '#home') {
+      return activePage === 'home' && (!currentHash || currentHash === '#top' || currentHash === '#home');
+    }
+    if (href === '/shop') {
+      return activePage === 'shop' && selectedCategory === 'All Collection';
+    }
+    if (href.startsWith('/shop?category=') || href.startsWith('category:')) {
+      const catParam = href.replace('/shop?category=', '').replace('category:', '');
+      return activePage === 'shop' && selectedCategory === decodeURIComponent(catParam);
+    }
+    if (href === '/about' || href === '?page=about') {
+      return activePage === 'about';
+    }
+    if (href === '/contact' || href === '?page=contact') {
+      return activePage === 'contact';
+    }
+    if (href.startsWith('/policy') || href.startsWith('?page=policy')) {
+      return activePage === 'policy';
+    }
+    return false;
+  };
+
   return (
     <>
       {showAnnouncementBar !== false && announcementText && (
@@ -92,7 +239,14 @@ export const Header: React.FC<HeaderProps> = ({
           {announcementText}
         </div>
       )}
-      <header className="sticky top-0 z-40 h-16 sm:h-[76px] bg-[#FAF8F5] sm:bg-[#FAF8F5]/95 sm:backdrop-blur-sm border-b border-[#ECE6DD]">
+      <header
+        className="sticky top-0 z-40 h-16 sm:h-[76px] border-b border-[#ECE6DD] transition-colors"
+        style={{
+          backgroundColor: `rgba(250, 248, 245, ${(siteSettings?.headerOpacity ?? 95) / 100})`,
+          backdropFilter: `blur(${siteSettings?.headerBlur ?? 8}px)`,
+          WebkitBackdropFilter: `blur(${siteSettings?.headerBlur ?? 8}px)`,
+        }}
+      >
       <div className="relative max-w-[1920px] mx-auto w-full h-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
         {/* Mobile Left Hamburger Trigger (flex-1 on mobile so logo stays centered) */}
         <div className="flex-1 flex items-center justify-start md:hidden">
@@ -125,96 +279,80 @@ export const Header: React.FC<HeaderProps> = ({
           </a>
         </div>
 
-        {/* Zone 2: Clean Text Navigation Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-9 lg:gap-11 text-[13px] tracking-[0.08em] font-normal text-[#4A433D]">
-          {showNewArrivals !== false && (
-            <button
-              type="button"
-              onClick={onNavigateNewArrivals}
-              className="hover:text-[#1E1B18] py-1 border-b border-transparent hover:border-[#1E1B18]/60 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              New Arrivals
-            </button>
-          )}
+        {/* Zone 2: Dynamic Clean Text Navigation Links (Desktop) */}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 xl:gap-10 text-[13px] tracking-[0.08em] font-normal text-[#4A433D] overflow-x-auto no-scrollbar py-1">
+          {configuredNavLinks.map((item) => {
+            const isActive = isLinkActive(item);
+            const isShopLink = item.href === '/shop';
 
-          <div
-            ref={dropdownRef}
-            className="relative"
-            onMouseEnter={() => setShopMenuOpen(true)}
-            onMouseLeave={() => setShopMenuOpen(false)}
-          >
-            <button
-              type="button"
-              onClick={() => setShopMenuOpen((prev) => !prev)}
-              className={`flex items-center gap-1.5 py-1 border-b transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activePage === 'shop'
-                  ? 'text-[#1E1B18] border-[#1E1B18]'
-                  : 'border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60'
-              }`}
-            >
-              <span>Shop</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 stroke-[1.4] transition-transform duration-200 ${
-                  shopMenuOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
+            if (isShopLink) {
+              return (
+                <div
+                  key={item.id}
+                  ref={dropdownRef}
+                  className="relative shrink-0"
+                  onMouseEnter={() => setShopMenuOpen(true)}
+                  onMouseLeave={() => setShopMenuOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => handleLinkNavigate(item, e)}
+                    className={`flex items-center gap-1.5 py-1 border-b transition-colors whitespace-nowrap cursor-pointer ${
+                      activePage === 'shop'
+                        ? 'text-[#1E1B18] border-[#1E1B18]'
+                        : 'border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 stroke-[1.4] transition-transform duration-200 ${
+                        shopMenuOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
 
-            {shopMenuOpen && (
-              <div className="absolute left-0 top-full pt-3 w-60 z-50">
-                <div className="bg-[#FAF8F5] border border-[#E8E1D7] py-2.5">
-                  {shopCategories.map(({ label }) => {
-                    const isSelected = activePage === 'shop' && selectedCategory === label;
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => handleCategorySelect(label)}
-                        className={`w-full text-left px-6 py-2.5 text-[13px] tracking-wide transition-colors flex items-center justify-between whitespace-nowrap cursor-pointer ${
-                          isSelected
-                            ? 'text-[#1E1B18] font-medium bg-[#F4F0EA]'
-                            : 'text-[#5C544D] hover:bg-[#F4F0EA]/70 hover:text-[#1E1B18]'
-                        }`}
-                      >
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
+                  {shopMenuOpen && (
+                    <div className="absolute left-0 top-full pt-3 w-60 z-50">
+                      <div className="bg-[#FAF8F5] border border-[#E8E1D7] py-2.5 shadow-md">
+                        {shopCategories.map(({ label }) => {
+                          const isCatSelected = activePage === 'shop' && selectedCategory === label;
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => handleCategorySelect(label)}
+                              className={`w-full text-left px-6 py-2.5 text-[13px] tracking-wide transition-colors flex items-center justify-between whitespace-nowrap cursor-pointer ${
+                                isCatSelected
+                                  ? 'text-[#1E1B18] font-medium bg-[#F4F0EA]'
+                                  : 'text-[#5C544D] hover:bg-[#F4F0EA]/70 hover:text-[#1E1B18]'
+                              }`}
+                            >
+                              <span>{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              );
+            }
 
-          <button
-            type="button"
-            onClick={onNavigateAbout}
-            className={`py-1 border-b transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activePage === 'about'
-                ? 'text-[#1E1B18] border-[#1E1B18]'
-                : 'border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60'
-            }`}
-          >
-            About
-          </button>
-
-          <button
-            type="button"
-            onClick={onNavigateContact}
-            className={`py-1 border-b transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activePage === 'contact'
-                ? 'text-[#1E1B18] border-[#1E1B18]'
-                : 'border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60'
-            }`}
-          >
-            Contact
-          </button>
-
-          <a
-            href="/my-orders"
-            className="py-1 border-b border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60 transition-colors whitespace-nowrap shrink-0 text-xs tracking-wider uppercase font-medium text-[#6E5043]"
-          >
-            Track Orders
-          </a>
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={(e) => handleLinkNavigate(item, e)}
+                className={`py-1 border-b transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  isActive
+                    ? 'text-[#1E1B18] border-[#1E1B18] font-medium'
+                    : 'border-transparent hover:text-[#1E1B18] hover:border-[#1E1B18]/60'
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Zone 3: Minimal Refined Actions (Search | Wishlist | Cart) */}
@@ -305,85 +443,72 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Minimal Editorial Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#FAF8F5] border-b border-[#E8E1D7] px-6 py-8 space-y-7">
-          <div className="flex flex-col space-y-5">
-            <button
-              type="button"
-              onClick={() => {
-                onNavigateNewArrivals();
-                setMobileMenuOpen(false);
-              }}
-              className="text-left font-serif text-2xl text-[#1E1B18] font-normal"
-            >
-              New Arrivals
-            </button>
+        <div className="md:hidden bg-[#FAF8F5] border-b border-[#E8E1D7] px-6 py-8 space-y-6">
+          <div className="flex flex-col space-y-3.5">
+            {configuredNavLinks.map((item) => {
+              const isShop = item.href === '/shop';
+              const isActive = isLinkActive(item);
 
-            <div className="pt-4 border-t border-[#ECE6DD] space-y-3">
-              <p className="text-[11px] tracking-[0.16em] uppercase text-[#7C736A]">
-                Shop Collection
-              </p>
-              <div className="flex flex-col space-y-2.5 pl-1">
-                {shopCategories.map(({ label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => handleCategorySelect(label)}
-                    className={`flex items-center justify-between text-left py-1 text-base transition-colors ${
-                      activePage === 'shop' && selectedCategory === label
-                        ? 'text-[#1E1B18] font-medium'
-                        : 'text-[#5C544D]'
-                    }`}
-                  >
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+              if (isShop) {
+                return (
+                  <div key={item.id} className="pt-2 border-t border-[#ECE6DD] space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={(e) => handleLinkNavigate(item, e)}
+                      className={`text-left font-serif text-2xl transition-colors cursor-pointer ${
+                        isActive ? 'text-[#1E1B18] font-medium' : 'text-[#1E1B18]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                    <div className="flex flex-col space-y-2 pl-2">
+                      {shopCategories.map(({ label }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => handleCategorySelect(label)}
+                          className={`flex items-center justify-between text-left py-1 text-base transition-colors cursor-pointer ${
+                            activePage === 'shop' && selectedCategory === label
+                              ? 'text-[#1E1B18] font-medium'
+                              : 'text-[#5C544D]'
+                          }`}
+                        >
+                          <span>{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={(e) => handleLinkNavigate(item, e)}
+                  className={`text-left font-serif text-2xl transition-colors cursor-pointer ${
+                    isActive ? 'text-[#1E1B18] font-medium' : 'text-[#1E1B18]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
 
             <div className="pt-4 border-t border-[#ECE6DD] flex flex-col space-y-3.5">
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigateAbout();
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left font-serif text-2xl text-[#1E1B18] font-normal"
-              >
-                About
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigateContact();
-                  setMobileMenuOpen(false);
-                }}
-                className="text-left font-serif text-2xl text-[#1E1B18] font-normal"
-              >
-                Contact
-              </button>
-
               <button
                 type="button"
                 onClick={() => {
                   onOpenWishlist();
                   setMobileMenuOpen(false);
                 }}
-                className="flex items-center justify-between text-left font-serif text-2xl text-[#1E1B18] font-normal"
+                className="flex items-center justify-between text-left font-serif text-2xl text-[#1E1B18] font-normal cursor-pointer"
               >
                 <span>Wishlist</span>
                 {wishlistCount > 0 && (
                   <span className="text-sm font-mono text-[#6E5043]">({wishlistCount})</span>
                 )}
               </button>
-
-              <a
-                href="/my-orders"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-left font-serif text-2xl text-[#6E5043] font-normal"
-              >
-                Track Orders & Bills
-              </a>
 
               <div className="pt-3 border-t border-[#ECE6DD]">
                 <button

@@ -8,13 +8,15 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB maximum per photo limit
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
+  'image/pjpeg',
   'image/png',
   'image/webp',
   'image/gif',
   'image/svg+xml',
+  'image/avif',
 ]);
 
-const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg']);
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.avif']);
 
 export async function POST(request: Request) {
   try {
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Only standard image formats (JPG, PNG, WebP, GIF, SVG) are permitted',
+          error: 'Only standard image formats (JPEG, JPG, PNG, WebP, GIF, SVG, AVIF) are permitted',
         },
         { status: 400 }
       );
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
           return NextResponse.json({
             success: true,
             imageUrl: publicUrl,
+            url: publicUrl,
             message: 'Image uploaded to Supabase cloud storage',
           });
         }
@@ -138,6 +141,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       imageUrl,
+      url: imageUrl,
       message: 'Image verified and saved to cloud storage',
     });
   } catch (error) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Product, CollectionFilter, GarmentSize, ProductReview } from '@/src/data/products';
@@ -18,8 +18,15 @@ interface DynamicProductPageProps {
 
 export default function DynamicProductPage({ params }: DynamicProductPageProps) {
   const router = useRouter();
-  const resolvedParams = use(params);
-  const productId = resolvedParams.id;
+  const resolvedParams: any = typeof (params as any)?.then === 'function' ? {} : params;
+  const [productId, setProductId] = useState<string>((params as any)?.id ? decodeURIComponent((params as any).id) : '');
+  useEffect(() => {
+    if (params && typeof (params as any).then === 'function') {
+      Promise.resolve(params).then((p: any) => {
+        if (p?.id) setProductId(decodeURIComponent(p.id));
+      });
+    }
+  }, [params]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
@@ -220,7 +227,13 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
         products={products}
         onNavigateHome={() => router.push('/')}
         onNavigateNewArrivals={() => router.push('/#new-arrivals')}
-        onNavigateShopCategory={() => router.push('/')}
+        onNavigateShopCategory={(cat) =>
+          router.push(
+            cat && cat !== 'All Collection'
+              ? `/?page=shop&category=${encodeURIComponent(cat)}`
+              : '/?page=shop'
+          )
+        }
         onNavigateAbout={() => router.push('/?page=about')}
         onNavigateContact={() => router.push('/?page=contact')}
         onOpenSearch={() => setSearchModalOpen(true)}
@@ -229,6 +242,9 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
         onOpenAccount={() => setAuthModalOpen(true)}
         logoUrl={siteSettings?.logoUrl}
         announcementText={siteSettings?.announcementText}
+        navLinks={siteSettings?.navLinks}
+        siteSettings={siteSettings}
+        onNavigatePolicy={(topic) => router.push(`/?page=policy&topic=${topic}`)}
       />
 
       <main className="flex-1">
@@ -236,8 +252,14 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
           product={product}
           allProducts={products}
           wishlistIds={wishlistIds}
-          onBackToShop={() => router.push('/')}
-          onSelectCategory={() => router.push('/')}
+          onBackToShop={() => router.push('/?page=shop')}
+          onSelectCategory={(cat) =>
+            router.push(
+              cat
+                ? `/?page=shop&category=${encodeURIComponent(cat)}`
+                : '/?page=shop'
+            )
+          }
           onSelectProduct={(p) => router.push(`/product/${p.id}`)}
           onAddToCart={(p, sz, qty) => handleAddToCart(p, sz, qty, true)}
           onBuyNow={handleBuyNow}
@@ -249,10 +271,18 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
 
       <Footer
         onNavigateHome={() => router.push('/')}
-        onNavigateCategory={() => router.push('/')}
+        onNavigateCategory={(cat) =>
+          router.push(
+            cat === 'All Collection'
+              ? '/?page=shop'
+              : `/?page=shop&category=${encodeURIComponent(cat)}`
+          )
+        }
         onNavigateAbout={() => router.push('/?page=about')}
         onNavigateContact={() => router.push('/?page=contact')}
-        onNavigatePolicy={() => router.push('/?page=policy')}
+        onNavigatePolicy={(topic) => router.push(`/?page=policy&topic=${topic}`)}
+        logoUrl={siteSettings?.logoUrl}
+        siteSettings={siteSettings}
       />
 
       {/* Cart Drawer */}

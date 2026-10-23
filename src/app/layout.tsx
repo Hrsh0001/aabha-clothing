@@ -37,6 +37,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+        <link rel="preconnect" href="https://peakzpsjvdunyliojhcy.supabase.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://peakzpsjvdunyliojhcy.supabase.co" />
         <link
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap"
           rel="stylesheet"
@@ -45,6 +49,7 @@ export default function RootLayout({
           rel="preload"
           as="image"
           href="/images/hero_editorial_banner_1791119088652.jpg"
+          type="image/jpeg"
           fetchPriority="high"
         />
       </head>

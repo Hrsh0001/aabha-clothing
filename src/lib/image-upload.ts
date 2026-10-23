@@ -17,9 +17,9 @@ export {
 };
 
 const MAX_RAW_FILE_BYTES = MAX_IMAGE_FILE_SIZE_BYTES; // 5 MB per photo limit
-const TARGET_MAX_DIMENSION = 1080;
-const TARGET_QUALITY = 0.78;
-const TARGET_MAX_BYTES = 95 * 1024; // Ultra-lightweight ~40KB–90KB WebP for instant storefront loading
+const TARGET_MAX_DIMENSION = 2560; // 2.5K high-res studio fidelity
+const TARGET_QUALITY = 0.95; // Pristine visual quality
+const TARGET_MAX_BYTES = 5 * 1024 * 1024; // Up to 5 MB per photo
 
 export function fileToDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -98,38 +98,10 @@ export async function compressImageFile(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // 1. Encode as WebP first (max 1080px, quality 0.78 -> ~40KB–90KB)
+        // 1. Encode preserving high fidelity (0.95+)
         let blob = await canvasToBlob(canvas, 'image/webp', quality);
-
-        // 2. If browser fell back to PNG or blob exceeds target budget, compress further
-        if (!blob || blob.size > TARGET_MAX_BYTES) {
-          const smallerDim = Math.min(900, maxDimension);
-          if (canvas.width > smallerDim || canvas.height > smallerDim) {
-            const scale = smallerDim / Math.max(canvas.width, canvas.height);
-            const c2 = document.createElement('canvas');
-            c2.width = Math.max(1, Math.round(canvas.width * scale));
-            c2.height = Math.max(1, Math.round(canvas.height * scale));
-            const ctx2 = c2.getContext('2d');
-            if (ctx2) {
-              ctx2.imageSmoothingEnabled = true;
-              ctx2.imageSmoothingQuality = 'high';
-              ctx2.fillStyle = '#FAF8F5';
-              ctx2.fillRect(0, 0, c2.width, c2.height);
-              ctx2.drawImage(canvas, 0, 0, c2.width, c2.height);
-              const webp2 = await canvasToBlob(c2, 'image/webp', 0.72);
-              if (webp2 && webp2.size <= TARGET_MAX_BYTES) {
-                blob = webp2;
-              } else {
-                const jpg2 = await canvasToBlob(c2, 'image/jpeg', 0.72);
-                if (jpg2) blob = jpg2;
-              }
-            }
-          } else {
-            const jpgBlob = await canvasToBlob(canvas, 'image/jpeg', 0.74);
-            if (jpgBlob && (!blob || jpgBlob.size < blob.size)) {
-              blob = jpgBlob;
-            }
-          }
+        if (!blob) {
+          blob = await canvasToBlob(canvas, 'image/jpeg', 0.95);
         }
 
         if (!blob) {
@@ -168,7 +140,7 @@ export async function compressDataUrlIfNeeded(url: string): Promise<string> {
     !url ||
     !url.startsWith('data:image/') ||
     url.startsWith('data:image/svg') ||
-    (url.startsWith('data:image/webp') && url.length < 130_000)
+    url.length < 2_000_000
   ) {
     return url;
   }
@@ -200,15 +172,12 @@ export async function compressDataUrlIfNeeded(url: string): Promise<string> {
           return;
         }
 
-        ctx.fillStyle = '#FAF8F5';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        let compressed = canvas.toDataURL('image/webp', TARGET_QUALITY);
-        if (compressed.length > 150_000 || !compressed.startsWith('data:image/webp')) {
-          compressed = canvas.toDataURL('image/jpeg', 0.72);
-        }
-        resolve(compressed);
+        const compressed = canvas.toDataURL('image/webp', TARGET_QUALITY);
+        resolve(compressed || url);
       } catch {
         resolve(url);
       }
@@ -240,8 +209,8 @@ export async function safeParseJsonResponse(res: Response): Promise<any> {
 }
 
 /**
- * Compresses an image file on the client and uploads it to /api/upload.
- * Falls back to a compressed client Data URL if the serverless upload endpoint is unreachable.
+ * Uploads an image file directly to /api/upload preserving 100% pristine visual clarity.
+ * Falls back to client Data URL only if the serverless upload endpoint is unreachable.
  */
 export async function uploadAdminImage(
   file: File,
@@ -264,11 +233,10 @@ export async function uploadAdminImage(
     };
   }
 
-  const compressedFile = await compressImageFile(file);
-
   try {
     const formData = new FormData();
-    formData.append('file', compressedFile);
+    // Preserve 100% pristine original photo bytes without client re-encoding
+    formData.append('file', file);
 
     const res = await fetch('/api/upload', {
       method: 'POST',
@@ -295,8 +263,8 @@ export async function uploadAdminImage(
       };
     }
 
-    // Fallback to client-encoded compressed Data URL if server upload returned a 5xx/storage error
-    const fallbackDataUrl = await fileToDataUrl(compressedFile);
+    // Fallback to client Data URL if server upload returned a 5xx/storage error
+    const fallbackDataUrl = await fileToDataUrl(file);
     if (fallbackDataUrl) {
       return { success: true, imageUrl: fallbackDataUrl };
     }
@@ -307,7 +275,7 @@ export async function uploadAdminImage(
     };
   } catch (err) {
     try {
-      const fallbackDataUrl = await fileToDataUrl(compressedFile);
+      const fallbackDataUrl = await fileToDataUrl(file);
       if (fallbackDataUrl) {
         return { success: true, imageUrl: fallbackDataUrl };
       }

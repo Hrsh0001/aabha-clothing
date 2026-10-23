@@ -122,7 +122,7 @@ describe('1. Product Editor Simultaneous All-Inputs Validation (useForm style)',
 });
 
 describe('2. Image Upload File Size Limit (5 MB) & Batch Validation', () => {
-  test('accepts valid JPG, PNG, and WebP files under 5 MB', () => {
+  test('accepts valid JPG, PNG, WebP, and AVIF files under 5 MB', () => {
     expect(
       validateImageFile({ name: 'studio-front.jpg', size: 1.4 * 1024 * 1024, type: 'image/jpeg' }).valid
     ).toBe(true);
@@ -131,6 +131,9 @@ describe('2. Image Upload File Size Limit (5 MB) & Batch Validation', () => {
     ).toBe(true);
     expect(
       validateImageFile({ name: 'lookbook.webp', size: 420 * 1024, type: 'image/webp' }).valid
+    ).toBe(true);
+    expect(
+      validateImageFile({ name: 'editorial.avif', size: 850 * 1024, type: 'image/avif' }).valid
     ).toBe(true);
   });
 

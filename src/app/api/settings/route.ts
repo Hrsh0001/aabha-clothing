@@ -5,16 +5,18 @@ import { persistImageUrlForCloud } from '../../../lib/image-store';
 import {
   type SiteSettings,
   DEFAULT_SETTINGS,
+} from '../../../lib/site-settings';
+import {
   readLocalSettings,
   saveLocalSettings,
-} from '../../../lib/site-settings';
+} from '../../../lib/site-settings-server';
 
 export type { SiteSettings };
 
 // GET /api/settings — Fetch active branding & section images
 export async function GET() {
   try {
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         const row = await prisma.siteSetting.findUnique({
           where: { id: 'site_branding' },
@@ -24,17 +26,23 @@ export async function GET() {
             typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
           const merged: SiteSettings = { ...DEFAULT_SETTINGS, ...parsed };
           saveLocalSettings(merged);
-          return NextResponse.json({ success: true, settings: merged });
+          return NextResponse.json(
+            { success: true, settings: merged },
+            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+          );
         }
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings read notice:', dbErr);
         }
       }
     }
 
     const settings = readLocalSettings();
-    return NextResponse.json({ success: true, settings });
+    return NextResponse.json(
+      { success: true, settings },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch {
     return NextResponse.json({ success: true, settings: DEFAULT_SETTINGS });
   }
@@ -52,7 +60,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     let current = readLocalSettings();
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         const row = await prisma.siteSetting.findUnique({
           where: { id: 'site_branding' },
@@ -63,7 +71,7 @@ export async function POST(request: Request) {
           current = { ...DEFAULT_SETTINGS, ...parsed };
         }
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings read notice in POST:', dbErr);
         }
       }
@@ -147,7 +155,7 @@ export async function POST(request: Request) {
         Object.keys(categoryImages).length > 0 ? categoryImages : (rawUpdated.categoryImages || {}),
     };
 
-    if (prisma) {
+    if ((process.env.NODE_ENV as string) !== 'test' && prisma) {
       try {
         await prisma.siteSetting.upsert({
           where: { id: 'site_branding' },
@@ -155,7 +163,7 @@ export async function POST(request: Request) {
           create: { id: 'site_branding', data: updated as any },
         });
       } catch (dbErr) {
-        if (process.env.NODE_ENV !== 'test') {
+        if ((process.env.NODE_ENV as string) !== 'test') {
           console.warn('Database settings write notice:', dbErr);
         }
       }

@@ -55,6 +55,7 @@ export async function ensureUploadedImageTable(): Promise<boolean> {
 
 function getExtensionFromMime(mimeType: string): string {
   const clean = mimeType.toLowerCase();
+  if (clean.includes('avif')) return '.avif';
   if (clean.includes('webp')) return '.webp';
   if (clean.includes('png')) return '.png';
   if (clean.includes('svg')) return '.svg';
@@ -64,6 +65,7 @@ function getExtensionFromMime(mimeType: string): string {
 
 function getMimeFromFilename(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
+  if (ext === '.avif') return 'image/avif';
   if (ext === '.webp') return 'image/webp';
   if (ext === '.png') return 'image/png';
   if (ext === '.svg') return 'image/svg+xml';

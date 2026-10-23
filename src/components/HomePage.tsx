@@ -241,6 +241,12 @@ export const HomePage: React.FC<HomePageProps> = ({
             }
           };
 
+          const heroOpacityVal = typeof siteSettings?.heroOverlayOpacity === 'number'
+            ? siteSettings.heroOverlayOpacity / 100
+            : 0.35;
+          const heroBlurPx = siteSettings?.heroBannerBlur ?? 0;
+          const heroBackdropBlurPx = siteSettings?.heroBackdropBlur ?? 0;
+
           return (
             <div
               key={slide.id}
@@ -250,55 +256,66 @@ export const HomePage: React.FC<HomePageProps> = ({
                 isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               } ${!hasButton && !hasTextContent ? 'cursor-pointer' : ''}`}
             >
-              {slide.mobileImage ? (
-                <>
-                  <div className="block md:hidden w-full h-full">
-                    <EditorialImage
-                      src={slide.mobileImage}
-                      alt={slide.alt}
-                      priority={index === 0}
-                      onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                      containerClassName="w-full h-full bg-[#F3EFEA]"
-                      className={`w-full h-full object-cover object-top transition-transform duration-1000 ease-out ${
-                        isActive ? 'scale-100' : 'scale-[1.03]'
-                      }`}
-                    />
-                  </div>
-                  <div className="hidden md:block w-full h-full">
-                    <EditorialImage
-                      src={slide.image}
-                      alt={slide.alt}
-                      priority={index === 0}
-                      onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                      containerClassName="w-full h-full bg-[#F3EFEA]"
-                      className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
-                        isActive ? 'scale-100' : 'scale-[1.03]'
-                      }`}
-                    />
-                  </div>
-                </>
-              ) : (
-                <EditorialImage
-                  src={slide.image}
-                  alt={slide.alt}
-                  priority={index === 0}
-                  onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                  containerClassName="w-full h-full bg-[#F3EFEA]"
-                  className={`w-full h-full object-cover object-top sm:object-center transition-transform duration-1000 ease-out ${
-                    isActive ? 'scale-100' : 'scale-[1.03]'
-                  }`}
-                />
-              )}
+              <div
+                className="w-full h-full"
+                style={{
+                  filter: heroBlurPx > 0 ? `blur(${heroBlurPx}px)` : undefined,
+                  transform: heroBlurPx > 0 ? 'scale(1.05)' : undefined,
+                }}
+              >
+                {slide.mobileImage ? (
+                  <>
+                    <div className="block md:hidden w-full h-full">
+                      <EditorialImage
+                        src={slide.mobileImage}
+                        alt={slide.alt}
+                        priority={index === 0}
+                        onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
+                        containerClassName="w-full h-full bg-[#F3EFEA]"
+                        className={`w-full h-full object-cover object-top transition-transform duration-1000 ease-out ${
+                          isActive ? 'scale-100' : 'scale-[1.03]'
+                        }`}
+                      />
+                    </div>
+                    <div className="hidden md:block w-full h-full">
+                      <EditorialImage
+                        src={slide.image}
+                        alt={slide.alt}
+                        priority={index === 0}
+                        onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
+                        containerClassName="w-full h-full bg-[#F3EFEA]"
+                        className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
+                          isActive ? 'scale-100' : 'scale-[1.03]'
+                        }`}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <EditorialImage
+                    src={slide.image}
+                    alt={slide.alt}
+                    priority={index === 0}
+                    onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
+                    containerClassName="w-full h-full bg-[#F3EFEA]"
+                    className={`w-full h-full object-cover object-top sm:object-center transition-transform duration-1000 ease-out ${
+                      isActive ? 'scale-100' : 'scale-[1.03]'
+                    }`}
+                  />
+                )}
+              </div>
 
-              {/* Scrim Overlay: Smoothly fades in only once photo has loaded to eliminate mobile dark flash */}
+              {/* Scrim Overlay: Smoothly fades in with configurable opacity & backdrop blur */}
               <div
                 className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${
-                  isSlideLoaded
-                    ? hasTextContent
-                      ? 'opacity-100 bg-gradient-to-t from-[#14110E]/85 via-[#14110E]/40 to-black/15'
-                      : 'opacity-100 bg-gradient-to-t from-black/55 via-transparent to-transparent'
-                    : 'opacity-0'
+                  isSlideLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
+                style={{
+                  background: hasTextContent
+                    ? `linear-gradient(to top, rgba(20, 17, 14, ${Math.min(0.95, heroOpacityVal + 0.45)}) 0%, rgba(20, 17, 14, ${heroOpacityVal}) 50%, rgba(0, 0, 0, ${Math.max(0, heroOpacityVal - 0.2)}) 100%)`
+                    : `linear-gradient(to top, rgba(0, 0, 0, ${heroOpacityVal}) 0%, transparent 70%)`,
+                  backdropFilter: heroBackdropBlurPx > 0 ? `blur(${heroBackdropBlurPx}px)` : undefined,
+                  WebkitBackdropFilter: heroBackdropBlurPx > 0 ? `blur(${heroBackdropBlurPx}px)` : undefined,
+                }}
                 aria-hidden="true"
               />
 
@@ -564,7 +581,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 4. Brand Story — Generous Editorial Rest Section */}
       {siteSettings?.showBrandStory !== false && (
-      <section className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
+      <section id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
         <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
@@ -621,7 +638,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 5. Curated Collection */}
       {siteSettings?.showCuratedSection !== false && curatedProducts.length > 0 && (
-        <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <section id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
             <div>
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">

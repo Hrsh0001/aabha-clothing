@@ -198,9 +198,15 @@ function normalizeProduct(raw: any): any {
   const fabric = raw.fabric || 'Pure Handloom Chanderi Silk';
   const category = raw.category || 'Anarkali';
 
-  let colors: Array<{ name: string; hex: string; imageUrl?: string }> | undefined = undefined;
+  let colors: Array<{ name: string; hex: string; imageUrl?: string; inStock?: boolean; stockQuantity?: number }> | undefined = undefined;
   if (Array.isArray(raw.colors) && raw.colors.length > 0) {
-    colors = raw.colors;
+    colors = raw.colors.map((c: any) => ({
+      name: String(c?.name || 'Artisan Shade').trim(),
+      hex: String(c?.hex || '#6E5043').trim(),
+      ...(c?.imageUrl ? { imageUrl: sanitizeImageUrl(c.imageUrl, '') } : {}),
+      inStock: typeof c?.inStock === 'boolean' ? c.inStock : (typeof raw.inStock === 'boolean' ? raw.inStock : true),
+      stockQuantity: typeof c?.stockQuantity === 'number' ? c.stockQuantity : (raw.inStock === false ? 0 : 10),
+    }));
   } else if (Array.isArray(raw.highlights)) {
     const colorMarker = raw.highlights.find(
       (h: any) => typeof h === 'string' && h.startsWith('__COLORS__:')
@@ -212,9 +218,54 @@ function normalizeProduct(raw: any): any {
     }
   }
 
+  // Parse sizeStock
+  let sizeStock: Record<string, { inStock: boolean; quantity?: number }> | undefined = undefined;
+  if (raw.sizeStock && typeof raw.sizeStock === 'object') {
+    sizeStock = raw.sizeStock;
+  } else if (Array.isArray(raw.highlights)) {
+    const sizeMarker = raw.highlights.find(
+      (h: any) => typeof h === 'string' && h.startsWith('__SIZE_STOCK__:')
+    );
+    if (sizeMarker) {
+      try {
+        sizeStock = JSON.parse(sizeMarker.slice('__SIZE_STOCK__:'.length));
+      } catch {}
+    }
+  }
+
+  const rawSizes =
+    Array.isArray(raw.sizes) && raw.sizes.length > 0
+      ? raw.sizes.map((s: any) => String(s).trim().toUpperCase()).filter(Boolean)
+      : ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  const resolvedMasterInStock = typeof raw.inStock === 'boolean' ? raw.inStock : true;
+
+  if (!sizeStock || typeof sizeStock !== 'object') {
+    sizeStock = {};
+    rawSizes.forEach((s: string) => {
+      sizeStock![s] = {
+        inStock: resolvedMasterInStock,
+        quantity: resolvedMasterInStock ? 10 : 0,
+      };
+    });
+  } else {
+    // Ensure every size has an entry
+    rawSizes.forEach((s: string) => {
+      if (!sizeStock![s]) {
+        sizeStock![s] = {
+          inStock: resolvedMasterInStock,
+          quantity: resolvedMasterInStock ? 10 : 0,
+        };
+      }
+    });
+  }
+
   const highlights = Array.isArray(raw.highlights)
     ? raw.highlights.filter(
-        (h: any) => typeof h === 'string' && !h.startsWith('__COLORS__:')
+        (h: any) =>
+          typeof h === 'string' &&
+          !h.startsWith('__COLORS__:') &&
+          !h.startsWith('__SIZE_STOCK__:')
       )
     : [
         'Handcrafted artisan detailing',
@@ -239,14 +290,12 @@ function normalizeProduct(raw: any): any {
       'Artisan Handloom',
     colorHex: raw.colorHex || '#6E5043',
     colors: colors && colors.length > 0 ? colors : undefined,
+    sizeStock,
     fabric,
     isNewArrival: typeof raw.isNewArrival === 'boolean' ? raw.isNewArrival : true,
     isCurated: typeof raw.isCurated === 'boolean' ? raw.isCurated : false,
-    inStock: typeof raw.inStock === 'boolean' ? raw.inStock : true,
-    sizes:
-      Array.isArray(raw.sizes) && raw.sizes.length > 0
-        ? raw.sizes
-        : ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    inStock: resolvedMasterInStock,
+    sizes: rawSizes,
     primaryImage,
     secondaryImage,
     gallery,
@@ -324,10 +373,13 @@ export async function GET(request: Request) {
           const dbProducts = await prisma.product.findMany({
             orderBy: { createdAt: 'desc' },
           });
-          return NextResponse.json({
-            success: true,
-            products: dbProducts.map(normalizeProduct),
-          });
+          return NextResponse.json(
+            {
+              success: true,
+              products: dbProducts.map(normalizeProduct),
+            },
+            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+          );
         }
       } catch (e) {
         console.warn('Prisma fetch notice, falling back to local cache:', e);
@@ -340,12 +392,18 @@ export async function GET(request: Request) {
         (p: any) => p.id === id || p.sku?.toLowerCase() === id.toLowerCase()
       );
       if (matched) {
-        return NextResponse.json({ success: true, product: matched });
+        return NextResponse.json(
+          { success: true, product: matched },
+          { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+        );
       }
       return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, products: localProducts });
+    return NextResponse.json(
+      { success: true, products: localProducts },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch products' },
@@ -380,6 +438,7 @@ export async function POST(request: Request) {
       colorName,
       colors,
       sizes,
+      sizeStock,
     } = body;
 
     const fieldErrors: Record<string, string> = {};
@@ -478,6 +537,8 @@ export async function POST(request: Request) {
             name: String(c.name).trim(),
             hex: String(c.hex || '#6E5043').trim(),
             ...(c.imageUrl ? { imageUrl: String(c.imageUrl).trim() } : {}),
+            inStock: typeof c.inStock === 'boolean' ? c.inStock : true,
+            stockQuantity: typeof c.stockQuantity === 'number' ? c.stockQuantity : 10,
           }))
       : undefined;
 
@@ -503,6 +564,7 @@ export async function POST(request: Request) {
       fabric: resolvedFabric,
       colorName: resolvedColorName,
       colors: resolvedColors,
+      sizeStock: sizeStock && typeof sizeStock === 'object' ? sizeStock : undefined,
       highlights: ['Handcrafted detailing', 'Breathable luxury weave', 'Side seam pockets'],
       fabricAndCare: ['Dry clean only', 'Store in cotton muslin bag'],
       sizeAndFit: ['Relaxed tailored silhouette', 'Model is 5ft 8in wearing Size S'],
@@ -531,9 +593,13 @@ export async function POST(request: Request) {
           newProduct.secondaryImage
         );
 
-        const dbHighlights = resolvedColors && resolvedColors.length > 0
+        let dbHighlights = resolvedColors && resolvedColors.length > 0
           ? [...newProduct.highlights, `__COLORS__:${JSON.stringify(resolvedColors)}`]
           : newProduct.highlights;
+
+        if (newProduct.sizeStock) {
+          dbHighlights = [...dbHighlights, `__SIZE_STOCK__:${JSON.stringify(newProduct.sizeStock)}`];
+        }
 
         const created = await prisma.product.create({
           data: {
@@ -732,15 +798,28 @@ export async function PUT(request: Request) {
                 name: String(c.name).trim(),
                 hex: String(c.hex || '#6E5043').trim(),
                 ...(c.imageUrl ? { imageUrl: String(c.imageUrl).trim() } : {}),
+                inStock: typeof c.inStock === 'boolean' ? c.inStock : true,
+                stockQuantity: typeof c.stockQuantity === 'number' ? c.stockQuantity : 10,
               }))
           : base?.colors;
 
-        const baseHighlights = (base?.highlights || ['Handcrafted detailing', 'Breathable luxury weave'])
-          .filter((h: any) => typeof h === 'string' && !h.startsWith('__COLORS__:'));
+        const incomingSizeStock = updates.sizeStock !== undefined ? updates.sizeStock : base?.sizeStock;
 
-        const highlightsWithColors = incomingColors && incomingColors.length > 0
+        const baseHighlights = (base?.highlights || ['Handcrafted detailing', 'Breathable luxury weave'])
+          .filter(
+            (h: any) =>
+              typeof h === 'string' &&
+              !h.startsWith('__COLORS__:') &&
+              !h.startsWith('__SIZE_STOCK__:')
+          );
+
+        let highlightsWithMarkers = incomingColors && incomingColors.length > 0
           ? [...baseHighlights, `__COLORS__:${JSON.stringify(incomingColors)}`]
           : baseHighlights;
+
+        if (incomingSizeStock && typeof incomingSizeStock === 'object') {
+          highlightsWithMarkers = [...highlightsWithMarkers, `__SIZE_STOCK__:${JSON.stringify(incomingSizeStock)}`];
+        }
 
         const prismaData = {
           sku: mergedSku,
@@ -756,7 +835,7 @@ export async function PUT(request: Request) {
           description: mergedDescription,
           fabric: mergedFabric,
           colorName: mergedColorName,
-          highlights: highlightsWithColors,
+          highlights: highlightsWithMarkers,
         };
 
         const updated = await prisma.product.upsert({
@@ -765,7 +844,7 @@ export async function PUT(request: Request) {
           create: {
             id,
             ...prismaData,
-            highlights: highlightsWithColors,
+            highlights: highlightsWithMarkers,
             fabricAndCare: base?.fabricAndCare || ['Dry clean recommended'],
           },
         });
@@ -816,6 +895,7 @@ export async function PUT(request: Request) {
       ...updates,
       gallery: nextGallery,
       ...(updates.colors !== undefined ? { colors: updates.colors } : {}),
+      ...(updates.sizeStock !== undefined ? { sizeStock: updates.sizeStock } : {}),
     });
     saveLocalProducts(localProducts);
 
@@ -826,6 +906,120 @@ export async function PUT(request: Request) {
       {
         success: false,
         error: error?.message || 'Failed to update product',
+        details: String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/products — Fast 1-click stock status toggling (size-wise, color-wise, or master)
+export async function PATCH(request: Request) {
+  try {
+    if (!isAuthorizedAdmin(request)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Administrator access required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, size, inStock, quantity, colorName, sizeStock, colors } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Product ID required' }, { status: 400 });
+    }
+
+    const dbReady = await ensureProductsDatabaseReady();
+    let currentProduct: any = null;
+
+    if (dbReady && prisma) {
+      try {
+        const p = await prisma.product.findUnique({ where: { id } });
+        if (p) currentProduct = normalizeProduct(p);
+      } catch {}
+    }
+
+    if (!currentProduct) {
+      const localProducts = readLocalProducts();
+      const found = localProducts.find((p: any) => p.id === id);
+      if (found) currentProduct = normalizeProduct(found);
+    }
+
+    if (!currentProduct) {
+      return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 });
+    }
+
+    const updates: any = {};
+
+    // 1. Overall inStock toggle
+    if (inStock !== undefined && size === undefined && colorName === undefined && sizeStock === undefined) {
+      updates.inStock = Boolean(inStock);
+    }
+
+    // 2. Specific size toggle / quantity update
+    if (size) {
+      const currentSizeStock = { ...(currentProduct.sizeStock || {}) };
+      const cur = currentSizeStock[size] || { inStock: true, quantity: 10 };
+      currentSizeStock[size] = {
+        inStock: inStock !== undefined ? Boolean(inStock) : !cur.inStock,
+        quantity: quantity !== undefined ? Number(quantity) : (cur.quantity ?? 10),
+      };
+      updates.sizeStock = currentSizeStock;
+    }
+
+    // 3. Full sizeStock map
+    if (sizeStock && typeof sizeStock === 'object') {
+      updates.sizeStock = sizeStock;
+    }
+
+    // 4. Specific color toggle / quantity update
+    if (colorName) {
+      let currentColors = [...(currentProduct.colors || [])];
+      if (currentColors.length === 0 && currentProduct.colorName) {
+        currentColors = [
+          {
+            name: currentProduct.colorName,
+            hex: currentProduct.colorHex || '#6E5043',
+            inStock: true,
+            stockQuantity: 10,
+          },
+        ];
+      }
+      const cIdx = currentColors.findIndex(
+        (c: any) => String(c.name).toLowerCase() === String(colorName).toLowerCase()
+      );
+      if (cIdx !== -1) {
+        currentColors[cIdx] = {
+          ...currentColors[cIdx],
+          inStock: inStock !== undefined ? Boolean(inStock) : !currentColors[cIdx].inStock,
+          ...(quantity !== undefined ? { stockQuantity: Number(quantity) } : {}),
+        };
+        updates.colors = currentColors;
+      }
+    }
+
+    // 5. Full colors array
+    if (colors && Array.isArray(colors)) {
+      updates.colors = colors;
+    }
+
+    const synthesizedReq = new Request('http://localhost/api/products', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: request.headers.get('Authorization') || '',
+      },
+      body: JSON.stringify({ id, ...updates }),
+    });
+
+    return PUT(synthesizedReq);
+  } catch (error: any) {
+    console.error('PATCH /api/products error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error?.message || 'Failed to patch product stock',
         details: String(error),
       },
       { status: 500 }
