@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { describe, test, expect, beforeAll, afterAll } from './jest-lite';
 import * as SettingsAPI from '../src/app/api/settings/route';
 import * as ProductsAPI from '../src/app/api/products/route';
-import { resetSettingsForTesting } from '../src/lib/site-settings';
+import { resetSettingsForTesting } from '../src/lib/site-settings-server';
 import { signJwt } from '../src/lib/jwt';
 import { validateBrandingForm } from '../src/lib/form-validation';
 

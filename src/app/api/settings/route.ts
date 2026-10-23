@@ -5,9 +5,11 @@ import { persistImageUrlForCloud } from '../../../lib/image-store';
 import {
   type SiteSettings,
   DEFAULT_SETTINGS,
+} from '../../../lib/site-settings';
+import {
   readLocalSettings,
   saveLocalSettings,
-} from '../../../lib/site-settings';
+} from '../../../lib/site-settings-server';
 
 export type { SiteSettings };
 
