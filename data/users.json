@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "usr_1792770489000_5g4g",
+    "name": "Namarata pandit",
+    "email": "panditnamrata421@gmail.com",
+    "phone": "8849022214",
+    "createdAt": "2026-10-23T15:48:09.000Z",
+    "resetToken": null,
+    "passwordHash": "03a470f4523746292e551ed7fea5f23186b72620756134d8661ea65cbccc1216",
+    "resetTokenExpiry": null
+  }
+]

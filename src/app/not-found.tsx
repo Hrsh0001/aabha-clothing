@@ -66,7 +66,7 @@ export default function NotFound() {
             Popular Atelier Collections
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-            {['Anarkali Suits', 'Handwoven Chanderi', 'Co-ord Sets', '3-Piece Ensembles'].map((item) => (
+            {['Anarkali Suits', 'Handwoven Chanderi', 'Co-ord Sets', 'Kurta Sets'].map((item) => (
               <Link
                 key={item}
                 href="/"

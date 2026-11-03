@@ -54,7 +54,7 @@ function ensureDataDirectory(): void {
 }
 
 function readOrders(): CODOrder[] {
-  if (inMemoryOrdersCache && inMemoryOrdersCache.length > 0) {
+  if (inMemoryOrdersCache !== null) {
     return inMemoryOrdersCache;
   }
   try {
@@ -64,9 +64,11 @@ function readOrders(): CODOrder[] {
       inMemoryOrdersCache = JSON.parse(data);
       return inMemoryOrdersCache || [];
     }
-    return inMemoryOrdersCache || [];
+    inMemoryOrdersCache = [];
+    return inMemoryOrdersCache;
   } catch (err) {
-    return inMemoryOrdersCache || [];
+    inMemoryOrdersCache = [];
+    return inMemoryOrdersCache;
   }
 }
 
@@ -83,28 +85,18 @@ function saveOrders(orders: CODOrder[]): void {
 // GET /api/orders — Fetch all COD orders (Used by Admin Dashboard)
 export async function GET() {
   try {
-    const localOrders = [...readOrders()].reverse();
     if (prisma) {
       try {
         const dbOrders = await prisma.order.findMany({
           orderBy: { createdAt: 'desc' },
         });
-        if (dbOrders && dbOrders.length > 0) {
-          const seenIds = new Set(dbOrders.map((o: any) => o.id));
-          const seenNums = new Set(dbOrders.map((o: any) => o.orderNumber));
-          const merged = [...dbOrders];
-          for (const loc of localOrders) {
-            if (!seenIds.has(loc.id) && !seenNums.has(loc.orderNumber)) {
-              merged.push(loc as any);
-            }
-          }
-          return NextResponse.json({ success: true, orders: merged });
-        }
+        return NextResponse.json({ success: true, orders: dbOrders });
       } catch (dbErr) {
         console.warn('Prisma orders fetch notice:', dbErr);
       }
     }
 
+    const localOrders = [...readOrders()].reverse();
     return NextResponse.json({ success: true, orders: localOrders });
   } catch (error) {
     return NextResponse.json(

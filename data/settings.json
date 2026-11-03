@@ -41,13 +41,22 @@
   "categorySectionEyebrow": "THE LAUNCH SILHOUETTES",
   "categorySectionHeading": "Shop By Category",
   "categorySectionSubheading": "Fluid silhouettes tailored for effortless elegance",
+  "categoryNames": {
+    "Anarkali": "Anarkali",
+    "Kurta Set": "Kurta Set",
+    "3-Piece Dresses": "Kurta Set",
+    "Co-ord Sets": "Co-ord Sets",
+    "Chikankari Suit": "Chikankari Suit"
+  },
   "categoryTaglines": {
     "Anarkali": "Fluid kalidar silhouettes in Chanderi & silk",
+    "Kurta Set": "Complete ensembles with mulmul dupatta",
     "3-Piece Dresses": "Complete ensembles with mulmul dupatta",
     "Co-ord Sets": "Tailored twin-sets for modern refinement",
     "Chikankari Suit": "Intricate tone-on-tone artisanal needlework"
   },
   "categoryImages": {},
+  "customCategories": [],
   "newArrivalsEyebrow": "INAUGURAL RELEASE",
   "newArrivalsHeading": "New Arrivals",
   "newArrivalsSubheading": "Handcrafted in limited quantities with artisanal attention.",
@@ -168,8 +177,8 @@
     },
     {
       "id": "nav-3piece",
-      "label": "3-Piece Dresses",
-      "href": "/shop?category=3-Piece Dresses",
+      "label": "Kurta Set",
+      "href": "/shop?category=Kurta Set",
       "visible": true
     },
     {
@@ -223,8 +232,8 @@
         },
         {
           "id": "fl-3piece",
-          "label": "3-Piece Dresses",
-          "href": "/shop?category=3-Piece Dresses",
+          "label": "Kurta Set",
+          "href": "/shop?category=Kurta Set",
           "visible": true
         },
         {

@@ -80,18 +80,27 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   const activeCategoryMeta = useMemo(() => {
     if (selectedCategory === 'All Collection') {
       return {
-        title: 'All Collection',
+        title: siteSettings?.shopHeaderTitle || 'All Collection',
         subtitle:
           siteSettings?.categorySectionSubheading ||
-          'The AABHA CLOTHING curated collection: handcrafted Anarkalis, Three-Piece Dresses, Co-ord Sets, and Chikankari Suits in Chanderi silk and fine linen.',
+          'The AABHA CLOTHING curated collection: handcrafted Anarkalis, Kurta Sets, Co-ord Sets, and Chikankari Suits in Chanderi silk and fine linen.',
       };
     }
-    const found = CATEGORIES.find((c) => c.id === selectedCategory);
+    const found = CATEGORIES.find((c) => c.id === selectedCategory || c.name === selectedCategory);
+    const customCat = siteSettings?.customCategories?.find(
+      (c) => c.name === selectedCategory || c.id === selectedCategory
+    );
+    const customTitle =
+      siteSettings?.categoryNames?.[selectedCategory] ||
+      (found ? siteSettings?.categoryNames?.[found.id] || siteSettings?.categoryNames?.[found.name] : undefined) ||
+      customCat?.name ||
+      selectedCategory;
     const customTagline =
       siteSettings?.categoryTaglines?.[selectedCategory] ||
-      (found ? siteSettings?.categoryTaglines?.[found.name] : undefined);
+      (found ? siteSettings?.categoryTaglines?.[found.name] || siteSettings?.categoryTaglines?.[found.id] : undefined) ||
+      customCat?.tagline;
     return {
-      title: selectedCategory,
+      title: customTitle,
       subtitle:
         customTagline ||
         found?.tagline ||
@@ -100,35 +109,63 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   }, [selectedCategory, siteSettings]);
 
   const categoryTabs = useMemo(() => {
-    return [
+    const tabs: { id: CollectionFilter; label: string }[] = [
       {
         id: 'All Collection' as CollectionFilter,
         label: 'All Collection',
       },
       {
         id: 'Anarkali' as CollectionFilter,
-        label: 'Anarkali',
+        label: siteSettings?.categoryNames?.['Anarkali'] || 'Anarkali',
       },
       {
-        id: '3-Piece Dresses' as CollectionFilter,
-        label: '3-Piece Dresses',
+        id: 'Kurta Set' as CollectionFilter,
+        label:
+          siteSettings?.categoryNames?.['Kurta Set'] ||
+          siteSettings?.categoryNames?.['3-Piece Dresses'] ||
+          'Kurta Set',
       },
       {
         id: 'Co-ord Sets' as CollectionFilter,
-        label: 'Co-ord Sets',
+        label: siteSettings?.categoryNames?.['Co-ord Sets'] || 'Co-ord Sets',
       },
       {
         id: 'Chikankari Suit' as CollectionFilter,
-        label: 'Chikankari Suit',
+        label: siteSettings?.categoryNames?.['Chikankari Suit'] || 'Chikankari Suit',
       },
     ];
-  }, []);
+
+    if (siteSettings?.customCategories && Array.isArray(siteSettings.customCategories)) {
+      for (const c of siteSettings.customCategories) {
+        if (c && c.name && c.visible !== false) {
+          tabs.push({
+            id: c.name as CollectionFilter,
+            label: c.name,
+          });
+        }
+      }
+    }
+
+    return tabs;
+  }, [siteSettings]);
 
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
     if (selectedCategory !== 'All Collection') {
-      list = list.filter((p) => p.category === selectedCategory);
+      const aliasName =
+        siteSettings?.categoryNames?.[selectedCategory] ||
+        (selectedCategory === 'Kurta Set' ? '3-Piece Dresses' : '');
+
+      list = list.filter((p) => {
+        if (selectedCategory === 'Kurta Set' || selectedCategory === '3-Piece Dresses') {
+          return p.category === 'Kurta Set' || p.category === '3-Piece Dresses' || (p.category as string) === '3-Piece Dress';
+        }
+        return (
+          p.category === selectedCategory ||
+          (aliasName && p.category === aliasName)
+        );
+      });
     }
 
     if (sortBy === 'newest') {

@@ -72,7 +72,7 @@ export const EditorialImage: React.FC<EditorialImageProps> = ({
               onLoad?.();
             }}
             onError={handleError}
-            className={`${className} transition-opacity duration-300 ease-out ${
+            className={`${className} transform-gpu backface-hidden transition-opacity duration-300 ease-out ${
               isLoaded || cleanSrc.startsWith('data:') ? 'opacity-100' : 'opacity-0'
             }`}
           />

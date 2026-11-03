@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -44,6 +44,7 @@ import {
   type ProductFormErrors,
   type ProductFormValues,
 } from '@/src/lib/form-validation';
+import type { SiteSettings } from '@/src/lib/site-settings';
 
 export interface GalleryItem {
   url: string;
@@ -110,6 +111,31 @@ function ProductEditorContent() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+
+  const availableCategories = useMemo(() => {
+    const list = [
+      { value: 'Anarkali', label: siteSettings?.categoryNames?.['Anarkali'] || 'Anarkali' },
+      {
+        value: 'Kurta Set',
+        label:
+          siteSettings?.categoryNames?.['Kurta Set'] ||
+          siteSettings?.categoryNames?.['3-Piece Dresses'] ||
+          'Kurta Set',
+      },
+      { value: '3-Piece Dresses', label: '3-Piece Dresses (Kurta Set)' },
+      { value: 'Co-ord Sets', label: siteSettings?.categoryNames?.['Co-ord Sets'] || 'Co-ord Sets' },
+      { value: 'Chikankari Suit', label: siteSettings?.categoryNames?.['Chikankari Suit'] || 'Chikankari Suit' },
+    ];
+    if (siteSettings?.customCategories && Array.isArray(siteSettings.customCategories)) {
+      for (const c of siteSettings.customCategories) {
+        if (c && c.name && !list.some((item) => item.value === c.name)) {
+          list.push({ value: c.name, label: c.name });
+        }
+      }
+    }
+    return list;
+  }, [siteSettings]);
 
   // Uploading state
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -203,8 +229,15 @@ function ProductEditorContent() {
     };
   };
 
-  // Load existing product
+  // Load existing product & site settings
   useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.settings) setSiteSettings(d.settings);
+      })
+      .catch(() => {});
+
     if (isNew) {
       setSku(`AB-ANA-${Math.floor(100 + Math.random() * 899)}`);
       return;
@@ -1534,10 +1567,11 @@ function ProductEditorContent() {
                     : 'border-[#E0D8CE] focus:border-[#1E1B18]'
                 }`}
               >
-                <option value="Anarkali">Anarkali</option>
-                <option value="3-Piece Dresses">3-Piece Dresses</option>
-                <option value="Co-ord Sets">Co-ord Sets</option>
-                <option value="Chikankari Suit">Chikankari Suit</option>
+                {availableCategories.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
               </select>
               {errors.category && (
                 <p className="mt-1.5 text-xs text-[#C62828] flex items-center gap-1.5 font-medium" role="alert">

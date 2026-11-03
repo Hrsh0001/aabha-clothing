@@ -113,6 +113,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // Persist any uploaded custom categories cover photos
+    const customCategories: any[] = [];
+    if (Array.isArray(rawUpdated.customCategories)) {
+      for (const item of rawUpdated.customCategories) {
+        if (item && typeof item === 'object') {
+          const img = item.imageUrl ? (await persistImageUrlForCloud(item.imageUrl)) || item.imageUrl : '';
+          customCategories.push({
+            ...item,
+            imageUrl: img,
+          });
+        }
+      }
+    }
+
     const updated: SiteSettings = {
       ...DEFAULT_SETTINGS,
       ...rawUpdated,
@@ -165,6 +179,8 @@ export async function POST(request: Request) {
       igPhotos: igPhotos.length > 0 ? igPhotos : DEFAULT_SETTINGS.igPhotos,
       categoryImages:
         Object.keys(categoryImages).length > 0 ? categoryImages : (rawUpdated.categoryImages || {}),
+      customCategories:
+        customCategories.length > 0 ? customCategories : (rawUpdated.customCategories || []),
     };
 
     if ((process.env.NODE_ENV as string) !== 'test' && prisma) {

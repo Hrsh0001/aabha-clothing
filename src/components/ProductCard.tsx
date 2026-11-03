@@ -70,8 +70,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           fallbackLabel={product.name}
           priority={priority}
           containerClassName="w-full h-full"
-          className={`w-full h-full object-cover transition-transform duration-500 ease-out ${
-            isHovered ? 'scale-[1.03]' : 'scale-100'
+          className={`w-full h-full object-cover transform-gpu will-change-transform backface-hidden transition-transform duration-500 ease-out ${
+            isHovered ? 'scale-[1.02]' : 'scale-100'
           }`}
         />
 

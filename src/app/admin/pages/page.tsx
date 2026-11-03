@@ -46,11 +46,13 @@ import {
   NavLinkItem,
   FooterColumn,
   SiteSettings,
+  CustomCategoryItem,
   DEFAULT_CUSTOM_PAGES,
   DEFAULT_NAV_LINKS,
   DEFAULT_FOOTER_COLUMNS,
   DEFAULT_SETTINGS,
 } from '@/src/lib/site-settings';
+import { CATEGORIES } from '@/src/data/products';
 import {
   validateImageFile,
   IMAGE_UPLOAD_LIMIT_BADGE,
@@ -1168,30 +1170,151 @@ function AdminPagesStudio() {
                                   )}
 
                                   {secKey === 'categories' && (
-                                    <div className="space-y-3 text-xs">
-                                      <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
-                                        Shop By Category Header
-                                      </h5>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-4 text-xs">
+                                      <div className="flex items-center justify-between pb-1 border-b border-[#ECE6DD]">
+                                        <h5 className="font-semibold text-xs text-[#1E1B18] uppercase tracking-wider">
+                                          Shop By Category Section
+                                        </h5>
+                                        <Link
+                                          href="/admin/branding?tab=categories"
+                                          className="text-[11px] text-[#6E5043] hover:text-[#1E1B18] underline font-medium flex items-center gap-1"
+                                        >
+                                          <span>Open Branding & Cover Studio</span>
+                                          <ExternalLink className="w-3 h-3" />
+                                        </Link>
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         <div>
-                                          <label className="block text-[10px] text-[#7C736A] mb-1">Eyebrow:</label>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1 font-medium">Eyebrow:</label>
                                           <input
                                             type="text"
                                             value={settings.categorySectionEyebrow || 'The Launch Silhouettes'}
                                             onChange={(e) => setSettings({ ...settings, categorySectionEyebrow: e.target.value })}
-                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white focus:outline-none"
                                           />
                                         </div>
                                         <div>
-                                          <label className="block text-[10px] text-[#7C736A] mb-1">Heading:</label>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1 font-medium">Heading:</label>
                                           <input
                                             type="text"
                                             value={settings.categorySectionHeading || 'Shop By Category'}
                                             onChange={(e) => setSettings({ ...settings, categorySectionHeading: e.target.value })}
-                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white"
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white focus:outline-none"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] text-[#7C736A] mb-1 font-medium">Subheading:</label>
+                                          <input
+                                            type="text"
+                                            value={settings.categorySectionSubheading || 'Fluid silhouettes tailored for effortless elegance'}
+                                            onChange={(e) => setSettings({ ...settings, categorySectionSubheading: e.target.value })}
+                                            className="w-full px-2.5 py-1.5 border border-[#ECE6DD] text-xs bg-white focus:outline-none"
                                           />
                                         </div>
                                       </div>
+
+                                      {/* Individual Silhouette Cards */}
+                                      <div className="pt-2">
+                                        <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] font-semibold mb-2">
+                                          Category Titles & Taglines:
+                                        </label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          {CATEGORIES.map((cat) => {
+                                            const catTitle = settings.categoryNames?.[cat.id] || settings.categoryNames?.[cat.name] || cat.name;
+                                            const catTagline = settings.categoryTaglines?.[cat.id] || settings.categoryTaglines?.[cat.name] || cat.tagline;
+                                            return (
+                                              <div key={cat.id} className="p-2.5 bg-white border border-[#ECE6DD] space-y-2">
+                                                <div className="flex items-center justify-between text-[11px] font-medium text-[#1E1B18]">
+                                                  <span>{cat.index} · Silhouette</span>
+                                                  <span className="text-[10px] text-[#7C736A] font-mono">{cat.id}</span>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[9px] uppercase tracking-wider text-[#7C736A] mb-0.5">Title / Name:</label>
+                                                  <input
+                                                    type="text"
+                                                    value={catTitle}
+                                                    onChange={(e) => {
+                                                      setSettings({
+                                                        ...settings,
+                                                        categoryNames: {
+                                                          ...(settings.categoryNames || {}),
+                                                          [cat.id]: e.target.value,
+                                                        },
+                                                      });
+                                                    }}
+                                                    className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-[#FAF8F5] focus:outline-none focus:bg-white"
+                                                    placeholder={cat.name}
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[9px] uppercase tracking-wider text-[#7C736A] mb-0.5">Tagline:</label>
+                                                  <input
+                                                    type="text"
+                                                    value={catTagline}
+                                                    onChange={(e) => {
+                                                      setSettings({
+                                                        ...settings,
+                                                        categoryTaglines: {
+                                                          ...(settings.categoryTaglines || {}),
+                                                          [cat.id]: e.target.value,
+                                                        },
+                                                      });
+                                                    }}
+                                                    className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-[#FAF8F5] focus:outline-none focus:bg-white"
+                                                  />
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* Custom Categories if any */}
+                                      {settings.customCategories && settings.customCategories.length > 0 && (
+                                        <div className="pt-2">
+                                          <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] font-semibold mb-2">
+                                            Custom Categories:
+                                          </label>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {settings.customCategories.map((c, idx) => (
+                                              <div key={c.id} className="p-2.5 bg-white border border-[#ECE6DD] space-y-2">
+                                                <div className="flex items-center justify-between text-[11px] font-medium text-[#1E1B18]">
+                                                  <span>Custom #{idx + 5} · {c.name}</span>
+                                                  <span className="text-[10px] text-[#2E7D32] font-mono">Custom</span>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[9px] uppercase tracking-wider text-[#7C736A] mb-0.5">Title / Name:</label>
+                                                  <input
+                                                    type="text"
+                                                    value={c.name}
+                                                    onChange={(e) => {
+                                                      const updated = (settings.customCategories || []).map((item) =>
+                                                        item.id === c.id ? { ...item, name: e.target.value } : item
+                                                      );
+                                                      setSettings({ ...settings, customCategories: updated });
+                                                    }}
+                                                    className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-[#FAF8F5] focus:outline-none focus:bg-white"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[9px] uppercase tracking-wider text-[#7C736A] mb-0.5">Tagline:</label>
+                                                  <input
+                                                    type="text"
+                                                    value={c.tagline || ''}
+                                                    onChange={(e) => {
+                                                      const updated = (settings.customCategories || []).map((item) =>
+                                                        item.id === c.id ? { ...item, tagline: e.target.value } : item
+                                                      );
+                                                      setSettings({ ...settings, customCategories: updated });
+                                                    }}
+                                                    className="w-full px-2 py-1 border border-[#ECE6DD] text-xs bg-[#FAF8F5] focus:outline-none focus:bg-white"
+                                                  />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
 

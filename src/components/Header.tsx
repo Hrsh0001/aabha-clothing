@@ -44,7 +44,7 @@ interface HeaderProps {
 const SHOP_CATEGORIES: Array<{ label: CollectionFilter; count: number }> = [
   { label: 'All Collection', count: 0 },
   { label: 'Anarkali', count: 0 },
-  { label: '3-Piece Dresses', count: 0 },
+  { label: 'Kurta Set', count: 0 },
   { label: 'Co-ord Sets', count: 0 },
   { label: 'Chikankari Suit', count: 0 },
 ];
@@ -81,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
   const shopCategories = useMemo<{ label: CollectionFilter }[]>(() => [
     { label: 'All Collection' },
     { label: 'Anarkali' },
-    { label: '3-Piece Dresses' },
+    { label: 'Kurta Set' },
     { label: 'Co-ord Sets' },
     { label: 'Chikankari Suit' },
   ], []);
