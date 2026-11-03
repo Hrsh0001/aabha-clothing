@@ -47,6 +47,7 @@ import {
   validateJsonPayloadSize,
   ProductFormValues,
 } from '@/src/lib/form-validation';
+import type { SiteSettings } from '@/src/lib/site-settings';
 
 
 export interface GalleryItem {
@@ -137,12 +138,37 @@ export default function AdminProductsPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingSecondary, setUploadingSecondary] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const availableCategories = useMemo(() => {
+    const list = [
+      { value: 'Anarkali', label: siteSettings?.categoryNames?.['Anarkali'] || 'Anarkali' },
+      {
+        value: 'Kurta Set',
+        label:
+          siteSettings?.categoryNames?.['Kurta Set'] ||
+          siteSettings?.categoryNames?.['3-Piece Dresses'] ||
+          'Kurta Set',
+      },
+      { value: '3-Piece Dresses', label: '3-Piece Dresses (Kurta Set)' },
+      { value: 'Co-ord Sets', label: siteSettings?.categoryNames?.['Co-ord Sets'] || 'Co-ord Sets' },
+      { value: 'Chikankari Suit', label: siteSettings?.categoryNames?.['Chikankari Suit'] || 'Chikankari Suit' },
+    ];
+    if (siteSettings?.customCategories && Array.isArray(siteSettings.customCategories)) {
+      for (const c of siteSettings.customCategories) {
+        if (c && c.name && !list.some((item) => item.value === c.name)) {
+          list.push({ value: c.name, label: c.name });
+        }
+      }
+    }
+    return list;
+  }, [siteSettings]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +238,12 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     fetchProducts();
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.settings) setSiteSettings(d.settings);
+      })
+      .catch(() => {});
   }, []);
 
   // Reset pagination on filter change
@@ -789,6 +821,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -819,6 +856,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -850,6 +892,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -880,6 +927,11 @@ export default function AdminProductsPage() {
       });
       const data = await safeParseJsonResponse(res);
       if (data.success && data.product) {
+        try {
+          localStorage.removeItem('aabha_products_cache_v2');
+          sessionStorage.removeItem('aabha_products_cache');
+          window.dispatchEvent(new CustomEvent('aabha:products_updated'));
+        } catch {}
         setProducts((prev) =>
           prev.map((item) => (item.id === product.id ? { ...item, ...data.product } : item))
         );
@@ -1057,10 +1109,11 @@ export default function AdminProductsPage() {
               className="bg-[#FAF8F5] border border-[#E0D8CE] px-3 py-2 text-xs text-[#1E1B18] focus:outline-none cursor-pointer"
             >
               <option value="ALL">All Categories</option>
-              <option value="Anarkali">Anarkali</option>
-              <option value="3-Piece Dresses">3-Piece Dresses</option>
-              <option value="Co-ord Sets">Co-ord Sets</option>
-              <option value="Chikankari Suit">Chikankari Suit</option>
+              {availableCategories.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
             </select>
 
             {/* Stock Filter */}
@@ -1265,13 +1318,22 @@ export default function AdminProductsPage() {
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </a>
-                            <Link
-                              href={`/admin/products/edit?id=${p.id}`}
-                              className="p-1.5 text-[#5C544D] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer flex items-center gap-1"
-                              title="Edit Silhouette & Multi-Angle Photos on Full Page"
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(p)}
+                              className="p-1.5 text-[#5C544D] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer flex items-center gap-1 hover:bg-[#ECE6DD] transition-colors"
+                              title="Quick Edit in Popup Modal"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
-                              <span className="text-[11px] font-medium hidden sm:inline">Edit</span>
+                              <span className="text-[11px] font-medium hidden sm:inline">Quick Edit</span>
+                            </button>
+                            <Link
+                              href={`/admin/products/edit?id=${p.id}`}
+                              className="p-1.5 text-[#5C544D] hover:text-[#1E1B18] border border-[#E0D8CE] bg-[#FAF8F5] cursor-pointer flex items-center gap-1 hover:bg-[#ECE6DD] transition-colors"
+                              title="Edit Silhouette & Multi-Angle Photos on Full Page"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-medium hidden sm:inline">Full Edit</span>
                             </Link>
                             <button
                               type="button"
@@ -1406,10 +1468,11 @@ export default function AdminProductsPage() {
                       errors.category ? 'border-[#C62828] bg-[#FFF5F5]' : 'border-[#E0D8CE]'
                     }`}
                   >
-                    <option value="Anarkali">Anarkali</option>
-                    <option value="3-Piece Dresses">3-Piece Dresses</option>
-                    <option value="Co-ord Sets">Co-ord Sets</option>
-                    <option value="Chikankari Suit">Chikankari Suit</option>
+                    {availableCategories.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                   {errors.category && (
                     <p className="text-[11px] text-[#C62828] mt-1 font-medium flex items-center gap-1">

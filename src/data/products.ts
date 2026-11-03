@@ -24,9 +24,10 @@ export const BRAND_CONFIG = {
 
 export type ProductCategory =
   | 'Anarkali'
-  | '3-Piece Dresses'
+  | 'Kurta Set'
   | 'Co-ord Sets'
-  | 'Chikankari Suit';
+  | 'Chikankari Suit'
+  | '3-Piece Dresses'; // Backward-compatible alias for existing records
 
 export type CollectionFilter = 'All Collection' | ProductCategory;
 
@@ -175,9 +176,9 @@ export const CATEGORIES: CategoryInfo[] = [
     image: EDITORIAL_ASSETS.dressOchre,
   },
   {
-    id: '3-Piece Dresses',
+    id: 'Kurta Set',
     index: '02',
-    name: '3-Piece Dresses',
+    name: 'Kurta Set',
     tagline: 'Complete Chanderi silk & organza three-piece ensembles',
     image: EDITORIAL_ASSETS.kurtaSetSand,
   },
@@ -323,13 +324,13 @@ export const PRODUCTS: Product[] = [
     reviews: [],
   },
 
-  // ======================== 3-PIECE DRESSES (5 PRODUCTS) ========================
+  // ======================== KURTA SETS (5 PRODUCTS) ========================
   {
     id: 'three-piece-01',
     sku: 'AB-3P-01',
     name: 'Three-Piece Dress 01',
     subtitle: 'Champagne sand Chanderi silk kurta, wide trousers & organza dupatta',
-    category: '3-Piece Dresses',
+    category: 'Kurta Set',
     price: 8990,
     originalPrice: 10400,
     colorName: 'Champagne Sand',
@@ -386,7 +387,7 @@ export const PRODUCTS: Product[] = [
     sku: 'AB-3P-02',
     name: 'Three-Piece Dress 02',
     subtitle: 'Deep rosewood silk-cotton tunic, straight pants & zari stole',
-    category: '3-Piece Dresses',
+    category: 'Kurta Set',
     price: 8490,
     colorName: 'Deep Rosewood',
     colorHex: '#5C3A32',
@@ -429,7 +430,7 @@ export const PRODUCTS: Product[] = [
     sku: 'AB-3P-03',
     name: 'Three-Piece Dress 03',
     subtitle: 'Warm sandstone Chanderi ensemble with tapered trousers & tissue dupatta',
-    category: '3-Piece Dresses',
+    category: 'Kurta Set',
     price: 9290,
     colorName: 'Warm Sandstone',
     colorHex: '#D6C4AE',
@@ -468,7 +469,7 @@ export const PRODUCTS: Product[] = [
     sku: 'AB-3P-04',
     name: 'Three-Piece Dress 04',
     subtitle: 'Botanical sage raw silk tunic, straight trousers & handwoven silk stole',
-    category: '3-Piece Dresses',
+    category: 'Kurta Set',
     price: 8690,
     originalPrice: 9600,
     colorName: 'Botanical Sage',
@@ -509,7 +510,7 @@ export const PRODUCTS: Product[] = [
     sku: 'AB-3P-05',
     name: 'Three-Piece Dress 05',
     subtitle: 'Ivory pintuck linen-silk kurta, wide palazzos & kora organza dupatta',
-    category: '3-Piece Dresses',
+    category: 'Kurta Set',
     price: 8190,
     colorName: 'Warm Ivory',
     colorHex: '#EFECE6',

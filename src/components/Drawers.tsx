@@ -111,7 +111,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <ShoppingBag className="w-7 h-7 text-[#948A80] mb-4 stroke-[1.2]" />
               <p className="font-serif text-2xl text-[#1E1B18] mb-1.5">Your bag is empty</p>
               <p className="text-xs text-[#7C736A] font-light max-w-xs mb-7 leading-relaxed">
-                Explore our 17-piece launch collection of Anarkalis, 3-Piece Dresses, Co-ord Sets, and Chikankari Suits.
+                Explore our 17-piece launch collection of Anarkalis, Kurta Sets, Co-ord Sets, and Chikankari Suits.
               </p>
               <button
                 type="button"
@@ -488,7 +488,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         {/* Minimal Search Suggestions */}
         <div className="px-6 py-3.5 bg-[#F3EFEA] flex flex-wrap items-center gap-3 text-xs">
           <span className="text-[#7C736A] tracking-wide">Suggestions:</span>
-          {['Anarkali', '3-Piece Dress', 'Co-ord Set', 'Chikankari Suit', 'Chanderi', 'Linen'].map(
+          {['Anarkali', 'Kurta Set', 'Co-ord Set', 'Chikankari Suit', 'Chanderi', 'Linen'].map(
             (term) => (
               <button
                 key={term}
@@ -546,7 +546,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             </div>
           ) : (
             <p className="text-sm text-[#7C736A] font-light py-10 text-center">
-              No silhouettes matched "{query}". Try searching for Anarkali, 3-Piece Dress, Co-ord Set, or Chikankari.
+              No silhouettes matched "{query}". Try searching for Anarkali, Kurta Set, Co-ord Set, or Chikankari.
             </p>
           )}
         </div>

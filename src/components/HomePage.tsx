@@ -206,11 +206,39 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  return (
-    <div className="space-y-24 sm:space-y-36 pb-24 sm:pb-32">
-      {/* 1. 3-Slide Swipeable Editorial Hero Carousel */}
-      {siteSettings?.showHeroCarousel !== false && (
+  const activeSectionsOrder = useMemo(() => {
+    const defaultOrder = [
+      'hero',
+      'categories',
+      'new_arrivals',
+      'brand_story',
+      'curated',
+      'trust_badges',
+      'instagram',
+    ];
+    if (Array.isArray(siteSettings?.homeSectionsOrder) && siteSettings.homeSectionsOrder.length > 0) {
+      const validKeys = new Set(defaultOrder);
+      const configured = siteSettings.homeSectionsOrder.filter((k) => validKeys.has(k));
+      const missing = defaultOrder.filter((k) => !configured.includes(k));
+      return [...configured, ...missing];
+    }
+    return defaultOrder;
+  }, [siteSettings?.homeSectionsOrder]);
+
+  const renderHeroCarousel = () => {
+    if (siteSettings?.showHeroCarousel === false) return null;
+
+    const bannerHeight = siteSettings?.heroBannerHeight as string | undefined;
+    const heightClass =
+      bannerHeight === 'compact'
+        ? 'h-[50vh] sm:h-[58vh] md:h-[64vh] min-h-[380px] max-h-[640px]'
+        : bannerHeight === 'fullscreen' || bannerHeight === 'full'
+        ? 'h-[85vh] sm:h-[90vh] md:h-[95vh] min-h-[520px] max-h-[960px]'
+        : 'h-[60vh] sm:h-[70vh] md:h-[76vh] min-h-[420px] max-h-[760px]';
+
+    return (
       <section
+        key="hero"
         aria-roledescription="carousel"
         aria-label="Featured Collections"
         onMouseEnter={() => setIsPaused(true)}
@@ -224,7 +252,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        className="relative w-full h-[70vh] sm:h-[80vh] md:h-[85vh] min-h-[460px] max-h-[880px] overflow-hidden bg-[#F3EFEA] select-none touch-pan-y"
+        className={`relative w-full ${heightClass} overflow-hidden bg-[#1E1B18] select-none touch-pan-y`}
       >
         {heroSlides.map((slide, index) => {
           const isActive = index === activeSlide;
@@ -260,7 +288,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                 className="w-full h-full"
                 style={{
                   filter: heroBlurPx > 0 ? `blur(${heroBlurPx}px)` : undefined,
-                  transform: heroBlurPx > 0 ? 'scale(1.05)' : undefined,
                 }}
               >
                 {slide.mobileImage ? (
@@ -271,10 +298,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                         alt={slide.alt}
                         priority={index === 0}
                         onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                        containerClassName="w-full h-full bg-[#F3EFEA]"
-                        className={`w-full h-full object-cover object-top transition-transform duration-1000 ease-out ${
-                          isActive ? 'scale-100' : 'scale-[1.03]'
-                        }`}
+                        containerClassName="w-full h-full bg-[#1E1B18]"
+                        className="w-full h-full object-cover object-top transform-gpu will-change-transform backface-hidden"
                       />
                     </div>
                     <div className="hidden md:block w-full h-full">
@@ -283,10 +308,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                         alt={slide.alt}
                         priority={index === 0}
                         onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                        containerClassName="w-full h-full bg-[#F3EFEA]"
-                        className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
-                          isActive ? 'scale-100' : 'scale-[1.03]'
-                        }`}
+                        containerClassName="w-full h-full bg-[#1E1B18]"
+                        className="w-full h-full object-cover object-center transform-gpu will-change-transform backface-hidden"
                       />
                     </div>
                   </>
@@ -296,10 +319,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                     alt={slide.alt}
                     priority={index === 0}
                     onLoad={() => setLoadedSlides((prev) => ({ ...prev, [slide.id]: true }))}
-                    containerClassName="w-full h-full bg-[#F3EFEA]"
-                    className={`w-full h-full object-cover object-top sm:object-center transition-transform duration-1000 ease-out ${
-                      isActive ? 'scale-100' : 'scale-[1.03]'
-                    }`}
+                    containerClassName="w-full h-full bg-[#1E1B18]"
+                    className="w-full h-full object-cover object-top sm:object-center transform-gpu will-change-transform backface-hidden"
                   />
                 )}
               </div>
@@ -421,11 +442,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 2. Shop By Category — Exact 4 Categories with Dynamic Product Thumbnails & Counts */}
-      {siteSettings?.showCategorySection !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderCategoriesSection = () => {
+    if (siteSettings?.showCategorySection === false) return null;
+    return (
+      <section key="categories" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14">
           <div>
             <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -450,17 +473,31 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-7">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-7">
           {CATEGORIES.map((category) => {
-            const categoryProducts = products.filter((p) => p.category === category.id);
+            const displayName =
+              siteSettings?.categoryNames?.[category.id] ||
+              siteSettings?.categoryNames?.[category.name] ||
+              (category.id === 'Kurta Set' ? (siteSettings?.categoryNames?.['3-Piece Dresses'] || 'Kurta Set') : category.name);
+            const categoryProducts = products.filter(
+              (p) =>
+                p.category === category.id ||
+                p.category === displayName ||
+                (category.id === 'Kurta Set' &&
+                  ((p.category as string) === '3-Piece Dresses' || (p.category as string) === '3-Piece Dress'))
+            );
             const defaultDynamicCover = categoryProducts[0]?.primaryImage || category.image;
             const customCover =
+              siteSettings?.categoryImages?.[displayName] ||
               siteSettings?.categoryImages?.[category.name] ||
               siteSettings?.categoryImages?.[category.id] ||
+              (category.id === 'Kurta Set' ? siteSettings?.categoryImages?.['3-Piece Dresses'] : undefined) ||
               defaultDynamicCover;
             const customTagline =
+              siteSettings?.categoryTaglines?.[displayName] ||
               siteSettings?.categoryTaglines?.[category.name] ||
               siteSettings?.categoryTaglines?.[category.id] ||
+              (category.id === 'Kurta Set' ? siteSettings?.categoryTaglines?.['3-Piece Dresses'] : undefined) ||
               category.tagline;
 
             return (
@@ -474,8 +511,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full bg-[#F3EFEA] overflow-hidden mb-3.5 sm:mb-4">
                   <EditorialImage
                     src={customCover}
-                    alt={`${category.name} — ${customTagline}`}
-                    fallbackLabel={category.name}
+                    alt={`${displayName} — ${customTagline}`}
+                    fallbackLabel={displayName}
                     containerClassName="w-full h-full"
                     className="w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
                   />
@@ -483,7 +520,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="font-serif text-xl sm:text-[26px] text-[#1E1B18] font-normal group-hover:text-[#6E5043] transition-colors">
-                    {category.name}
+                    {displayName}
                   </h3>
                   <span className="text-xs sm:text-sm tracking-[0.1em] text-[#7C736A] group-hover:text-[#1E1B18] transition-colors inline-flex items-center gap-1.5 font-light">
                     <span>Explore</span>
@@ -496,13 +533,64 @@ export const HomePage: React.FC<HomePageProps> = ({
               </button>
             );
           })}
+
+          {/* Dynamic Custom Categories configured from Admin Panel */}
+          {siteSettings?.customCategories &&
+            siteSettings.customCategories
+              .filter((c) => c && c.name && c.visible !== false)
+              .map((c) => {
+                const catProducts = products.filter(
+                  (p) => p.category === c.name || p.category === c.id
+                );
+                const coverImage =
+                  c.imageUrl ||
+                  catProducts[0]?.primaryImage ||
+                  '/images/hero_editorial_banner_1791119088652.jpg';
+                const tagline =
+                  c.tagline || 'Handcrafted luxury silhouettes tailored for celebration & everyday grace.';
+
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => onShopCollection(c.name as CollectionFilter)}
+                    className="group text-left flex flex-col cursor-pointer"
+                  >
+                    <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full bg-[#F3EFEA] overflow-hidden mb-3.5 sm:mb-4">
+                      <EditorialImage
+                        src={coverImage}
+                        alt={`${c.name} — ${tagline}`}
+                        fallbackLabel={c.name}
+                        containerClassName="w-full h-full"
+                        className="w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                      />
+                    </div>
+
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h3 className="font-serif text-xl sm:text-[26px] text-[#1E1B18] font-normal group-hover:text-[#6E5043] transition-colors">
+                        {c.name}
+                      </h3>
+                      <span className="text-xs sm:text-sm tracking-[0.1em] text-[#7C736A] group-hover:text-[#1E1B18] transition-colors inline-flex items-center gap-1.5 font-light">
+                        <span>Explore</span>
+                        <ArrowRight className="w-3.5 h-3.5 stroke-[1.4] transition-transform duration-300 group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                    <p className="hidden sm:block text-xs text-[#7C736A] mt-1 line-clamp-1 font-light">
+                      {tagline}
+                    </p>
+                  </button>
+                );
+              })}
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 3. New Arrivals (Dynamic Database Catalog) */}
-      {siteSettings?.showNewArrivals !== false && (
+  const renderNewArrivalsSection = () => {
+    if (siteSettings?.showNewArrivals === false) return null;
+    return (
       <section
+        key="new_arrivals"
         id="new-arrivals"
         className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 scroll-mt-24"
       >
@@ -577,11 +665,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 4. Brand Story — Generous Editorial Rest Section */}
-      {siteSettings?.showBrandStory !== false && (
-      <section id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
+  const renderBrandStorySection = () => {
+    if (siteSettings?.showBrandStory === false) return null;
+    return (
+      <section key="brand_story" id="brand-story" className="bg-[#F3EFEA] py-16 sm:py-24 lg:py-32">
         <div className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
@@ -634,11 +724,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 5. Curated Collection */}
-      {siteSettings?.showCuratedSection !== false && curatedProducts.length > 0 && (
-        <section id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderCuratedSection = () => {
+    if (siteSettings?.showCuratedSection === false || curatedProducts.length === 0) return null;
+    return (
+      <section key="curated" id="curated" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-14 px-0.5 sm:px-0">
             <div>
               <p className="text-[11px] tracking-[0.2em] uppercase text-[#7C736A] mb-2">
@@ -666,11 +758,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             ))}
           </div>
         </section>
-      )}
+      );
+    };
 
-      {/* 6. Instagram-Style Fashion Gallery */}
-      {siteSettings?.showInstagramSection !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+    const renderInstagramSection = () => {
+      if (siteSettings?.showInstagramSection === false) return null;
+      return (
+        <section key="instagram" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 sm:mb-12">
             <div>
@@ -711,11 +805,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
 
-      {/* 7. Heritage & Trust Badges (4 Pillars) */}
-      {siteSettings?.showTrustBadges !== false && (
-      <section className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+  const renderTrustBadgesSection = () => {
+    if (siteSettings?.showTrustBadges === false) return null;
+    return (
+      <section key="trust_badges" className="max-w-[1920px] mx-auto w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="border-t border-[#ECE6DD] pt-14 sm:pt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
           <div className="space-y-2">
             <Truck className="w-5 h-5 text-[#6E5043] stroke-[1.3]" />
@@ -758,7 +854,31 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      )}
+    );
+  };
+
+  return (
+    <div className="space-y-24 sm:space-y-36 pb-24 sm:pb-32">
+      {activeSectionsOrder.map((sectionKey) => {
+        switch (sectionKey) {
+          case 'hero':
+            return renderHeroCarousel();
+          case 'categories':
+            return renderCategoriesSection();
+          case 'new_arrivals':
+            return renderNewArrivalsSection();
+          case 'brand_story':
+            return renderBrandStorySection();
+          case 'curated':
+            return renderCuratedSection();
+          case 'trust_badges':
+            return renderTrustBadgesSection();
+          case 'instagram':
+            return renderInstagramSection();
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 };

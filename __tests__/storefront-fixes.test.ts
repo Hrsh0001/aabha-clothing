@@ -39,7 +39,7 @@ describe('Storefront Fixes: Categories, Email Diagnostics & Order Notifications'
     expect(CATEGORIES.length).toBe(4);
     const catNames = CATEGORIES.map((c) => c.name);
     expect(catNames).toContain('Anarkali');
-    expect(catNames).toContain('3-Piece Dresses');
+    expect(catNames).toContain('Kurta Set');
     expect(catNames).toContain('Co-ord Sets');
     expect(catNames).toContain('Chikankari Suit');
     CATEGORIES.forEach((cat) => {

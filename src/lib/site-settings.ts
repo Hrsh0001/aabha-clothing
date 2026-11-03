@@ -53,6 +53,15 @@ export interface CustomPageItem {
   updatedAt?: string;
 }
 
+export interface CustomCategoryItem {
+  id: string;
+  name: string;
+  tagline?: string;
+  imageUrl?: string;
+  visible?: boolean;
+  order?: number;
+}
+
 export interface SiteSettings {
   logoUrl: string;
   heroBanner: string;
@@ -95,8 +104,10 @@ export interface SiteSettings {
   categorySectionEyebrow?: string;
   categorySectionHeading?: string;
   categorySectionSubheading?: string;
+  categoryNames?: Record<string, string>;
   categoryTaglines?: Record<string, string>;
   categoryImages?: Record<string, string>;
+  customCategories?: CustomCategoryItem[];
 
   // 4. New Arrivals Section
   newArrivalsEyebrow?: string;
@@ -137,7 +148,8 @@ export interface SiteSettings {
   aboutFoundationalTitle?: string;
   aboutFoundationalBody?: string;
 
-  // Section Visibility / Add & Remove Flags
+  // Section Visibility / Add & Remove Flags & Sequence Order
+  homeSectionsOrder?: string[];
   showAnnouncementBar?: boolean;
   showHeroCarousel?: boolean;
   showCategorySection?: boolean;
@@ -296,13 +308,22 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   categorySectionEyebrow: 'THE LAUNCH SILHOUETTES',
   categorySectionHeading: 'Shop By Category',
   categorySectionSubheading: 'Fluid silhouettes tailored for effortless elegance',
+  categoryNames: {
+    Anarkali: 'Anarkali',
+    'Kurta Set': 'Kurta Set',
+    '3-Piece Dresses': 'Kurta Set',
+    'Co-ord Sets': 'Co-ord Sets',
+    'Chikankari Suit': 'Chikankari Suit',
+  },
   categoryTaglines: {
     Anarkali: 'Fluid kalidar silhouettes in Chanderi & silk',
+    'Kurta Set': 'Complete ensembles with mulmul dupatta',
     '3-Piece Dresses': 'Complete ensembles with mulmul dupatta',
     'Co-ord Sets': 'Tailored twin-sets for modern refinement',
     'Chikankari Suit': 'Intricate tone-on-tone artisanal needlework',
   },
   categoryImages: {},
+  customCategories: [],
 
   // 4. New Arrivals
   newArrivalsEyebrow: 'INAUGURAL RELEASE',
@@ -344,6 +365,15 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   aboutFoundationalBody: 'Instead of producing hundreds of fleeting styles each month, our curated edition consists of thoughtfully tailored garments across our foundational categories: Anarkalis, Three-Piece Dresses, Contemporary Co-ord Sets, and Authentic Chikankari.',
 
   // Section Visibility Defaults (all true by default)
+  homeSectionsOrder: [
+    'hero',
+    'categories',
+    'new_arrivals',
+    'brand_story',
+    'curated',
+    'trust_badges',
+    'instagram',
+  ],
   showAnnouncementBar: true,
   showHeroCarousel: true,
   showCategorySection: true,
@@ -416,7 +446,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     { id: 'nav-new-arrivals', label: 'New Arrivals', href: '/#new-arrivals', visible: true },
     { id: 'nav-shop', label: 'All Collection', href: '/shop', visible: true },
     { id: 'nav-anarkali', label: 'Anarkali', href: '/shop?category=Anarkali', visible: true },
-    { id: 'nav-3piece', label: '3-Piece Dresses', href: '/shop?category=3-Piece Dresses', visible: true },
+    { id: 'nav-3piece', label: 'Kurta Set', href: '/shop?category=Kurta Set', visible: true },
     { id: 'nav-coord', label: 'Co-ord Sets', href: '/shop?category=Co-ord Sets', visible: true },
     { id: 'nav-chikankari', label: 'Chikankari Suit', href: '/shop?category=Chikankari Suit', visible: true },
     { id: 'nav-about', label: 'About', href: '/about', visible: true },
@@ -433,7 +463,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
       links: [
         { id: 'fl-all', label: 'All Collection', href: '/shop', visible: true },
         { id: 'fl-anarkali', label: 'Anarkali', href: '/shop?category=Anarkali', visible: true },
-        { id: 'fl-3piece', label: '3-Piece Dresses', href: '/shop?category=3-Piece Dresses', visible: true },
+        { id: 'fl-3piece', label: 'Kurta Set', href: '/shop?category=Kurta Set', visible: true },
         { id: 'fl-coord', label: 'Co-ord Sets', href: '/shop?category=Co-ord Sets', visible: true },
         { id: 'fl-chikankari', label: 'Chikankari Suit', href: '/shop?category=Chikankari Suit', visible: true },
       ],

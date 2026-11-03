@@ -25,7 +25,7 @@ interface FooterProps {
 const FOOTER_CATEGORIES: CollectionFilter[] = [
   'All Collection',
   'Anarkali',
-  '3-Piece Dresses',
+  'Kurta Set',
   'Co-ord Sets',
   'Chikankari Suit',
 ];

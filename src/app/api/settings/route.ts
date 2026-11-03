@@ -28,7 +28,13 @@ export async function GET() {
           saveLocalSettings(merged);
           return NextResponse.json(
             { success: true, settings: merged },
-            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+            {
+              headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+            }
           );
         }
       } catch (dbErr) {
@@ -41,7 +47,13 @@ export async function GET() {
     const settings = readLocalSettings();
     return NextResponse.json(
       { success: true, settings },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
     );
   } catch {
     return NextResponse.json({ success: true, settings: DEFAULT_SETTINGS });
@@ -101,6 +113,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // Persist any uploaded custom categories cover photos
+    const customCategories: any[] = [];
+    if (Array.isArray(rawUpdated.customCategories)) {
+      for (const item of rawUpdated.customCategories) {
+        if (item && typeof item === 'object') {
+          const img = item.imageUrl ? (await persistImageUrlForCloud(item.imageUrl)) || item.imageUrl : '';
+          customCategories.push({
+            ...item,
+            imageUrl: img,
+          });
+        }
+      }
+    }
+
     const updated: SiteSettings = {
       ...DEFAULT_SETTINGS,
       ...rawUpdated,
@@ -153,6 +179,8 @@ export async function POST(request: Request) {
       igPhotos: igPhotos.length > 0 ? igPhotos : DEFAULT_SETTINGS.igPhotos,
       categoryImages:
         Object.keys(categoryImages).length > 0 ? categoryImages : (rawUpdated.categoryImages || {}),
+      customCategories:
+        customCategories.length > 0 ? customCategories : (rawUpdated.customCategories || []),
     };
 
     if ((process.env.NODE_ENV as string) !== 'test' && prisma) {

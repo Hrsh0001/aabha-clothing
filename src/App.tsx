@@ -97,17 +97,36 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const path = typeof window !== 'undefined' ? window.location.pathname : '/';
 
-      if (params.get('checkout') === '1' || path === '/checkout') {
+      let initialPage: ActivePage = 'home';
+      let initialProductId = '';
+      let initialCategory: CollectionFilter = 'All Collection';
+      let initialSlug = 'our-craft';
+      let initialTopic: PolicyTopic = 'shipping';
+
+      const prodParam = params.get('product') || params.get('productId');
+      if (prodParam) {
+        initialPage = 'product';
+        initialProductId = prodParam;
+        setSelectedProductId(prodParam);
+        setActivePage('product');
+      } else if (params.get('checkout') === '1' || path === '/checkout') {
+        initialPage = 'checkout';
         setActivePage('checkout');
       } else {
         const pageParam = params.get('page');
         if (pageParam === 'custom') {
+          initialPage = 'custom';
           setActivePage('custom');
           const slugParam = params.get('slug');
-          if (slugParam) setCustomPageSlug(slugParam);
+          if (slugParam) {
+            initialSlug = slugParam;
+            setCustomPageSlug(slugParam);
+          }
         } else if (path.startsWith('/pages/') || path.startsWith('/page/')) {
           const match = path.match(/\/pages?\/([^?#/]+)/);
           if (match) {
+            initialPage = 'custom';
+            initialSlug = match[1];
             setActivePage('custom');
             setCustomPageSlug(match[1]);
           }
@@ -117,37 +136,86 @@ export default function App() {
           pageParam === 'policy' ||
           pageParam === 'shop'
         ) {
+          initialPage = pageParam;
           setActivePage(pageParam);
         } else if (path === '/shop') {
+          initialPage = 'shop';
           setActivePage('shop');
         } else if (path === '/about') {
+          initialPage = 'about';
           setActivePage('about');
         } else if (path === '/contact') {
+          initialPage = 'contact';
           setActivePage('contact');
         } else if (path === '/policy') {
+          initialPage = 'policy';
           setActivePage('policy');
         }
       }
 
       const catParam = params.get('category');
       if (catParam) {
-        setSelectedCategory(decodeURIComponent(catParam) as CollectionFilter);
-        setActivePage('shop');
+        const decodedCat = decodeURIComponent(catParam) as CollectionFilter;
+        initialCategory = decodedCat;
+        setSelectedCategory(decodedCat);
+        if (!prodParam) {
+          initialPage = 'shop';
+          setActivePage('shop');
+        }
       }
 
       const topicParam = params.get('topic');
       if (topicParam) {
+        initialTopic = topicParam as PolicyTopic;
         setPolicyTopic(topicParam as PolicyTopic);
-        setActivePage('policy');
+        if (!prodParam) {
+          initialPage = 'policy';
+          setActivePage('policy');
+        }
       }
 
-      // Smooth scroll if URL has a hash anchor on load
-      if (typeof window !== 'undefined' && window.location.hash) {
-        const targetId = window.location.hash.replace('#', '');
-        setTimeout(() => {
-          const el = document.getElementById(targetId);
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }, 150);
+      // Initialize browser history entry so mobile hardware/swipe Back button works reliably
+      if (typeof window !== 'undefined') {
+        if (!window.history.state || !window.history.state.page) {
+          window.history.replaceState(
+            {
+              page: initialPage,
+              productId: initialProductId,
+              category: initialCategory,
+              customPageSlug: initialSlug,
+              topic: initialTopic,
+            },
+            ''
+          );
+        }
+
+        // Smooth scroll if URL has a hash anchor on load
+        if (window.location.hash) {
+          const targetId = window.location.hash.replace('#', '');
+          setTimeout(() => {
+            const el = document.getElementById(targetId);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 150);
+        }
+
+        const handlePopState = (event: PopStateEvent) => {
+          const state = event.state;
+          if (state && state.page) {
+            setActivePage(state.page);
+            if (state.productId !== undefined) setSelectedProductId(state.productId);
+            if (state.category !== undefined) setSelectedCategory(state.category);
+            if (state.customPageSlug !== undefined) setCustomPageSlug(state.customPageSlug);
+            if (state.topic !== undefined) setPolicyTopic(state.topic);
+          } else {
+            // Reverted back to the root entry point: return to homepage
+            setActivePage('home');
+            setSelectedProductId('');
+          }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
       }
     } catch {
       // ignore
@@ -201,34 +269,53 @@ export default function App() {
       preloadImg.src = bannerToPreload;
     }
 
-    // 3. Background revalidation from database API (non-blocking)
-    fetch('/api/products')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
-          try {
-            localStorage.setItem('aabha_products_cache_v2', JSON.stringify(data.products));
-            sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products));
-          } catch {}
-        }
-      })
-      .catch((err) => {
-        console.warn('Live products sync notice:', err);
-      });
+    // 3. Background revalidation from database API (non-blocking, always fresh)
+    const refreshLiveCatalog = () => {
+      fetch('/api/products?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products);
+            try {
+              localStorage.setItem('aabha_products_cache_v2', JSON.stringify(data.products));
+              sessionStorage.setItem('aabha_products_cache', JSON.stringify(data.products));
+            } catch {}
+          }
+        })
+        .catch((err) => {
+          console.warn('Live products sync notice:', err);
+        });
 
-    fetch('/api/settings')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.settings) {
-          setSiteSettings(data.settings);
-          try {
-            localStorage.setItem('aabha_settings_cache_v2', JSON.stringify(data.settings));
-            sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings));
-          } catch {}
-        }
-      })
-      .catch((err) => console.warn('Live settings sync notice:', err));
+      fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.settings) {
+            setSiteSettings(data.settings);
+            try {
+              localStorage.setItem('aabha_settings_cache_v2', JSON.stringify(data.settings));
+              sessionStorage.setItem('aabha_settings_cache', JSON.stringify(data.settings));
+            } catch {}
+          }
+        })
+        .catch((err) => console.warn('Live settings sync notice:', err));
+    };
+
+    refreshLiveCatalog();
+
+    // Listen for live updates dispatched by admin panel (products or settings saved)
+    const handleLiveUpdate = () => {
+      refreshLiveCatalog();
+    };
+
+    window.addEventListener('aabha:products_updated', handleLiveUpdate);
+    window.addEventListener('aabha:settings_updated', handleLiveUpdate);
+    window.addEventListener('storage', handleLiveUpdate);
+
+    return () => {
+      window.removeEventListener('aabha:products_updated', handleLiveUpdate);
+      window.removeEventListener('aabha:settings_updated', handleLiveUpdate);
+      window.removeEventListener('storage', handleLiveUpdate);
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -242,40 +329,78 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigateHome = () => {
+  const pushNavState = (
+    page: ActivePage,
+    opts?: { productId?: string; category?: CollectionFilter; customPageSlug?: string; topic?: PolicyTopic }
+  ) => {
+    if (typeof window === 'undefined') return;
+    let url = '/';
+    if (page === 'product' && (opts?.productId || selectedProductId)) {
+      const pid = opts?.productId || selectedProductId;
+      url = `?product=${encodeURIComponent(pid)}`;
+    } else if (page === 'shop') {
+      const cat = opts?.category !== undefined ? opts.category : selectedCategory;
+      url = cat && cat !== 'All Collection' ? `/shop?category=${encodeURIComponent(cat)}` : '/shop';
+    } else if (page === 'custom' && (opts?.customPageSlug || customPageSlug)) {
+      url = `/pages/${opts?.customPageSlug || customPageSlug}`;
+    } else if (page === 'policy') {
+      url = opts?.topic ? `/policy?topic=${opts.topic}` : '/policy';
+    } else if (page !== 'home') {
+      url = `/${page}`;
+    }
+
+    const state = {
+      page,
+      productId: opts?.productId || '',
+      category: opts?.category || 'All Collection',
+      customPageSlug: opts?.customPageSlug || '',
+      topic: opts?.topic || 'shipping',
+    };
+
+    window.history.pushState(state, '', url);
+  };
+
+  const handleNavigateHome = (push = true) => {
+    setSelectedProductId('');
     setActivePage('home');
     scrollToTop();
+    if (push) pushNavState('home');
   };
 
   const handleNavigateNewArrivals = () => {
     if (activePage !== 'home') {
-      setActivePage('home');
+      handleNavigateHome(true);
       setTimeout(() => {
         const el = document.getElementById('new-arrivals');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }, 80);
+      }, 120);
     } else {
       const el = document.getElementById('new-arrivals');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleNavigateShopCategory = (category: CollectionFilter = 'All Collection') => {
+  const handleNavigateShopCategory = (category: CollectionFilter = 'All Collection', push = true) => {
+    setSelectedProductId('');
     setSelectedCategory(category);
     setActivePage('shop');
     scrollToTop();
+    if (push) pushNavState('shop', { category });
   };
 
-  const handleNavigateCustomPage = (slug: string) => {
+  const handleNavigateCustomPage = (slug: string, push = true) => {
+    setSelectedProductId('');
     setCustomPageSlug(slug);
     setActivePage('custom');
     scrollToTop();
+    if (push) pushNavState('custom', { customPageSlug: slug });
   };
 
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: Product, push = true) => {
     setSelectedProductId(product.id);
     setActivePage('product');
     scrollToTop();
+    if (push) pushNavState('product', { productId: product.id });
   };
 
   const handleToggleWishlist = (productId: string, e: React.MouseEvent) => {
@@ -462,16 +587,20 @@ export default function App() {
         wishlistCount={wishlistIds.length}
         cartCount={totalCartCount}
         products={products}
-        onNavigateHome={handleNavigateHome}
+        onNavigateHome={() => handleNavigateHome(true)}
         onNavigateNewArrivals={handleNavigateNewArrivals}
-        onNavigateShopCategory={handleNavigateShopCategory}
+        onNavigateShopCategory={(cat) => handleNavigateShopCategory(cat, true)}
         onNavigateAbout={() => {
+          setSelectedProductId('');
           setActivePage('about');
           scrollToTop();
+          pushNavState('about');
         }}
         onNavigateContact={() => {
+          setSelectedProductId('');
           setActivePage('contact');
           scrollToTop();
+          pushNavState('contact');
         }}
         onOpenSearch={() => setSearchModalOpen(true)}
         onOpenWishlist={() => setWishlistDrawerOpen(true)}
@@ -484,11 +613,13 @@ export default function App() {
         navLinks={siteSettings?.navLinks}
         siteSettings={siteSettings}
         onNavigatePolicy={(topic) => {
+          setSelectedProductId('');
           setPolicyTopic(topic);
           setActivePage('policy');
           scrollToTop();
+          pushNavState('policy', { topic });
         }}
-        onNavigateCustomPage={handleNavigateCustomPage}
+        onNavigateCustomPage={(slug) => handleNavigateCustomPage(slug, true)}
       />
 
       {/* Main Content View Router with Subtle Editorial Fade-In Transition */}
@@ -511,8 +642,10 @@ export default function App() {
               onToggleWishlist={handleToggleWishlist}
               onQuickAdd={handleQuickAdd}
               onNavigateAbout={() => {
+                setSelectedProductId('');
                 setActivePage('about');
                 scrollToTop();
+                pushNavState('about');
               }}
             />
           )}
@@ -536,8 +669,11 @@ export default function App() {
               allProducts={products}
               wishlistIds={wishlistIds}
               onBackToShop={() => {
-                setActivePage('shop');
-                scrollToTop();
+                if (typeof window !== 'undefined' && window.history.state?.page) {
+                  window.history.back();
+                } else {
+                  handleNavigateShopCategory('All Collection', true);
+                }
               }}
               onSelectCategory={(cat) => handleNavigateShopCategory(cat)}
               onSelectProduct={handleSelectProduct}
@@ -603,20 +739,26 @@ export default function App() {
 
       {/* Premium Footer */}
       <Footer
-        onNavigateHome={handleNavigateHome}
-        onNavigateCategory={handleNavigateShopCategory}
+        onNavigateHome={() => handleNavigateHome(true)}
+        onNavigateCategory={(cat) => handleNavigateShopCategory(cat, true)}
         onNavigateAbout={() => {
+          setSelectedProductId('');
           setActivePage('about');
           scrollToTop();
+          pushNavState('about');
         }}
         onNavigateContact={() => {
+          setSelectedProductId('');
           setActivePage('contact');
           scrollToTop();
+          pushNavState('contact');
         }}
         onNavigatePolicy={(topic) => {
+          setSelectedProductId('');
           setPolicyTopic(topic);
           setActivePage('policy');
           scrollToTop();
+          pushNavState('policy', { topic });
         }}
         logoUrl={siteSettings?.logoUrl}
         siteSettings={siteSettings}

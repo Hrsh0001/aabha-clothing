@@ -3,8 +3,8 @@
     "id": "prod_1792656986359_zw2f",
     "sku": "AB-ANA-148",
     "name": "Dusty Pink Kurta Pant Set with Dupatta",
-    "subtitle": "Pure Handloom Chanderi Silk 3-Piece Dresses silhouette",
-    "category": "3-Piece Dresses",
+    "subtitle": "Pure Handloom Chanderi Silk Kurta Set silhouette",
+    "category": "Kurta Set",
     "price": 1399,
     "originalPrice": 1799,
     "colorName": "Pure Handloom",
@@ -24,16 +24,20 @@
         "quantity": 15
       },
       "L": {
-        "inStock": true,
-        "quantity": 10
+        "inStock": false,
+        "quantity": 0
       },
       "XL": {
         "inStock": true,
-        "quantity": 10
+        "quantity": 1
       },
       "XXL": {
         "inStock": true,
-        "quantity": 10
+        "quantity": 1
+      },
+      "S": {
+        "inStock": false,
+        "quantity": 0
       }
     },
     "fabric": "Pure Handloom Chanderi Silk",
@@ -44,13 +48,14 @@
       "M",
       "L",
       "XL",
-      "XXL"
+      "XXL",
+      "S"
     ],
-    "primaryImage": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
+    "primaryImage": "/api/images/garment_Artboard_19_1793189605211.jpg",
     "secondaryImage": "/api/images/garment_Lilac_dupatta_with_gold_bands-4_1792656780913.webp",
     "gallery": [
       {
-        "url": "/api/images/garment_Lilac_Dupatta_with_Gold_Jacquard_1792656773006.webp",
+        "url": "/api/images/garment_Artboard_19_1793189605211.jpg",
         "label": "Full Studio Silhouette",
         "focalClass": "object-center"
       },

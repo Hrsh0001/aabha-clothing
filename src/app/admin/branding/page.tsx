@@ -50,6 +50,7 @@ import {
   FooterLinkItem,
   FooterColumn,
   CustomPageItem,
+  CustomCategoryItem,
   DEFAULT_NAV_LINKS,
   DEFAULT_FOOTER_COLUMNS,
   DEFAULT_CUSTOM_PAGES,
@@ -74,6 +75,7 @@ const DESTINATION_PRESETS = [
   { label: 'New Arrivals Edit (/#new-arrivals)', value: '/#new-arrivals' },
   { label: 'All Collection Catalog (/shop)', value: '/shop' },
   { label: 'Anarkali Suits (/shop?category=Anarkali)', value: '/shop?category=Anarkali' },
+  { label: 'Kurta Set (/shop?category=Kurta Set)', value: '/shop?category=Kurta Set' },
   { label: '3-Piece Ensembles (/shop?category=3-Piece Dresses)', value: '/shop?category=3-Piece Dresses' },
   { label: 'Co-ord Twin Sets (/shop?category=Co-ord Sets)', value: '/shop?category=Co-ord Sets' },
   { label: 'Chikankari Handloom (/shop?category=Chikankari Suit)', value: '/shop?category=Chikankari Suit' },
@@ -290,6 +292,15 @@ export default function AdminBrandingPage() {
               [catKey]: data.imageUrl,
             },
           };
+        } else if (fieldKey.startsWith('customCatImage_')) {
+          const catId = fieldKey.replace('customCatImage_', '');
+          const nextCustom = (settings.customCategories || []).map((c) =>
+            c.id === catId ? { ...c, imageUrl: data.imageUrl } : c
+          );
+          nextSettings = {
+            ...settings,
+            customCategories: nextCustom,
+          };
         } else {
           nextSettings = { ...settings, [fieldKey]: data.imageUrl };
         }
@@ -343,6 +354,16 @@ export default function AdminBrandingPage() {
         }
       }
 
+      const compressedCustomCats: CustomCategoryItem[] = [];
+      if (settings.customCategories && Array.isArray(settings.customCategories)) {
+        for (const c of settings.customCategories) {
+          compressedCustomCats.push({
+            ...c,
+            imageUrl: c.imageUrl ? await compressDataUrlIfNeeded(c.imageUrl) : '',
+          });
+        }
+      }
+
       const payload: SiteSettings = {
         ...settings,
         logoUrl: await compressDataUrlIfNeeded(settings.logoUrl),
@@ -361,6 +382,7 @@ export default function AdminBrandingPage() {
         brandStory: await compressDataUrlIfNeeded(settings.brandStory),
         igPhotos: compressedIg,
         categoryImages: compressedCategoryImages,
+        customCategories: compressedCustomCats,
       };
 
       const payloadCheck = validateJsonPayloadSize(payload);
@@ -383,6 +405,11 @@ export default function AdminBrandingPage() {
       if (data.success) {
         setSettings(payload);
         setFieldUploadErrors({});
+        try {
+          localStorage.removeItem('aabha_settings_cache_v2');
+          sessionStorage.removeItem('aabha_settings_cache');
+          window.dispatchEvent(new CustomEvent('aabha:settings_updated'));
+        } catch {}
         showToast('All storefront sections & branding saved successfully!');
       } else {
         const msg = data.error || 'Failed to save settings';
@@ -397,6 +424,17 @@ export default function AdminBrandingPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateCategoryName = (categoryKey: string, value: string) => {
+    if (!settings) return;
+    setSettings({
+      ...settings,
+      categoryNames: {
+        ...(settings.categoryNames || {}),
+        [categoryKey]: value,
+      },
+    });
   };
 
   const updateCategoryTagline = (categoryKey: string, value: string) => {
@@ -418,6 +456,103 @@ export default function AdminBrandingPage() {
       ...settings,
       categoryImages: nextImages,
     });
+  };
+
+  const handleAddCustomCategory = () => {
+    if (!settings) return;
+    const existing = settings.customCategories || [];
+    const newIdx = existing.length + 5;
+    const newCat: CustomCategoryItem = {
+      id: `custom_cat_${Date.now()}`,
+      name: `Category ${newIdx}`,
+      tagline: 'Handcrafted silhouettes with effortless refinement',
+      imageUrl: '',
+      visible: true,
+      order: newIdx,
+    };
+    setSettings({
+      ...settings,
+      customCategories: [...existing, newCat],
+    });
+    showToast(`Added Category #${newIdx}. Click "Save All Changes" to publish.`);
+  };
+
+  const handleUpdateCustomCategory = (id: string, updates: Partial<CustomCategoryItem>) => {
+    if (!settings) return;
+    const updated = (settings.customCategories || []).map((c) =>
+      c.id === id ? { ...c, ...updates } : c
+    );
+    setSettings({
+      ...settings,
+      customCategories: updated,
+    });
+  };
+
+  const handleRemoveCustomCategory = (id: string) => {
+    if (!settings) return;
+    const updated = (settings.customCategories || []).filter((c) => c.id !== id);
+    setSettings({
+      ...settings,
+      customCategories: updated,
+    });
+    showToast('Custom category removed. Click "Save All Changes" to commit.');
+  };
+
+  const handleToggleCustomCategory = (id: string) => {
+    if (!settings) return;
+    const updated = (settings.customCategories || []).map((c) =>
+      c.id === id ? { ...c, visible: c.visible === false ? true : false } : c
+    );
+    setSettings({
+      ...settings,
+      customCategories: updated,
+    });
+  };
+
+  const handleAddCustomCategoryToNavbar = (categoryName: string) => {
+    if (!settings) return;
+    const links = [...(settings.navLinks || DEFAULT_NAV_LINKS)];
+    const targetHref = `/shop?category=${encodeURIComponent(categoryName)}`;
+    if (links.some((l) => l.href === targetHref)) {
+      showToast(`"${categoryName}" is already in the navigation menu.`);
+      return;
+    }
+    const newItem: NavLinkItem = {
+      id: `nav_cat_${Date.now()}`,
+      label: categoryName,
+      href: targetHref,
+      visible: true,
+    };
+    setSettings({ ...settings, navLinks: [...links, newItem] });
+    showToast(`Added "${categoryName}" to Header Navigation!`);
+  };
+
+  const handleAddCustomCategoryToFooter = (categoryName: string) => {
+    if (!settings) return;
+    const cols = [...(settings.footerColumns || DEFAULT_FOOTER_COLUMNS)];
+    const targetHref = `/shop?category=${encodeURIComponent(categoryName)}`;
+    const silIdx = cols.findIndex((c) => c.id === 'col-silhouettes');
+    const targetIdx = silIdx >= 0 ? silIdx : 0;
+    if (cols[targetIdx]) {
+      if (cols[targetIdx].links.some((l) => l.href === targetHref)) {
+        showToast(`"${categoryName}" is already in the footer silhouettes column.`);
+        return;
+      }
+      cols[targetIdx] = {
+        ...cols[targetIdx],
+        links: [
+          ...cols[targetIdx].links,
+          {
+            id: `fl_cat_${Date.now()}`,
+            label: categoryName,
+            href: targetHref,
+            visible: true,
+          },
+        ],
+      };
+      setSettings({ ...settings, footerColumns: cols });
+      showToast(`Added "${categoryName}" to Footer Silhouettes!`);
+    }
   };
 
   const toggleSection = (flag: keyof SiteSettings) => {
@@ -1870,7 +2005,8 @@ export default function AdminBrandingPage() {
                           >
                             <option value="All Collection">All Collection</option>
                             <option value="Anarkali">Anarkali</option>
-                            <option value="3-Piece Dresses">3-Piece Dresses</option>
+                            <option value="Kurta Set">Kurta Set</option>
+                            <option value="3-Piece Dresses">3-Piece Dresses (Legacy)</option>
                             <option value="Co-ord Sets">Co-ord Sets</option>
                             <option value="Chikankari Suit">Chikankari Suit</option>
                           </select>
@@ -1982,7 +2118,8 @@ export default function AdminBrandingPage() {
                           >
                             <option value="All Collection">All Collection</option>
                             <option value="Anarkali">Anarkali</option>
-                            <option value="3-Piece Dresses">3-Piece Dresses</option>
+                            <option value="Kurta Set">Kurta Set</option>
+                            <option value="3-Piece Dresses">3-Piece Dresses (Legacy)</option>
                             <option value="Co-ord Sets">Co-ord Sets</option>
                             <option value="Chikankari Suit">Chikankari Suit</option>
                           </select>
@@ -2094,7 +2231,8 @@ export default function AdminBrandingPage() {
                           >
                             <option value="All Collection">All Collection</option>
                             <option value="Anarkali">Anarkali</option>
-                            <option value="3-Piece Dresses">3-Piece Dresses</option>
+                            <option value="Kurta Set">Kurta Set</option>
+                            <option value="3-Piece Dresses">3-Piece Dresses (Legacy)</option>
                             <option value="Co-ord Sets">Co-ord Sets</option>
                             <option value="Chikankari Suit">Chikankari Suit</option>
                           </select>
@@ -2160,86 +2298,269 @@ export default function AdminBrandingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {CATEGORIES.map((category) => {
-                        const customImage =
-                          settings.categoryImages?.[category.name] ||
-                          settings.categoryImages?.[category.id];
-                        const customTagline =
-                          settings.categoryTaglines?.[category.name] ||
-                          settings.categoryTaglines?.[category.id] ||
-                          category.tagline;
-                        const uploadKey = `categoryImage_${category.id}`;
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-[#1E1B18] uppercase tracking-wider">
+                          Built-In Foundational Silhouettes
+                        </span>
+                        <span className="text-[11px] text-[#7C736A]">
+                          Edit display titles, taglines, and cover photos
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {CATEGORIES.map((category) => {
+                          const customName =
+                            settings.categoryNames?.[category.id] ||
+                            settings.categoryNames?.[category.name] ||
+                            category.name;
+                          const customImage =
+                            settings.categoryImages?.[category.name] ||
+                            settings.categoryImages?.[category.id];
+                          const customTagline =
+                            settings.categoryTaglines?.[category.name] ||
+                            settings.categoryTaglines?.[category.id] ||
+                            category.tagline;
+                          const uploadKey = `categoryImage_${category.id}`;
 
-                        return (
-                          <div
-                            key={category.id}
-                            className="bg-[#FAF8F5] border border-[#E0D8CE] p-3.5 space-y-3"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-[#1E1B18]">
-                                {category.name}
-                              </span>
-                              <span className="text-[10px] text-[#7C736A] font-mono">
-                                {category.index}
-                              </span>
-                            </div>
+                          return (
+                            <div
+                              key={category.id}
+                              className="bg-[#FAF8F5] border border-[#E0D8CE] p-3.5 space-y-3"
+                            >
+                              <div className="flex items-center justify-between pb-1 border-b border-[#ECE6DD]">
+                                <span className="text-[11px] font-semibold text-[#1E1B18]">
+                                  {category.index} · Silhouette
+                                </span>
+                                <span className="text-[10px] text-[#7C736A] font-mono">
+                                  ID: {category.id}
+                                </span>
+                              </div>
 
-                            <div className="aspect-[4/3] bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
-                              {customImage ? (
-                                <img
-                                  src={customImage}
-                                  alt={category.name}
-                                  className="w-full h-full object-cover"
+                              <div>
+                                <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-semibold">
+                                  Category Title / Name:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customName}
+                                  onChange={(e) => updateCategoryName(category.id, e.target.value)}
+                                  className="w-full bg-white border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] font-medium focus:outline-none focus:border-[#1E1B18]"
+                                  placeholder={category.name}
                                 />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-[#F3EFEA]">
-                                  <span className="text-xs font-serif text-[#1E1B18] font-medium">
-                                    {category.name}
-                                  </span>
-                                  <span className="text-[10px] text-[#7C736A] mt-1">
-                                    Default product cover
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                              </div>
 
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => triggerFileUpload(uploadKey)}
-                                disabled={uploadingKey === uploadKey}
-                                className="flex-1 py-1.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[11px] font-medium text-[#1E1B18] hover:bg-[#ECE6DD] transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                              >
-                                <Upload className="w-3 h-3" />
-                                {uploadingKey === uploadKey ? 'Uploading...' : 'Custom Photo'}
-                              </button>
-                              {customImage && (
+                              <div className="aspect-[4/3] bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                                {customImage ? (
+                                  <img
+                                    src={customImage}
+                                    alt={customName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-[#F3EFEA]">
+                                    <span className="text-xs font-serif text-[#1E1B18] font-medium">
+                                      {customName}
+                                    </span>
+                                    <span className="text-[10px] text-[#7C736A] mt-1">
+                                      Default product cover
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => removeCategoryImage(category.id)}
-                                  className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
-                                  title="Reset to default product photo"
+                                  onClick={() => triggerFileUpload(uploadKey)}
+                                  disabled={uploadingKey === uploadKey}
+                                  className="flex-1 py-1.5 bg-[#FAF8F5] border border-[#E0D8CE] text-[11px] font-medium text-[#1E1B18] hover:bg-[#ECE6DD] transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                 >
-                                  Reset
+                                  <Upload className="w-3 h-3" />
+                                  {uploadingKey === uploadKey ? 'Uploading...' : 'Custom Photo'}
                                 </button>
-                              )}
-                            </div>
+                                {customImage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCategoryImage(category.id)}
+                                    className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
+                                    title="Reset to default product photo"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
 
-                            <div>
-                              <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
-                                Category Tagline:
-                              </label>
-                              <input
-                                type="text"
-                                value={customTagline}
-                                onChange={(e) => updateCategoryTagline(category.id, e.target.value)}
-                                className="w-full bg-white border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
-                              />
+                              <div>
+                                <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
+                                  Category Tagline:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customTagline}
+                                  onChange={(e) => updateCategoryTagline(category.id, e.target.value)}
+                                  className="w-full bg-white border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none"
+                                />
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Additional & Custom Categories Section */}
+                    <div className="mt-8 pt-6 border-t border-[#E0D8CE] space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#1E1B18]">
+                            Additional & Custom Categories
+                          </h4>
+                          <p className="text-xs text-[#7C736A]">
+                            Add new categories (e.g. Sarees, Lehengas, Festive Edits) to display across the homepage, shop filter tabs, and admin product editors.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddCustomCategory}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#231F1D] text-[#FAF8F5] text-xs font-medium uppercase tracking-wider hover:bg-[#14110E] transition-colors cursor-pointer self-start sm:self-auto"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span>+ Add Custom Category</span>
+                        </button>
+                      </div>
+
+                      {(!settings.customCategories || settings.customCategories.length === 0) ? (
+                        <div className="p-6 text-center border border-dashed border-[#D5CCC2] bg-[#FAF8F5]">
+                          <p className="text-xs text-[#7C736A] font-light">
+                            No custom categories added yet. Click &quot;+ Add Custom Category&quot; above to create Category #5 or beyond.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {settings.customCategories.map((c, idx) => {
+                            const uploadKey = `customCatImage_${c.id}`;
+                            return (
+                              <div
+                                key={c.id}
+                                className="bg-[#FAF8F5] border border-[#E0D8CE] p-4 space-y-3 relative group"
+                              >
+                                <div className="flex items-center justify-between pb-1 border-b border-[#ECE6DD]">
+                                  <span className="text-[11px] font-semibold text-[#1E1B18]">
+                                    Custom #{idx + 5} · {c.name || 'Untitled Category'}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleCustomCategory(c.id)}
+                                      className={`p-1 text-[10px] border cursor-pointer ${
+                                        c.visible !== false
+                                          ? 'text-[#2E7D32] border-[#C8E6C9] bg-[#E8F5E9]'
+                                          : 'text-[#7C736A] border-[#E0D8CE] bg-white'
+                                      }`}
+                                      title={c.visible !== false ? 'Category is visible on store' : 'Category is hidden'}
+                                    >
+                                      {c.visible !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCustomCategory(c.id)}
+                                      className="p-1 text-[#C62828] border border-[#FFCDD2] bg-[#FFF5F5] hover:bg-[#FFEBEE] cursor-pointer"
+                                      title="Delete this custom category"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1 font-semibold">
+                                    Category Title / Name:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={c.name}
+                                    onChange={(e) => handleUpdateCustomCategory(c.id, { name: e.target.value })}
+                                    placeholder="e.g. Sarees, Kurta Sets"
+                                    className="w-full bg-white border border-[#E0D8CE] px-2.5 py-1.5 text-xs text-[#1E1B18] font-medium focus:outline-none focus:border-[#1E1B18]"
+                                  />
+                                </div>
+
+                                <div className="aspect-[4/3] bg-[#ECE6DD] overflow-hidden border border-[#E0D8CE]">
+                                  {c.imageUrl ? (
+                                    <img
+                                      src={c.imageUrl}
+                                      alt={c.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-[#F3EFEA]">
+                                      <span className="text-xs font-serif text-[#1E1B18] font-medium">
+                                        {c.name || 'Category'}
+                                      </span>
+                                      <span className="text-[10px] text-[#7C736A] mt-1">
+                                        No cover photo uploaded
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => triggerFileUpload(uploadKey)}
+                                    disabled={uploadingKey === uploadKey}
+                                    className="flex-1 py-1.5 bg-white border border-[#E0D8CE] text-[11px] font-medium text-[#1E1B18] hover:bg-[#ECE6DD] transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                    {uploadingKey === uploadKey ? 'Uploading...' : 'Upload Cover Photo'}
+                                  </button>
+                                  {c.imageUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateCustomCategory(c.id, { imageUrl: '' })}
+                                      className="px-2 py-1.5 border border-[#E0D8CE] text-[#C62828] text-[11px] hover:bg-[#FFEBEE] cursor-pointer"
+                                      title="Remove cover photo"
+                                    >
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] uppercase tracking-wider text-[#7C736A] mb-1">
+                                    Category Tagline:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={c.tagline || ''}
+                                    onChange={(e) => handleUpdateCustomCategory(c.id, { tagline: e.target.value })}
+                                    placeholder="Short editorial description"
+                                    className="w-full bg-white border border-[#E0D8CE] px-2.5 py-1 text-xs text-[#1E1B18] focus:outline-none focus:border-[#1E1B18]"
+                                  />
+                                </div>
+
+                                <div className="pt-2 border-t border-[#ECE6DD] flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddCustomCategoryToNavbar(c.name)}
+                                    className="flex-1 py-1 px-1.5 bg-[#FAF8F5] border border-[#E0D8CE] hover:border-[#1E1B18] text-[10px] font-medium text-[#1E1B18] text-center cursor-pointer transition-colors"
+                                    title="Add link to header navigation bar"
+                                  >
+                                    + Add to Header Nav
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddCustomCategoryToFooter(c.name)}
+                                    className="flex-1 py-1 px-1.5 bg-[#FAF8F5] border border-[#E0D8CE] hover:border-[#1E1B18] text-[10px] font-medium text-[#1E1B18] text-center cursor-pointer transition-colors"
+                                    title="Add link to footer silhouettes column"
+                                  >
+                                    + Add to Footer
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -77,7 +77,7 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
   // Fetch live products and settings from API
   useEffect(() => {
     setLoading(true);
-    fetch('/api/products')
+    fetch('/api/products?t=' + Date.now(), { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.products)) {
@@ -97,7 +97,7 @@ export default function DynamicProductPage({ params }: DynamicProductPageProps) 
         setLoading(false);
       });
 
-    fetch('/api/settings')
+    fetch('/api/settings?t=' + Date.now(), { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.settings) setSiteSettings(data.settings);
